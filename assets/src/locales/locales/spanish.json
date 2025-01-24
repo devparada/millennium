@@ -9,7 +9,7 @@
     "themePanelInjectJavascript": "Inyectar JavaScript",
     "themePanelInjectJavascriptToolTip": "Decidir que temas tienen permiso para insertar JavaScript en Steam. Deshabilitar JavaScript puede romper la interfaz de Steam como consecuencia (requiere reiniciar)",
     "themePanelInjectCSS": "Inyectar StyleSheets",
-    "themePanelInjectCSSToolTip": "Decidir que temas tienen permiso para insertar stylesheets en Steam. (requiere recargar)",
+    "themePanelInjectCSSToolTip": "Decidir que temas tienen permiso para insertar hojas de estilo en Steam. (requiere reiniciar)",
     "updatePanelHasUpdates": "¡Actualizaciones Disponibles!",
     "updatePanelHasUpdatesSub": "Millennium ha encontrado las siguientes actualizaciones para tus temas.",
     "updatePanelReleasedTag": "Publicado:",
@@ -26,4 +26,8 @@
     "uninstall": "Desinstalar",
     "optionReloadNow": "Reiniciar Ahora",
     "optionReloadLater": "Reiniciar Después"
+    "updatePanelUpdateNotifications": "Notificationes Push",
+    "updatePanelUpdateNotificationsTooltip": "¡Obtén un recordatorio de Millennium cuando un artículo en tu biblioteca tenga una actualización!",
+    "customThemeSettingsColors": "Colores",
+    "customThemeSettingsConfig": "Ajustes personalizados"
 }
