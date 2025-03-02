@@ -97,7 +97,8 @@ class ThemeUpdater:
             if platform.system() == "Windows":
                 remote_name = 'origin'
                 remote = repo.remotes[remote_name]
-                remote.fetch()
+                # Enable automatic proxy detection
+                remote.fetch(proxy = True)
                 latest_commit = repo.revparse_single('origin/HEAD').id
                 repo.reset(latest_commit, pygit2.GIT_RESET_HARD)
             else:
@@ -140,6 +141,10 @@ class ThemeUpdater:
         self.update_list = []
         self.update_query = []
         self.query_themes()
+
+        if not self.update_query:
+            logger.log("No themes to update!")
+            return
 
         response = requests.post(
             "https://steambrew.app/api/v2/checkupdates",
