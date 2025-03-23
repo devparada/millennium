@@ -103,13 +103,14 @@ export interface Plugin {
     common_name?: string, 
     name: string,
     description?: string,
-    venv?: string
+    venv?: string,
+    version?: string
 }
 
 export interface PluginComponent {
     path: string,
     enabled: boolean,
-    data: Plugin
+    data: Plugin,
 }
 
 /**
@@ -157,7 +158,8 @@ export interface SettingsProps {
     useInterface: boolean,
     millenniumVersion: string,
     wantsUpdates: boolean,
-    wantsNotify: boolean
+    wantsNotify: boolean,
+    enabledPlugins: string
 }
 
 export interface ColorProp {
@@ -175,4 +177,9 @@ export enum UpdaterOptionProps {
     UNSET,
     YES,
     NO
+}
+
+export enum OSType {
+    Windows,
+    Linux
 }

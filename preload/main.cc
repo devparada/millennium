@@ -157,8 +157,8 @@ void PatchSharedJSContext(std::string strSteamPath)
 
         if (std::filesystem::exists(SteamUIModuleBackupPath) && std::filesystem::is_regular_file(SteamUIModuleBackupPath)) 
         {
-            Print("SharedJSContext already patched...");
-            return;
+            Print("Removing existing SharedJSContext backup...");
+            std::filesystem::remove(SteamUIModuleBackupPath);
         }
 
         Print("Backing up original SharedJSContext...");
@@ -218,8 +218,8 @@ void AllocateDevConsole()
 {
     std::unique_ptr<StartupParameters> startupParams = std::make_unique<StartupParameters>();
 
-    /** Check if developer mode is activated */
-    if (!startupParams->HasArgument("-dev")) 
+    /** Check if CTRL+SHIFT is being held, Check if developer mode is activated */
+    if (!((GetAsyncKeyState(VK_MENU) & 0x8000) && (GetAsyncKeyState('M') & 0x8000)) && !startupParams->HasArgument("-dev")) 
     {
         return;
     }

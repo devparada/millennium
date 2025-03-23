@@ -1,11 +1,11 @@
-pkgver=v2.17.2
+pkgver=2.18.0
 pkgname=millennium
-pkgrel=6
+pkgrel=1
 pkgdesc="Millennium is an open-source low-code modding framework to create, manage and use themes/plugins for the desktop Steam Client without any low-level internal interaction or overhead."
 arch=('x86_64')
 url="https://github.com/shdwmtr/millennium"
 license=('MIT')
-depends=('gtk3' 'ninja' 'cmake' 'gcc-multilib' 'glibc' 'zlib' 'ncurses' 'gdbm' 'nss' 'openssl' 'readline' 'libffi' 'sqlite' 'xz' 'python-i686-bin' 'git')
+depends=('gtk3' 'ninja' 'cmake' 'gcc-multilib' 'glibc' 'zlib' 'ncurses' 'gdbm' 'nss' 'openssl' 'readline' 'libffi' 'sqlite' 'xz' 'python-i686-bin' 'git' 'zip' 'unzip' 'tar' 'curl')
 makedepends=('git' 'nodejs' 'npm')
 source=("git+$url.git")
 sha256sums=('SKIP')
@@ -23,6 +23,7 @@ build() {
     echo -e "\e[1m\e[92m==>\e[0m \e[1mBuilding Millennium core assets...\e[0m"
 
     cd assets
+    npm install @steambrew/api --silent
     npm install --silent
     npm run build
     cd ..
@@ -65,8 +66,8 @@ package() {
     mkdir -p "$pkgdir/usr/lib/millennium"
     mkdir -p "$pkgdir$HOME/.local/share/millennium/lib/shims"
 
-    cp -r ./node_modules/@steambrew/api/dist/webkit_api.js "$pkgdir$HOME/.local/share/millennium/lib/shims/webkit_api.js"
-    cp -r ./node_modules/@steambrew/api/dist/client_api.js "$pkgdir$HOME/.local/share/millennium/lib/shims/client_api.js"
+    cp -r ./assets/node_modules/@steambrew/api/dist/webkit_api.js "$pkgdir$HOME/.local/share/millennium/lib/shims/webkit_api.js"
+    cp -r ./assets/node_modules/@steambrew/api/dist/client_api.js "$pkgdir$HOME/.local/share/millennium/lib/shims/client_api.js"
 
     install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
 }

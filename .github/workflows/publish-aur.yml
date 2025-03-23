@@ -7,6 +7,10 @@ on:
       - completed
   workflow_dispatch:
 
+concurrency:
+  group: aur-publish
+  cancel-in-progress: false
+
 jobs:
   aur-push:
     runs-on: ubuntu-latest
@@ -17,13 +21,14 @@ jobs:
 
       - name: Update Package Version
         run: |
-            sed -i "s/pkgver=.*/pkgver=$(sed -n '2p' ./version | tr -d '\n')/" ./pkgbuild/PKGBUILD
+            sed -i "s/pkgver=.*/pkgver=$(sed -n '2p' ./version | tr -d 'v\n')/" ./pkgbuild/PKGBUILD
 
       - name: Publish AUR package
         uses: KSXGitHub/github-actions-deploy-aur@master
         with:
           pkgname: millennium
           pkgbuild: ./pkgbuild/PKGBUILD
+          assets: ./pkgbuild/millennium.install
           commit_username: GitHub Actions
           commit_email: github-actions@github.com
           ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}

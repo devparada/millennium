@@ -27,6 +27,12 @@ updater = ThemeUpdater()
 def get_load_config():
     config = cfg.get_config()
 
+    enabled_plugins = []
+
+    for plugin in json.loads(find_all_plugins()):
+        if plugin["enabled"]:
+            enabled_plugins.append(plugin["data"]["name"])
+
     return json.dumps({
         "accent_color": json.loads(Colors.get_accent_color(config["accentColor"])), 
         "conditions": config["conditions"] if "conditions" in config else None, 
@@ -41,20 +47,40 @@ def get_load_config():
 
         "wantsUpdates": MillenniumUpdater.user_wants_updates().value,
         "wantsNotify": MillenniumUpdater.user_wants_update_notify().value,
+        
+        "enabledPlugins": enabled_plugins
     })
 
     
 def get_plugins_dir():
     return os.getenv("MILLENNIUM__PLUGINS_PATH")
 
+
 def _webkit_accent_color():
     return Colors.get_accent_color(cfg.get_config()["accentColor"])
+
 
 def update_plugin_status(plugin_name: str, enabled: bool):
     Millennium.change_plugin_status(plugin_name, enabled)
 
+
 def _get_plugin_logs():
     return Millennium.get_plugin_logs()
+
+
+def _get_env_var(variable: str):
+    return os.getenv(variable)
+
+
+def _get_os_type():
+    # Get OS type and translate to enum types on the frontend
+    if os.name == "nt":
+        return 0
+    elif os.name == "posix":
+        return 1
+    else:
+        raise ValueError("Unsupported OS")
+    
 
 def _copy_to_clipboard(data: str):
     try:
@@ -82,7 +108,7 @@ class Plugin:
 
 
     def _load(self):     
-        cfg.set_theme_cb()
+        # cfg.set_theme_cb()
         self.StartWebsocket()
 
         elapsed_time = time.perf_counter() - start_time
@@ -90,9 +116,18 @@ class Plugin:
         Millennium.ready()
 
         if os.name == "posix":
-            from unix.socket_con import serve_unix_socket
+            from unix.socket_con import MillenniumSocketServer
             logger.log("Starting UNIX socket server...")
-            serve_unix_socket()
+
+            self.unix_server = MillenniumSocketServer()
+
+            # Function to run the server in a thread
+            def start_server():
+                self.unix_server.serve()
+
+            # Start the server in a separate thread
+            server_thread = threading.Thread(target=start_server, daemon=True)
+            server_thread.start()
 
         # This CHECKS for updates on Millennium given the user has it enabled in settings.
         # It DOES NOT automatically update, it is interfaced in the front-end.
@@ -102,4 +137,10 @@ class Plugin:
     def _unload(self):
         logger.log("Millennium-Core is unloading...")
         self.server.stop()
+        logger.log("Websocket server has been stopped!")
+
+        if os.name == "posix":
+            logger.log("Stopping UNIX socket server...")
+            self.unix_server.stop()
+
         logger.log("Millennium-Core has been unloaded!")

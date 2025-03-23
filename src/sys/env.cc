@@ -109,6 +109,8 @@ const void SetupEnvironmentVariables()
     };
     environment.insert(environment_windows.begin(), environment_windows.end());
     #elif __linux__
+    const static std::string pythonEnv = fmt::format("{}/.local/share/millennium/lib/cache", std::getenv("HOME"));
+
     std::map<std::string, std::string> environment_unix = {
         { "MILLENNIUM_RUNTIME_PATH", "/usr/lib/millennium/libmillennium_x86.so" },
         { "LIBPYTHON_RUNTIME_PATH",  LIBPYTHON_RUNTIME_PATH },
@@ -118,13 +120,15 @@ const void SetupEnvironmentVariables()
         { "MILLENNIUM__CONFIG_PATH",    fmt::format("{}/.config/millennium",                 std::getenv("HOME")) },
         { "MILLENNIUM__LOGS_PATH",      fmt::format("{}/.local/share/millennium/logs",       std::getenv("HOME")) },
         { "MILLENNIUM__DATA_LIB",       fmt::format("{}/.local/share/millennium/lib",        std::getenv("HOME")) },
-        { "MILLENNIUM__PYTHON_ENV",     fmt::format("{}/.local/share/millennium/lib/cache",  std::getenv("HOME")) },
         { "MILLENNIUM__SHIMS_PATH",     fmt::format("{}/.local/share/millennium/lib/shims",  std::getenv("HOME")) },
         { "MILLENNIUM__ASSETS_PATH",    fmt::format("{}/.local/share/millennium/lib/assets", std::getenv("HOME")) },
-
-        { "LIBPYTHON_RUNTIME_BIN_PATH",         LIBPYTHON_RUNTIME_BIN_PATH         == "<UNKNOWN>" ? fmt::format("{}/lib/python3.11",             GetEnv("MILLENNIUM__PYTHON_ENV")) : LIBPYTHON_RUNTIME_BIN_PATH        },
-        { "LIBPYTHON_BUILTIN_MODULES_PATH",     LIBPYTHON_BUILTIN_MODULES_PATH     == "<UNKNOWN>" ? fmt::format("{}/lib/python3.11",             GetEnv("MILLENNIUM__PYTHON_ENV")) : LIBPYTHON_BUILTIN_MODULES_PATH    },
-        { "LIBPYTHON_BUILTIN_MODULES_DLL_PATH", LIBPYTHON_BUILTIN_MODULES_DLL_PATH == "<UNKNOWN>" ? fmt::format("{}/lib/python3.11/lib-dynload", GetEnv("MILLENNIUM__PYTHON_ENV")) : LIBPYTHON_BUILTIN_MODULES_DLL_PATH}
+        
+        { "MILLENNIUM__UPDATE_SCRIPT_PROMPT", MILLENNIUM__UPDATE_SCRIPT_PROMPT }, /** The script the user will run to update millennium. */
+        
+        { "MILLENNIUM__PYTHON_ENV",             pythonEnv },
+        { "LIBPYTHON_RUNTIME_BIN_PATH",         LIBPYTHON_RUNTIME_BIN_PATH         == "<UNKNOWN>" ? fmt::format("{}/bin/python3.11",             pythonEnv) : LIBPYTHON_RUNTIME_BIN_PATH         },
+        { "LIBPYTHON_BUILTIN_MODULES_PATH",     LIBPYTHON_BUILTIN_MODULES_PATH     == "<UNKNOWN>" ? fmt::format("{}/lib/python3.11",             pythonEnv) : LIBPYTHON_BUILTIN_MODULES_PATH     },
+        { "LIBPYTHON_BUILTIN_MODULES_DLL_PATH", LIBPYTHON_BUILTIN_MODULES_DLL_PATH == "<UNKNOWN>" ? fmt::format("{}/lib/python3.11/lib-dynload", pythonEnv) : LIBPYTHON_BUILTIN_MODULES_DLL_PATH }
     };
     environment.insert(environment_unix.begin(), environment_unix.end());
     #endif
@@ -134,12 +138,9 @@ const void SetupEnvironmentVariables()
         #ifdef __linux__
         #define RED "\033[31m"
         #define RESET "\033[0m"
-        /** Check permissions on each folder */
-        if (access(value.c_str(), R_OK) != 0) {
-            std::cout << fmt::format("{}{}{}{}{}", RED, "Error: ", RESET, fmt::format("Permission denied to access '{}'.", value), "\n");
-        }
-        #endif
+
         std::cout << fmt::format("{}={}", key, value) << std::endl;
+        #endif
         SetEnv(key, value);
     }
 }

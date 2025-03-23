@@ -137,12 +137,7 @@ public:
         if (json.value("method", std::string()) == "Target.attachedToTarget" && json["params"]["targetInfo"]["title"] == "SharedJSContext")
         {
             sharedJsContextSessionId = json["params"]["sessionId"];
-            Sockets::PostShared({ {"id", 9494 }, {"method", "Log.enable"}, {"sessionId", sharedJsContextSessionId} });
-
-            this->UnPatchSharedJSContext();
-        }
-        else if (json.value("id", -1) == 9773) 
-        {
+            Sockets::PostShared({ { "id", 9494 }, { "method", "Log.enable "}, { "sessionId", sharedJsContextSessionId } });
             this->onSharedJsConnect();
         }
         else
@@ -155,33 +150,6 @@ public:
     const void SetupSharedJSContext()
     {
         Sockets::PostGlobal({ { "id", 0 }, { "method", "Target.getTargets" } });
-    }
-
-    const void UnPatchSharedJSContext()
-    {
-        #ifdef _WIN32
-        Logger.Log("Restoring SharedJSContext...");
-
-        const auto SteamUIModulePath = SystemIO::GetSteamPath() / "steamui" / "index.html";
-        const auto SteamUIModulePathBackup = SystemIO::GetSteamPath() / "steamui" / "orig.html";
-
-        try
-        {
-            if (std::filesystem::exists(SteamUIModulePathBackup) && std::filesystem::is_regular_file(SteamUIModulePathBackup))
-            {
-                std::filesystem::remove(SteamUIModulePath);
-            }
-
-            std::filesystem::rename(SteamUIModulePathBackup, SteamUIModulePath);
-        }
-        catch (const std::exception& e)
-        {
-            Logger.Warn("Failed to restore SharedJSContext: {}", e.what());
-        }
-
-        Logger.Log("Restored SharedJSContext...");
-        #endif
-        Sockets::PostShared({ { "id", 9773 }, { "method", "Page.reload" } });
     }
 
     const void onSharedJsConnect()
@@ -213,6 +181,7 @@ public:
 
 const void PluginLoader::Initialize()
 {
+    
     m_settingsStorePtr  = std::make_unique<SettingsStore>();
     m_pluginsPtr        = std::make_shared<std::vector<SettingsStore::PluginTypeSchema>>(m_settingsStorePtr->ParseAllPlugins());
     m_enabledPluginsPtr = std::make_shared<std::vector<SettingsStore::PluginTypeSchema>>(m_settingsStorePtr->GetEnabledBackends());
@@ -254,7 +223,7 @@ std::shared_ptr<std::thread> PluginLoader::ConnectCEFBrowser(void* cefBrowserHan
  */
 const void PluginLoader::InjectWebkitShims() 
 {
-    Logger.Warn("Injecting webkit shims...");
+    Logger.Log("Injecting webkit shims...");
     
     this->Initialize();
     static std::vector<int> hookIds;

@@ -358,7 +358,37 @@ const void CoInitializer::BackendStartCallback(SettingsStore::PluginTypeSchema p
     }
 
     Py_DECREF(result);
+
+    const auto startTime = std::chrono::steady_clock::now();
+    std::atomic<bool> timeOutLockThreadRunning = true;
+
+    std::thread timeOutThread([&timeOutLockThreadRunning, startTime, plugin] 
+    {
+        while (timeOutLockThreadRunning.load()) 
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+
+            if (std::chrono::steady_clock::now() - startTime > std::chrono::seconds(30)) 
+            {
+                std::string errorMessage = fmt::format(
+                    "\nIt appears that the plugin '{}' either forgot to call `Millennium.ready()` or is I/O blocking the main thread. "
+                    "Your _load() function MUST NOT block the main thread, logic that runs for the duration of the plugin should run in true parallelism with threading."
+                    "\nLearn more: https://www.geeksforgeeks.org/multithreading-python-set-1/"
+                    "\nThis error is not fatal but this plugin will NOT be able to properly shutdown with may leave steam hanging on exit.", plugin.pluginName
+                );
+
+                LOG_ERROR(errorMessage);
+                ErrorToLogger(plugin.pluginName, errorMessage);
+
+                break;
+            }
+        }
+    });
+
     StartPluginBackend(globalDictionary, plugin.pluginName);  
+
+    timeOutLockThreadRunning.store(false);
+    timeOutThread.join();  
 }
 
 /**
@@ -398,6 +428,40 @@ const std::string ConstructOnLoadModule(uint16_t ftpPort, uint16_t ipcPort)
 }
 
 /**
+ * Restores the original `SharedJSContext` by renaming the backup file to the original file.
+ * It reverses the patches done in the preloader module
+ * 
+ * @note this function is only applicable to Windows
+ */
+const void UnPatchSharedJSContext()
+{
+    #ifdef _WIN32
+    Logger.Log("Restoring SharedJSContext...");
+
+    const auto SteamUIModulePath = SystemIO::GetSteamPath() / "steamui" / "index.html";
+    const auto SteamUIModulePathBackup = SystemIO::GetSteamPath() / "steamui" / "orig.html";
+
+    try
+    {
+        if (std::filesystem::exists(SteamUIModulePathBackup) && std::filesystem::is_regular_file(SteamUIModulePathBackup))
+        {
+            std::filesystem::remove(SteamUIModulePath);
+        }
+
+        std::filesystem::rename(SteamUIModulePathBackup, SteamUIModulePath);
+    }
+    catch (const std::exception& e)
+    {
+        Logger.Warn("Failed to restore SharedJSContext: {}", e.what());
+    }
+
+    Logger.Log("Restored SharedJSContext...");
+    #endif
+    // Sockets::PostShared({ { "id", 9773 }, { "method", "Page.reload" } });
+}
+
+
+/**
  * Notifies the frontend of the backend load and handles script injection and state updates.
  *
  * @param {uint16_t} ftpPort - The FTP port used to access frontend resources.
@@ -418,6 +482,7 @@ const std::string ConstructOnLoadModule(uint16_t ftpPort, uint16_t ipcPort)
  */
 void OnBackendLoad(uint16_t ftpPort, uint16_t ipcPort)
 {
+    UnPatchSharedJSContext(); // Restore the original SharedJSContext
     Logger.Log("Notifying frontend of backend load...");
 
     static uint16_t m_ftpPort = ftpPort;

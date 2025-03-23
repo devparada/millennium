@@ -63,6 +63,43 @@ const static void VerifyEnvironment()
         Logger.Log("Successfully enabled CEF remote debugging, you can now restart Steam...");
         std::exit(1);
     }
+
+    // Check if the user has set a Steam.cfg file to block updates, this is incompatible with Millennium as Millennium relies on the latest version of Steam. 
+    const auto steamUpdateBlock = SystemIO::GetSteamPath() / "Steam.cfg";
+
+    const std::string errorMessage = fmt::format("Millennium is incompatible with your {} config. This is a file you likely created to block Steam updates. In order for Millennium to properly function, remove it.", steamUpdateBlock.string());
+
+    if (std::filesystem::exists(steamUpdateBlock)) 
+    {
+        try
+        {
+            std::string steamConfig = SystemIO::ReadFileSync(steamUpdateBlock.string());
+
+            std::vector<std::string> blackListedKeys = { 
+                "BootStrapperInhibitAll",
+                "BootStrapperForceSelfUpdate",
+                "BootStrapperInhibitClientChecksum",
+                "BootStrapperInhibitBootstrapperChecksum",
+                "BootStrapperInhibitUpdateOnLaunch",
+            };
+
+            for (const auto& key : blackListedKeys) 
+            {
+                if (steamConfig.find(key) != std::string::npos) 
+                {
+                    throw SystemIO::FileException("Steam.cfg contains blacklisted keys");
+                }
+            }
+        }
+        catch(const SystemIO::FileException& e)
+        {
+            #ifdef _WIN32
+            MessageBoxA(NULL, errorMessage.c_str(), "Startup Error", MB_ICONERROR | MB_OK);
+            #endif
+
+            LOG_ERROR(errorMessage);
+        }
+    }
 }
 
 /**
@@ -170,7 +207,7 @@ __attribute__((constructor)) void __init_millennium()
 }
 
 #ifdef _WIN32
-HANDLE g_hMillenniumThread;
+std::unique_ptr<std::thread> g_millenniumThread;
 /**
  * @brief Entry point for Millennium on Windows.
  * @param fdwReason The reason for calling the DLL.
@@ -182,17 +219,17 @@ int __stdcall DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
     {
         case DLL_PROCESS_ATTACH: 
         {
-            const std::string threadName = fmt::format("Millennium@{}", MILLENNIUM_VERSION);
-
-            g_hMillenniumThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)EntryMain, NULL, 0, NULL);
-            SetThreadDescription(g_hMillenniumThread, std::wstring(threadName.begin(), threadName.end()).c_str());
+            g_millenniumThread = std::make_unique<std::thread>(EntryMain);
             break;
         }
         case DLL_PROCESS_DETACH: 
         {
             WinUtils::RestoreStdout();
-            Logger.PrintMessage(" MAIN ", "Shutting Millennium down...", COL_MAGENTA);
+            // Logger.PrintMessage(" MAIN ", "Shutting Millennium down...", COL_MAGENTA);
 
+            // g_threadTerminateFlag->flag.store(true);
+            // Sockets::Shutdown();
+            // g_millenniumThread->join();
             std::exit(0);
             break;
         }

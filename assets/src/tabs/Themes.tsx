@@ -1,30 +1,13 @@
-import {
-    Millennium,
-    ConfirmModal,
-    Dropdown,
-    DialogHeader,
-    DialogBody,
-    DialogButton,
-    classMap,
-    IconsModule,
-    pluginSelf,
-    Toggle,
-    showModal,
-    Field,
-    callable
-} from '@steambrew/client'
+import { Millennium, ConfirmModal, Dropdown, DialogButton, IconsModule, pluginSelf, Toggle, showModal, Field, callable } from '@steambrew/client'
 import * as CustomIcons from '../custom_components/CustomIcons'
-
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { RenderThemeEditor } from '../custom_components/ThemeEditor'
 import { ComboItem, ThemeItem } from '../types'
 import { SetupAboutRenderer } from '../custom_components/AboutTheme'
 import { locale } from '../locales'
 import { ConnectionFailed } from '../custom_components/ConnectionFailed'
-import { settingsClasses } from '../classes'
-import { DispatchSystemColors } from '../patcher/SystemColors'
-import { DOMModifier } from '../patcher/Dispatch'
 import { RenderAccentColorPicker } from './AccentColorPicker'
+import ReactDOM from 'react-dom'
 
 const Localize = (token: string): string =>
     // @ts-ignore
@@ -76,6 +59,14 @@ interface EditThemeProps {
  * @returns react component
  */
 const RenderEditTheme: React.FC<EditThemeProps> = ({ active }) => {
+    /** Force proper styling on buttons next to dropdowns. */
+    const sideBySideProps = {
+        padding: "9px 10px",
+        margin: "0",
+        marginRight: "10px",
+        display: "flex",
+        width: "auto"
+    };
 
     const Theme = (pluginSelf.activeTheme as ThemeItem)
 
@@ -85,10 +76,7 @@ const RenderEditTheme: React.FC<EditThemeProps> = ({ active }) => {
     }
 
     return (
-        <DialogButton
-            onClick={() => ThemeSettings(active)}
-            className="_3epr8QYWw_FqFgMx38YEEm millenniumIconButton"
-        >
+        <DialogButton onClick={() => ThemeSettings(active)} className="_3epr8QYWw_FqFgMx38YEEm millenniumIconButton" style={sideBySideProps}>
             <IconsModule.Settings height="16" />
         </DialogButton>
     )
@@ -213,84 +201,94 @@ const ThemeViewModal: React.FC = () => {
         SteamClient.System.OpenInSystemBrowser("https://steambrew.app/themes");
     }
 
+    const [isHoveringThemeDropdown, setIsHoveringThemeDropdown] = useState(false)
+
+    const PortalComponent = () => {
+        const elementRef = useRef(null);
+        const [position, setPosition] = useState({ top: 0, left: "0px" });
+
+        useEffect(() => {
+            const element = pluginSelf.windows["Millennium"].document.querySelector(".millenniumThemeDropdown");
+            if (!element) return;
+
+            const rect = element.getBoundingClientRect();
+
+            if (elementRef.current) {
+                const refRect = elementRef.current.getBoundingClientRect();
+                setPosition({
+                    top: rect.top + rect.height + 10,
+                    left: rect.right - refRect.width + "px",
+                });
+            }
+        }, []);
+
+        return ReactDOM.createPortal(
+            <div ref={elementRef} className="_3vg1vYU7iTWqONciv9cuJN _1Ye_0niF2UqB8uQTbm8B6B" style={{ top: position.top, left: position.left }}>
+                <div className="_2FxbHJzYoH024ko7zqcJOf" style={{ maxWidth: "50vw" }}>
+                    Millennium can't find any themes in your skins folder. If you have themes installed that aren't showing, verify you've extracted them properly. The skin.json file should be in the root of the theme folder.
+                    <br /><br />
+                    Example:<br></br> <code>Steam/steamui/skins/SkinName/skin.json</code><br></br> instead of<br></br> <code>Steam/steamui/skins/SkinName/SkinName/skin.json</code>
+                </div>
+            </div>,
+            pluginSelf.windows["Millennium"].document.body
+        );
+    };
+
+    /** Force proper styling on buttons next to dropdowns. */
+    const sideBySideProps = {
+        padding: "9px 10px",
+        margin: "0",
+        marginRight: "10px",
+        display: "flex",
+        width: "auto"
+    };
+
     return (
         <>
-            <style>
-                {`
-                .DialogDropDown._DialogInputContainer.Panel.Focusable { min-width: max-content !important; }
-                button.millenniumIconButton {
-                    padding: 9px 10px !important; 
-                    margin: 0 !important; 
-                    margin-right: 10px !important;
-                    display: flex;
-                    width: auto;
-                }
-            `}
-            </style>
+            {/* Fix the dropdown not filling the proper width when specific theme names are too long. */}
+            <style>{`.DialogDropDown._DialogInputContainer.Panel.Focusable { min-width: max-content !important; }`}</style>
 
-            {/* <DialogHeader>{locale.settingsPanelThemes}</DialogHeader>
-            <DialogBody className={classMap.SettingsDialogBodyFade}> */}
             <Field
                 label={locale.themePanelClientTheme}
-                description={
-                    <>
-                        {locale.themePanelThemeTooltip}
-                        {". "}
-                        <a href="#" onClick={GetMoreThemes}>
-                            {locale.themePanelGetMoreThemes}
-                        </a>
-                    </>
-                }
+                description={<>{locale.themePanelThemeTooltip}{". "}<a href="#" onClick={GetMoreThemes}>{locale.themePanelGetMoreThemes}</a></>}
             >
                 <RenderEditTheme active={active} />
 
                 {!pluginSelf.isDefaultTheme && (
-                    <DialogButton
-                        onClick={() => SetupAboutRenderer(active)}
-                        className="_3epr8QYWw_FqFgMx38YEEm millenniumIconButton"
-                    >
+                    <DialogButton onClick={() => SetupAboutRenderer(active)} className="_3epr8QYWw_FqFgMx38YEEm millenniumIconButton" style={sideBySideProps}>
                         <IconsModule.Information height="16" />
                     </DialogButton>
                 )}
 
-                <DialogButton
-                    onClick={OpenThemesFolder}
-                    className="_3epr8QYWw_FqFgMx38YEEm millenniumIconButton"
-                >
+                <DialogButton onClick={OpenThemesFolder} className="_3epr8QYWw_FqFgMx38YEEm millenniumIconButton" style={sideBySideProps}>
                     <CustomIcons.Folder />
                 </DialogButton>
 
-                <Dropdown
-                    onMenuOpened={async () => await findAllThemes().then((result: ComboItem[]) => setThemes(result))}
-                    contextMenuPositionOptions={{ bMatchWidth: false }}
-                    rgOptions={themes as any}
-                    selectedOption={1}
-                    strDefaultLabel={active}
-                    onChange={updateThemeCallback as any}
-                />
+                <div onMouseEnter={() => setIsHoveringThemeDropdown(true)} onMouseLeave={() => setIsHoveringThemeDropdown(false)} className='millenniumThemeDropdown'>
+                    <Dropdown
+                        onMenuOpened={async () => await findAllThemes().then((result: ComboItem[]) => setThemes(result))}
+                        contextMenuPositionOptions={{ bMatchWidth: false }}
+                        rgOptions={themes as any}
+                        selectedOption={1}
+                        strDefaultLabel={active}
+                        onChange={updateThemeCallback as any}
+                        disabled={themes?.length === 0}
+                    />
+                </div>
+                {isHoveringThemeDropdown && themes?.length === 0 && <PortalComponent />}
             </Field>
 
-            <Field
-                label={locale.themePanelInjectJavascript}
-                description={locale.themePanelInjectJavascriptToolTip}
-            >
-                {jsState !== undefined && (
-                    <Toggle value={jsState} onChange={onScriptToggle} />
-                )}
+            {/* Render inject javascript checkbox */}
+            <Field label={locale.themePanelInjectJavascript} description={locale.themePanelInjectJavascriptToolTip}>
+                {jsState !== undefined && (<Toggle value={jsState} onChange={onScriptToggle} />)}
             </Field>
 
-            <Field
-                label={locale.themePanelInjectCSS}
-                description={locale.themePanelInjectCSSToolTip}
-            >
-                {cssState !== undefined && (
-                    <Toggle value={cssState} onChange={onStyleToggle} />
-                )}
+            {/* Render inject stylesheet checkbox */}
+            <Field label={locale.themePanelInjectCSS} description={locale.themePanelInjectCSSToolTip}>
+                {cssState !== undefined && (<Toggle value={cssState} onChange={onStyleToggle} />)}
             </Field>
 
             <RenderAccentColorPicker currentThemeUsesAccentColor={themeUsesAccentColor} />
-
-            {/* </DialogBody> */}
         </>
     )
 }
