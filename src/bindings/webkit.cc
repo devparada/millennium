@@ -55,7 +55,7 @@ std::vector<head::theme_webkit_mgr::webkit_item> head::theme_webkit_mgr::parse_c
 {
     std::vector<theme_webkit_mgr::webkit_item> webkit_items;
 
-    nlohmann::json theme_conditions = CONFIG.get("themes.conditions." + theme_name, nlohmann::json::object());
+    nlohmann::json theme_conditions = CONFIG.get({"themes", "conditions", theme_name}, nlohmann::json::object());
 
     if (conditional_patches.contains("Conditions")) {
         for (auto& [item, condition] : conditional_patches["Conditions"].items()) {

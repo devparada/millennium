@@ -85,11 +85,11 @@ void head::theme_config_store::migrate_old_config()
         for (auto& [theme_name, conditions] : old_config["conditions"].items()) {
             if (!CONFIG.get("themes.conditions").is_object()) CONFIG.set("themes.conditions", nlohmann::json::object(), true);
 
-            if (!CONFIG.get("themes.conditions." + theme_name).is_object()) CONFIG.set("themes.conditions." + theme_name, nlohmann::json::object(), true);
+            if (!CONFIG.get({"themes", "conditions", theme_name}).is_object()) CONFIG.set({"themes", "conditions", theme_name}, nlohmann::json::object(), true);
 
             for (auto& [condition_name, condition_value] : conditions.items()) {
                 logger.log("Upgrading condition '" + condition_name + "' for theme '" + theme_name + "'");
-                CONFIG.set("themes.conditions." + theme_name + "." + condition_name, condition_value, true);
+                CONFIG.set({"themes", "conditions", theme_name, condition_name}, condition_value, true);
             }
         }
     }
@@ -99,11 +99,11 @@ void head::theme_config_store::migrate_old_config()
         for (auto& [theme_name, colors_obj] : old_config["colors"].items()) {
             if (!CONFIG.get("themes.themeColors").is_object()) CONFIG.set("themes.themeColors", nlohmann::json::object(), true);
 
-            if (!CONFIG.get("themes.themeColors." + theme_name).is_object()) CONFIG.set("themes.themeColors." + theme_name, nlohmann::json::object(), true);
+            if (!CONFIG.get({"themes", "themeColors", theme_name}).is_object()) CONFIG.set({"themes", "themeColors", theme_name}, nlohmann::json::object(), true);
 
             for (auto& [color_name, color_value] : colors_obj.items()) {
                 logger.log("Upgrading color '" + color_name + "' for theme '" + theme_name + "'");
-                CONFIG.set("themes.themeColors." + theme_name + "." + color_name, color_value, true);
+                CONFIG.set({"themes", "themeColors", theme_name, color_name}, color_value, true);
             }
         }
     }
@@ -232,7 +232,7 @@ void head::theme_config_store::setup_colors()
 
         if (CONFIG.get("themes.themeColors", nullptr).is_null()) CONFIG.set("themes.themeColors", nlohmann::json::object(), /*skipPropagation=*/true);
 
-        if (CONFIG.get("themes.themeColors." + nativeName, nullptr).is_null()) CONFIG.set("themes.themeColors." + nativeName, nlohmann::json::object(), /*skipPropagation=*/true);
+        if (CONFIG.get({"themes", "themeColors", nativeName}, nullptr).is_null()) CONFIG.set({"themes", "themeColors", nativeName}, nlohmann::json::object(), /*skipPropagation=*/true);
 
         for (auto& color : colors[nativeName]) {
             if (!color.contains("color") || !color["color"].is_string()) {
@@ -256,10 +256,9 @@ void head::theme_config_store::setup_colors()
                 continue;
             }
 
-            const std::string configPath = "themes.themeColors." + nativeName + "." + colorName;
-            const auto existing = CONFIG.get(configPath, nullptr);
+            const auto existing = CONFIG.get({"themes", "themeColors", nativeName, colorName}, nullptr);
             if (!existing.is_string()) {
-                CONFIG.set(configPath, colorValue.value(), /*skipPropagation=*/true);
+                CONFIG.set({"themes", "themeColors", nativeName, colorName}, colorValue.value(), /*skipPropagation=*/true);
             }
         }
     }
@@ -270,9 +269,9 @@ nlohmann::json head::theme_config_store::get_colors()
     std::string root = ":root {";
     std::string name = active_theme_name;
 
-    if (!CONFIG.get("themes.themeColors." + name).is_object()) return ":root {}";
+    if (!CONFIG.get({"themes", "themeColors", name}).is_object()) return ":root {}";
 
-    const auto themeColors = CONFIG.get(fmt::format("themes.themeColors.{}", name));
+    const auto themeColors = CONFIG.get({"themes", "themeColors", name});
 
     for (auto& [color, value] : themeColors.items()) {
         if (!value.is_string()) {
@@ -299,7 +298,7 @@ nlohmann::json head::theme_config_store::get_color_options(const std::string& th
     }
 
     nlohmann::json root_colors = colors[theme_name];
-    auto saved_colors = CONFIG.get("themes.themeColors." + theme_name);
+    auto saved_colors = CONFIG.get({"themes", "themeColors", theme_name});
 
     for (auto& color : root_colors) {
         std::string cname = color["color"].get<std::string>();
@@ -321,7 +320,7 @@ nlohmann::json head::theme_config_store::set_theme_color(const std::string& them
         return {};
     }
 
-    CONFIG.set(fmt::format("themes.themeColors.{}.{}", theme, color_name), parsed_color.value(), true);
+    CONFIG.set({"themes", "themeColors", theme, color_name}, parsed_color.value(), true);
     return parsed_color.value();
 }
 
@@ -361,8 +360,7 @@ void head::theme_config_store::setup_conditionals()
                 continue;
             }
 
-            nlohmann::json current_conditions = CONFIG.get(fmt::format("themes.conditions.{}", theme_name), nlohmann::json::object());
-            const std::string keyPath = fmt::format("themes.conditions.{}.{}", theme_name, condition_name);
+            nlohmann::json current_conditions = CONFIG.get({"themes", "conditions", theme_name}, nlohmann::json::object());
 
             if (is_slider) {
                 const auto& slider = condition_value["slider"];
@@ -377,7 +375,7 @@ void head::theme_config_store::setup_conditionals()
                 }
 
                 if (!current_conditions.contains(condition_name) || !current_conditions[condition_name].is_string()) {
-                    CONFIG.set(keyPath, default_value);
+                    CONFIG.set({"themes", "conditions", theme_name, condition_name}, default_value);
                 }
                 continue;
             }
@@ -396,13 +394,13 @@ void head::theme_config_store::setup_conditionals()
             }
 
             if (!current_conditions.contains(condition_name) || !current_conditions[condition_name].is_string()) {
-                CONFIG.set(keyPath, default_value);
+                CONFIG.set({"themes", "conditions", theme_name, condition_name}, default_value);
                 continue;
             }
 
             const std::string current_value = current_conditions[condition_name].get<std::string>();
             if (!values.contains(current_value)) {
-                CONFIG.set(keyPath, default_value);
+                CONFIG.set({"themes", "conditions", theme_name, condition_name}, default_value);
             }
         }
     }
@@ -412,7 +410,7 @@ void head::theme_config_store::setup_conditionals()
 
 nlohmann::json head::theme_config_store::set_condition(const std::string& theme, const nlohmann::json& newData, const std::string& condition)
 {
-    CONFIG.set(fmt::format("themes.conditions.{}.{}", theme, condition), newData, true);
+    CONFIG.set({"themes", "conditions", theme, condition}, newData, true);
 
     return {
         { "success", true }  /** just assume it worked, too laze to impl :) */
@@ -421,9 +419,9 @@ nlohmann::json head::theme_config_store::set_condition(const std::string& theme,
 
 std::string head::theme_config_store::get_theme_conditionals()
 {
-    if (!CONFIG.CONFIG.get("themes.conditions").is_object()) return "{}";
+    if (!CONFIG.get("themes.conditions").is_object()) return "{}";
 
-    return CONFIG.CONFIG.get("themes.conditions").dump(4);
+    return CONFIG.get("themes.conditions").dump(4);
 }
 
 std::set<std::string> head::theme_config_store::get_all_imports(const std::filesystem::path& css_path, std::set<std::string> visited)
