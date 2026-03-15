@@ -206,7 +206,6 @@ void crash_report_dispatch(EXCEPTION_POINTERS* ep, void (*writer)(EXCEPTION_POIN
 }
 #else
 #include <execinfo.h>
-#include <signal.h>
 #include <unistd.h>
 
 const char* crash_report_signal_name(int sig)

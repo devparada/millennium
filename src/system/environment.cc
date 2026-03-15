@@ -172,16 +172,14 @@ void platform::environment::setup()
     const auto dataLibPath = std::filesystem::path(assetsPath).parent_path().generic_string();
 
 #ifdef _WIN32
-    const auto dataPath = platform::get_millennium_data_path().string();
     std::map<std::string, std::string> environment_windows = {
-        { "MILLENNIUM__PLUGINS_PATH", dataPath + "/plugins"                               },
-        { "MILLENNIUM__CONFIG_PATH",  dataPath + "/config"                                },
-        { "MILLENNIUM__LOGS_PATH",    dataPath + "/logs"                                  },
-        { "MILLENNIUM__THEMES_PATH",  platform::get_themes_path().string()                },
+        { "MILLENNIUM__PLUGINS_PATH", platform::get_install_path().string() + "/plugins"  },
+        { "MILLENNIUM__CONFIG_PATH",  platform::get_install_path().string() + "/ext"      },
+        { "MILLENNIUM__LOGS_PATH",    platform::get_install_path().string() + "/ext/logs" },
         { "MILLENNIUM__DATA_LIB",     dataLibPath                                         },
         { "MILLENNIUM__SHIMS_PATH",   shimsPath                                           },
         { "MILLENNIUM__ASSETS_PATH",  assetsPath                                          },
-        { "MILLENNIUM__INSTALL_PATH", dataPath                                            }
+        { "MILLENNIUM__INSTALL_PATH", platform::get_install_path().string()               }
     };
     environment.insert(environment_windows.begin(), environment_windows.end());
 #elif __linux__
@@ -200,7 +198,6 @@ void platform::environment::setup()
         { "MILLENNIUM__PLUGINS_PATH", fmt::format("{}/millennium/plugins", dataDir) },
         { "MILLENNIUM__CONFIG_PATH", fmt::format("{}/millennium", configDir) },
         { "MILLENNIUM__LOGS_PATH", fmt::format("{}/millennium/logs", stateDir) },
-        { "MILLENNIUM__THEMES_PATH", platform::get_themes_path().string() },
         { "MILLENNIUM__DATA_LIB", dataLibPath },
         { "MILLENNIUM__SHIMS_PATH", shimsPath },
         { "MILLENNIUM__ASSETS_PATH", assetsPath },
@@ -220,7 +217,6 @@ void platform::environment::setup()
         { "MILLENNIUM__PLUGINS_PATH", fmt::format("{}/Millennium/plugins", dataDir) },
         { "MILLENNIUM__CONFIG_PATH", fmt::format("{}/Millennium", configDir) },
         { "MILLENNIUM__LOGS_PATH", fmt::format("{}/Millennium/logs", stateDir) },
-        { "MILLENNIUM__THEMES_PATH", platform::get_themes_path().string() },
         { "MILLENNIUM__DATA_LIB", dataLibPath },
         { "MILLENNIUM__SHIMS_PATH", shimsPath },
         { "MILLENNIUM__ASSETS_PATH", assetsPath },

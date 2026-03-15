@@ -54,8 +54,3 @@ endif()
 set_target_properties(${MILLENNIUM_RTB_NAME} PROPERTIES
     OUTPUT_NAME "${MILLENNIUM_RTB_NAME}"
 )
-
-if(NOT GITHUB_ACTION_BUILD)
-    include(${MILLENNIUM_BASE}/scripts/cmake/find_steam_path.cmake)
-    find_steam_path(${MILLENNIUM_RTB_NAME})
-endif()
