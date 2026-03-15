@@ -196,7 +196,6 @@ void network_hook_ctl::vfs_request_handler(const nlohmann::basic_json<>& message
         if (bFailedRead) {
             responseCode = http_code::NOT_FOUND;
             responseMessage = "millennium couldn't read " + localFilePath.string();
-            LOG_ERROR("failed to retrieve file '{}' info from disk.", localFilePath.string());
         }
 
         fileType = mime::get_file_type(localFilePath.string());
