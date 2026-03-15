@@ -62,6 +62,7 @@ class webkit_world_mgr
     struct target_context
     {
         std::string session_id;
+        std::string script_id;
         bool attaching{ false };
     };
 

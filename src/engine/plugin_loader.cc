@@ -323,6 +323,11 @@ void plugin_loader::inject_frontend_shims(bool reload_frontend)
     {
         self->m_cdp->send("Page.enable").get();
 
+        if (!self->document_script_id.empty()) {
+            self->m_cdp->send("Page.removeScriptToEvaluateOnNewDocument", json{{ "identifier", self->document_script_id }}).get();
+            self->document_script_id.clear();
+        }
+
         json params = {
             { "source", self->cdp_generate_shim_module() }
         };

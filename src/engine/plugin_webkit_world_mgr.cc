@@ -138,7 +138,7 @@ void webkit_world_mgr::attach_to_target(const std::string& target_id)
     }
     {
         std::lock_guard<std::mutex> lock(m_targets_mutex);
-        auto [it, inserted] = m_attached_targets.try_emplace(target_id, target_context{ "", true });
+        auto [it, inserted] = m_attached_targets.try_emplace(target_id, target_context{ "", "", true });
 
         if (!inserted) {
             if (it->second.attaching || !it->second.session_id.empty()) {
@@ -194,7 +194,7 @@ void webkit_world_mgr::attach_to_target(const std::string& target_id)
 
         {
             std::lock_guard<std::mutex> lock(m_targets_mutex);
-            m_attached_targets[target_id] = target_context{ session_id, false };
+            m_attached_targets[target_id] = target_context{ session_id, "", false };
         }
         expose_millennium_to_ctx(session_id, is_top_level);
 
@@ -262,11 +262,36 @@ void webkit_world_mgr::expose_millennium_to_ctx(const std::string& session_id, b
         };
         m_client->send_host("Runtime.addBinding", add_binding_params, session_id).get();
 
+        /** remove previously registered script for this session (if any) to avoid stacking */
+        {
+            std::lock_guard<std::mutex> lock(m_targets_mutex);
+            for (auto& [tid, ctx] : m_attached_targets) {
+                if (ctx.session_id == session_id && !ctx.script_id.empty()) {
+                    try {
+                        m_client->send_host("Page.removeScriptToEvaluateOnNewDocument", json{{ "identifier", ctx.script_id }}, session_id).get();
+                    } catch (...) {}
+                    ctx.script_id.clear();
+                    break;
+                }
+            }
+        }
+
         /** register script to run on every navigation (main world) */
         const json add_script_params = {
             { "source", this->compile_api_shim() }
         };
-        m_client->send_host("Page.addScriptToEvaluateOnNewDocument", add_script_params, session_id).get();
+        auto script_result = m_client->send_host("Page.addScriptToEvaluateOnNewDocument", add_script_params, session_id).get();
+
+        /** save script id so we can remove it later */
+        if (script_result.contains("identifier")) {
+            std::lock_guard<std::mutex> lock(m_targets_mutex);
+            for (auto& [tid, ctx] : m_attached_targets) {
+                if (ctx.session_id == session_id) {
+                    ctx.script_id = script_result["identifier"].get<std::string>();
+                    break;
+                }
+            }
+        }
 
         if (can_reload) {
             /** reload page to apply CSP bypass and run script */
