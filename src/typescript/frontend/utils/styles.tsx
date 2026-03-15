@@ -469,7 +469,7 @@ export const MillenniumDesktopSidebarStyles = ({ openAnimStart, isDesktopMenuOpe
 
 	.MillenniumDesktopSidebar_EditorContent {
 		display: flex;
-		padding: 20px;
+		padding: 0px 20px 20px 20px;
 		flex-direction: column;
 		height: 100%;
 		overflow: auto;
@@ -479,7 +479,8 @@ export const MillenniumDesktopSidebarStyles = ({ openAnimStart, isDesktopMenuOpe
 		}
 
 		& > .DialogBody {
-			padding: var(--sidebar-content-spacing-inline);
+			padding-top: 0px;
+        	-webkit-mask-image: unset !important;
 		}
 	}
 

@@ -234,12 +234,7 @@ export class RenderThemeEditor extends React.Component<ThemeEditorProps> {
 				inlineWrap={conditionType === ConditionType.Slider ? 'shift-children-below' : undefined}
 				verticalAlignment={conditionType === ConditionType.Slider ? 'none' : undefined}
 			>
-				<this.RenderComponentInterface
-					conditionType={conditionType}
-					conditionName={condition}
-					values={Object.keys(value?.values ?? {})}
-					slider={value?.slider}
-				/>
+				<this.RenderComponentInterface conditionType={conditionType} conditionName={condition} values={Object.keys(value?.values ?? {})} slider={value?.slider} />
 			</Field>
 		);
 	};
@@ -338,7 +333,7 @@ export class RenderThemeEditor extends React.Component<ThemeEditorProps> {
 			<div className="MillenniumDesktopSidebar_Editor" data-theme-name={activeTheme?.data?.name}>
 				<div className="MillenniumDesktopSidebar_EditorHeader">
 					<Dropdown
-						contextMenuPositionOptions={{ bMatchWidth: false }}
+						contextMenuPositionOptions={{ bMatchWidth: true }}
 						onChange={handleChange}
 						rgOptions={tabItems}
 						selectedOption={1}
