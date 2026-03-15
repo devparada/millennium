@@ -46,7 +46,7 @@ static std::string compute_crash_dump_base()
 {
 #ifdef _WIN32
     try {
-        return (platform::get_steam_path() / "ext" / "crash_dumps").string();
+        return (platform::get_millennium_path() / "crashes").string();
     } catch (...) {
         return "crash_dumps";
     }
@@ -146,6 +146,7 @@ static void spawn_watchdog()
     GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, reinterpret_cast<LPCSTR>(&install_millennium_crash_handler), &hSelf);
     GetModuleFileNameA(hSelf, dll_path, MAX_PATH);
 
+    // millennium.dll is in <steam>/millennium/lib/ — go up to millennium/, then into bin/
     char* last_sep = strrchr(dll_path, '\\');
     if (!last_sep) last_sep = strrchr(dll_path, '/');
     if (last_sep)
@@ -154,7 +155,7 @@ static void spawn_watchdog()
         dll_path[0] = '\0';
 
     char cmd[1024];
-    snprintf(cmd, sizeof(cmd), "\"%s%s\" --steam-pid=%u --steam-handle=%llX", dll_path, "millennium.crashhandler64.exe", steam_pid,
+    snprintf(cmd, sizeof(cmd), "\"%s..\\bin\\millennium.crashhandler64.exe\" --steam-pid=%u --steam-handle=%llX", dll_path, steam_pid,
              (unsigned long long)(uintptr_t)inheritable_handle);
 
     STARTUPINFOA si{};

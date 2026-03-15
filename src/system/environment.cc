@@ -172,14 +172,15 @@ void platform::environment::setup()
     const auto dataLibPath = std::filesystem::path(assetsPath).parent_path().generic_string();
 
 #ifdef _WIN32
+    const auto installPath = platform::get_install_path().string();
     std::map<std::string, std::string> environment_windows = {
-        { "MILLENNIUM__PLUGINS_PATH", platform::get_install_path().string() + "/plugins"  },
-        { "MILLENNIUM__CONFIG_PATH",  platform::get_install_path().string() + "/ext"      },
-        { "MILLENNIUM__LOGS_PATH",    platform::get_install_path().string() + "/ext/logs" },
-        { "MILLENNIUM__DATA_LIB",     dataLibPath                                         },
-        { "MILLENNIUM__SHIMS_PATH",   shimsPath                                           },
-        { "MILLENNIUM__ASSETS_PATH",  assetsPath                                          },
-        { "MILLENNIUM__INSTALL_PATH", platform::get_install_path().string()               }
+        { "MILLENNIUM__PLUGINS_PATH", installPath + "/plugins"  },
+        { "MILLENNIUM__CONFIG_PATH",  installPath + "/config"   },
+        { "MILLENNIUM__LOGS_PATH",    installPath + "/logs"     },
+        { "MILLENNIUM__DATA_LIB",     dataLibPath               },
+        { "MILLENNIUM__SHIMS_PATH",   shimsPath                 },
+        { "MILLENNIUM__ASSETS_PATH",  assetsPath                },
+        { "MILLENNIUM__INSTALL_PATH", installPath               }
     };
     environment.insert(environment_windows.begin(), environment_windows.end());
 #elif __linux__

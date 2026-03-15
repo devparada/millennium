@@ -77,6 +77,7 @@ async function initializeMillennium(settings: SettingsProps) {
 		conditionals: settings?.conditions,
 		steamPath: settings?.steamPath,
 		installPath: settings?.installPath,
+		themesPath: settings?.themesPath,
 		version: settings?.millenniumVersion,
 		enabledPlugins: settings?.enabledPlugins ?? [],
 		updates: settings?.updates ?? [],

@@ -157,7 +157,12 @@ std::optional<nlohmann::json> head::plugin_installer::read_plugin_metadata(const
 std::vector<nlohmann::json> head::plugin_installer::get_plugin_data()
 {
     std::vector<nlohmann::json> pluginData;
-    for (const auto& entry : std::filesystem::directory_iterator(get_plugins_path())) {
+    const auto pluginsPath = get_plugins_path();
+    if (!std::filesystem::exists(pluginsPath)) {
+        std::filesystem::create_directories(pluginsPath);
+        return pluginData;
+    }
+    for (const auto& entry : std::filesystem::directory_iterator(pluginsPath)) {
         if (!entry.is_directory()) continue;
 
         auto metadata = read_plugin_metadata(entry.path());

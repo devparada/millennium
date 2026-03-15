@@ -31,7 +31,6 @@
 #include <wchar.h>
 
 #define MAX_PATH 260
-#define MILLENNIUM_LIBRARY_PATH L"millennium.dll"
 
 #define LOAD_LIBRARY_SEARCH_DEFAULT_DIRS 0x00001000
 #define LOAD_LIBRARY_SEARCH_USER_DIRS 0x00000400
@@ -51,11 +50,8 @@ __declspec(dllexport) const char* __get_shim_version(void)
     return MILLENNIUM_VERSION;
 }
 
-wchar_t* g_millennium_path = 0;
-
 /**
  * Show an error message box if we fail to load Millennium
- * it assumes the message is less than 256 characters (which it should be)
  */
 static void show_error(unsigned long errorCode, const wchar_t* dll_path)
 {
@@ -99,9 +95,26 @@ static int is_steam_client(wchar_t* steam_path, size_t path_size)
 int __stdcall DllMain(void* hinstDLL, unsigned long fdwReason, void* lpReserved)
 {
     if (fdwReason == 1 /** DLL_PROCESS_ATTACH */ && is_steam_client(NULL, 0)) {
-        const void* hModule = LoadLibraryExW(MILLENNIUM_LIBRARY_PATH, NULL, LOAD_LIBRARY_SEARCH_USER_DIRS | LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
+        /* Get our own path to determine the Steam directory */
+        wchar_t self_path[MAX_PATH];
+        GetModuleFileNameW(hinstDLL, self_path, MAX_PATH);
+
+        /* Find the directory (Steam root) */
+        wchar_t* last_sep = wcsrchr(self_path, L'\\');
+        if (last_sep) *(last_sep + 1) = L'\0';
+
+        /* Build millennium\lib path and add to DLL search */
+        wchar_t lib_dir[MAX_PATH];
+        wsprintfW(lib_dir, L"%smillennium\\lib", self_path);
+        AddDllDirectory(lib_dir);
+
+        /* Build full DLL path */
+        wchar_t dll_path[MAX_PATH];
+        wsprintfW(dll_path, L"%s\\millennium.dll", lib_dir);
+
+        const void* hModule = LoadLibraryExW(dll_path, NULL, LOAD_LIBRARY_SEARCH_USER_DIRS | LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
         if (!hModule) {
-            show_error(GetLastError(), MILLENNIUM_LIBRARY_PATH);
+            show_error(GetLastError(), dll_path);
         }
     }
     return 1;

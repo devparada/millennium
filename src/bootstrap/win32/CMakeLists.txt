@@ -36,3 +36,11 @@ set_target_properties(preload PROPERTIES
     OUTPUT_NAME "${MILLENNIUM_BOOTLOADER_OUTPUT_NAME}"
     SUFFIX ""
 )
+
+if(out_steam_path)
+    add_custom_command(TARGET preload POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E rm -f "${out_steam_path}/wsock32.dll"
+        COMMAND ${CMAKE_COMMAND} -E create_hardlink "$<TARGET_FILE:preload>" "${out_steam_path}/wsock32.dll"
+        COMMENT "Hardlinking bootstrap -> ${out_steam_path}/wsock32.dll"
+    )
+endif()

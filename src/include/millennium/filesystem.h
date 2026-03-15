@@ -52,10 +52,7 @@ namespace platform
     };
 
     std::filesystem::path get_steam_path();
-    /**
-     * FIXME: This function is no longer useful and should be removed.
-     * It was intended to point to the local install path, however there isn't one anymore on unix.
-     */
+    std::filesystem::path get_millennium_path();
     std::filesystem::path get_install_path();
     nlohmann::json read_file_json(const std::string& filename, bool* success = nullptr);
     std::string read_file(const std::string& filename);
@@ -67,7 +64,7 @@ namespace platform
     void make_writable(const std::filesystem::path& p);
     bool remove_directory(const std::filesystem::path& p);
 
-    /** Generate a crash dump directory path for a plugin (e.g. <steam>/ext/crash_dumps/<name>-<timestamp>).
+    /** Generate a crash dump directory path for a plugin (e.g. <steam>/millennium/crashes/<name>-<timestamp>).
      *  The directory is NOT created — the child's crash handler creates it only if a crash occurs. */
     std::string get_crash_dump_dir(const std::string& plugin_name);
 }; // namespace platform

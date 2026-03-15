@@ -4,13 +4,25 @@ function (find_steam_path project_name)
         if(result EQUAL 0)
             string(REGEX MATCH "[a-zA-Z]:/[^ ]+([ ]+[^ ]+)*" out_steam_path "${steam_path}")
             string(REPLACE "\n" "" out_steam_path "${out_steam_path}")
-            message(STATUS "[Millennium] Target build path: ${out_steam_path}")
+            message(STATUS "[Millennium] Steam path: ${out_steam_path}")
 
             set(out_steam_path "${out_steam_path}" PARENT_SCOPE)
 
+            # Determine output dir based on target type:
+            #   shared libraries  -> <steam>/millennium/lib/
+            #   executables       -> <steam>/millennium/bin/
+            get_target_property(_target_type ${project_name} TYPE)
+            if(_target_type STREQUAL "SHARED_LIBRARY" OR _target_type STREQUAL "MODULE_LIBRARY")
+                set(_out_dir "${out_steam_path}/millennium/lib")
+            else()
+                set(_out_dir "${out_steam_path}/millennium/bin")
+            endif()
+
+            message(STATUS "[Millennium] Target build path (${project_name}): ${_out_dir}")
+
             set_target_properties(${project_name} PROPERTIES
-                RUNTIME_OUTPUT_DIRECTORY "${out_steam_path}"
-                LIBRARY_OUTPUT_DIRECTORY "${out_steam_path}"
+                RUNTIME_OUTPUT_DIRECTORY "${_out_dir}"
+                LIBRARY_OUTPUT_DIRECTORY "${_out_dir}"
             )
 
             foreach(cfg DEBUG RELEASE RELWITHDEBINFO MINSIZEREL)

@@ -70,7 +70,7 @@ const CrashModal = ({ detail, closeModal, onResolve }: { detail: PluginCrashInfo
 	};
 
 	const openCrashFolder = () => {
-		const target = detail.crashDumpDir || `${pluginSelf?.steamPath ?? ''}/ext/crash_dumps`;
+		const target = detail.crashDumpDir || `${pluginSelf?.steamPath ?? ''}/millennium/crashes`;
 		if (target) {
 			(window as any).SteamClient.System.OpenLocalDirectoryInSystemExplorer(target);
 		}

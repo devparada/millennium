@@ -172,6 +172,7 @@ builtin_payload head::millennium_backend::Core_GetStartConfig(const builtin_payl
         { "settings", CONFIG.get_all() },
         { "steamPath", platform::get_steam_path() },
         { "installPath", platform::get_install_path() },
+        { "themesPath", (platform::get_millennium_path() / "themes").string() },
         { "millenniumVersion", MILLENNIUM_VERSION },
         { "enabledPlugins", m_plugin_manager->get_enabled_plugin_names() },
         { "updates", m_updater->check_for_updates() },
@@ -187,7 +188,7 @@ builtin_payload head::millennium_backend::Core_GetStartConfig(const builtin_payl
 /** Quick CSS utilities */
 builtin_payload head::millennium_backend::Core_LoadQuickCss(const builtin_payload&)
 {
-    const std::string quickCssPath = fmt::format("{}/quickcss.css", platform::environment::get("MILLENNIUM__CONFIG_PATH"));
+    const std::string quickCssPath = fmt::format("{}/quick.css", platform::environment::get("MILLENNIUM__CONFIG_PATH"));
 
     if (!std::filesystem::exists(quickCssPath)) {
         platform::write_file(quickCssPath, "/* Quick CSS file created by Millennium */\n");
@@ -197,7 +198,7 @@ builtin_payload head::millennium_backend::Core_LoadQuickCss(const builtin_payloa
 }
 builtin_payload head::millennium_backend::Core_SaveQuickCss(const builtin_payload& args)
 {
-    const std::string quickCssPath = fmt::format("{}/quickcss.css", platform::environment::get("MILLENNIUM__CONFIG_PATH"));
+    const std::string quickCssPath = fmt::format("{}/quick.css", platform::environment::get("MILLENNIUM__CONFIG_PATH"));
     platform::write_file(quickCssPath, args["css"].get<std::string>());
     return {};
 }

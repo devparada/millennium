@@ -207,6 +207,7 @@ export interface SettingsProps {
 	settings: Settings;
 	steamPath: string;
 	installPath: string;
+	themesPath: string;
 	millenniumVersion: string;
 	enabledPlugins: string;
 	hasCheckedForUpdates: boolean;

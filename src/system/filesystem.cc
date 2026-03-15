@@ -82,12 +82,17 @@ std::filesystem::path get_steam_path()
     return cached_path;
 }
 
+std::filesystem::path get_millennium_path()
+{
+    return get_steam_path() / "millennium";
+}
+
 std::filesystem::path get_install_path()
 {
 #if defined(__linux__) || defined(__APPLE__)
     return platform::environment::get("MILLENNIUM__CONFIG_PATH");
 #elif defined(_WIN32)
-    return get_steam_path();
+    return get_millennium_path();
 #endif
 }
 
@@ -303,7 +308,7 @@ bool remove_directory(const std::filesystem::path& p)
 std::string get_crash_dump_dir(const std::string& plugin_name)
 {
 #ifdef _WIN32
-    auto base = get_steam_path() / "ext" / "crash_dumps";
+    auto base = get_millennium_path() / "crashes";
 #else
     const char* xdg_state = std::getenv("XDG_STATE_HOME");
     std::filesystem::path base;

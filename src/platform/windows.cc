@@ -30,6 +30,7 @@
 
 #ifdef _WIN32
 #include "millennium/millennium.h"
+#include "millennium/filesystem.h"
 #include "millennium/cmdline_parse.h"
 #include "millennium/plat_msg.h"
 #include "millennium/environment.h"
@@ -90,7 +91,7 @@ BOOL AreFilesIdentical(LPCWSTR path1, LPCWSTR path2)
  */
 VOID Win32_AttachWebHelperHook(VOID)
 {
-    const auto hookPath = platform::get_steam_path() / "millennium.hhx64.dll";
+    const auto hookPath = platform::get_millennium_path() / "lib" / "millennium.hhx64.dll";
     const auto targetPath = platform::get_steam_path() / "bin" / "cef" / "cef.win7x64" / "version.dll";
 
     if (!std::filesystem::exists(hookPath)) {

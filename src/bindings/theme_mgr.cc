@@ -46,9 +46,9 @@ head::theme_installer::theme_installer(std::shared_ptr<::plugin_manager> plugin_
     migrate_legacy_themes();
 }
 
-std::filesystem::path head::theme_installer::get_skins_folder()
+std::filesystem::path head::theme_installer::get_themes_folder()
 {
-    return std::filesystem::path(platform::get_steam_path()) / "steamui" / "skins";
+    return platform::get_millennium_path() / "themes";
 }
 
 nlohmann::json head::theme_installer::create_error_response(const std::string& message)
@@ -84,7 +84,7 @@ bool head::theme_installer::is_theme_installed(const std::string& repo, const st
         return false;
     }
 
-    std::filesystem::path path = get_skins_folder() / theme->value("native", std::string());
+    std::filesystem::path path = get_themes_folder() / theme->value("native", std::string());
     bool installed = std::filesystem::exists(path);
     logger.log("is_theme_installed: {}/{} -> {} (path: {})", owner, repo, installed, path.string());
     return installed;
@@ -99,7 +99,7 @@ nlohmann::json head::theme_installer::uninstall_theme(std::shared_ptr<theme_conf
 
     if (!themeOpt->contains("native")) return create_error_response("Theme does not have a native path!");
 
-    std::filesystem::path path = get_skins_folder() / themeOpt->value("native", std::string());
+    std::filesystem::path path = get_themes_folder() / themeOpt->value("native", std::string());
     if (!std::filesystem::exists(path)) return create_error_response("Theme path does not exist!");
 
     if (!platform::remove_directory(path)) return create_error_response("Failed to delete theme folder");
@@ -209,7 +209,7 @@ std::string head::theme_installer::get_commit_hash(const std::filesystem::path& 
 void head::theme_installer::migrate_legacy_themes()
 {
     try {
-        std::filesystem::path themesDir = get_skins_folder();
+        std::filesystem::path themesDir = get_themes_folder();
         if (!std::filesystem::exists(themesDir)) {
             return;
         }
@@ -270,7 +270,7 @@ nlohmann::json head::theme_installer::install_theme(std::shared_ptr<theme_config
             return create_error_response("Repository name and owner cannot be empty");
         }
 
-        std::filesystem::path finalPath = get_skins_folder() / repo;
+        std::filesystem::path finalPath = get_themes_folder() / repo;
 
         if (!std::filesystem::exists(finalPath.parent_path())) {
             return create_error_response("Themes root directory does not exist: " + finalPath.parent_path().string());
@@ -301,7 +301,7 @@ nlohmann::json head::theme_installer::install_theme(std::shared_ptr<theme_config
         logger.log("Downloading theme from: {}", downloadUrl);
         m_updater->dispatch_progress("Downloading theme archive...", 10, false);
 
-        tempDir = get_skins_folder() / ("__tmp_" + GenerateUUID());
+        tempDir = get_themes_folder() / ("__tmp_" + GenerateUUID());
         std::filesystem::create_directories(tempDir);
         std::filesystem::path zipPath = tempDir / (repo + ".zip");
 
@@ -384,7 +384,7 @@ bool head::theme_installer::update_theme(std::shared_ptr<theme_config_store> the
 {
     std::filesystem::path tempDir;
     try {
-        std::filesystem::path themePath = get_skins_folder() / native;
+        std::filesystem::path themePath = get_themes_folder() / native;
         logger.log("Updating theme '{}'", native);
 
         auto metadata = read_metadata(themePath);
@@ -418,7 +418,7 @@ bool head::theme_installer::update_theme(std::shared_ptr<theme_config_store> the
         logger.log("Downloading theme update from: {}", downloadUrl);
         m_updater->dispatch_progress("Downloading theme update...", 5, false);
 
-        tempDir = get_skins_folder() / ("__tmp_" + GenerateUUID());
+        tempDir = get_themes_folder() / ("__tmp_" + GenerateUUID());
         std::filesystem::create_directories(tempDir);
         std::filesystem::path zipPath = tempDir / (repo + ".zip");
 
@@ -499,7 +499,7 @@ std::vector<std::pair<nlohmann::json, std::filesystem::path>> head::theme_instal
     for (auto& theme : themes) {
         if (!theme["data"].contains("github")) continue;
 
-        std::filesystem::path path = get_skins_folder() / theme.value("native", "");
+        std::filesystem::path path = get_themes_folder() / theme.value("native", "");
         if (!std::filesystem::exists(path)) continue;
 
         bool hasMetadata = std::filesystem::exists(path / "metadata.json");
