@@ -33,6 +33,7 @@
 #include "millennium/singleton.h"
 #include "millennium/types.h"
 #include <functional>
+#include <initializer_list>
 #include <mutex>
 
 class config_manager : public singleton<config_manager>
@@ -55,7 +56,10 @@ class config_manager : public singleton<config_manager>
     void merge_default_config(json& current, const json& incoming, const std::string& path);
 
     json get(const std::string& path, const json& def = nullptr);
+    json get(std::initializer_list<std::string> segments, const json& def = nullptr);
+
     void set(const std::string& path, const json& value, bool skipPropagation = false);
+    void set(std::initializer_list<std::string> segments, const json& value, bool skipPropagation = false);
 
     config_manager();
     ~config_manager();

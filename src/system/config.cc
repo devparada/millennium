@@ -41,6 +41,24 @@
 
 #include "head/default_cfg.h"
 
+nlohmann::json config_manager::get(std::initializer_list<std::string> segments, const nlohmann::json& def)
+{
+    std::lock_guard<std::recursive_mutex> lock(_mutex);
+    const nlohmann::json* current = &_data;
+
+    auto it = segments.begin();
+    for (; it != segments.end(); ++it) {
+        if (!current->contains(*it)) return def;
+        if (std::next(it) != segments.end()) {
+            current = &(*current)[*it];
+        } else {
+            return (*current)[*it];
+        }
+    }
+
+    return def;
+}
+
 nlohmann::json config_manager::get(const std::string& path, const nlohmann::json& def)
 {
     std::lock_guard<std::recursive_mutex> lock(_mutex);
@@ -57,6 +75,47 @@ nlohmann::json config_manager::get(const std::string& path, const nlohmann::json
     std::string last_key = path.substr(start);
     if (!current->contains(last_key)) return def;
     return (*current)[last_key];
+}
+
+static std::string join_segments(std::initializer_list<std::string> segments)
+{
+    std::string result;
+    for (auto it = segments.begin(); it != segments.end(); ++it) {
+        if (it != segments.begin()) result += '.';
+        result += *it;
+    }
+    return result;
+}
+
+void config_manager::set(std::initializer_list<std::string> segments, const nlohmann::json& value, bool skipPropagation)
+{
+    std::lock_guard<std::recursive_mutex> lock(_mutex);
+    nlohmann::json* current = &_data;
+
+    auto it = segments.begin();
+    auto last = std::prev(segments.end());
+
+    for (; it != last; ++it) {
+        if (!current->contains(*it) || !(*current)[*it].is_object()) (*current)[*it] = nlohmann::json::object();
+        current = &(*current)[*it];
+    }
+
+    if (!current->is_object()) {
+        *current = nlohmann::json::object();
+    }
+
+    nlohmann::json old_value = nullptr;
+    if (current->contains(*last)) {
+        old_value = (*current)[*last];
+    }
+
+    if (old_value != value) {
+        (*current)[*last] = value;
+        if (!skipPropagation) {
+            notify_listeners(join_segments(segments), old_value, value);
+            save_to_disk();
+        }
+    }
 }
 
 void config_manager::set(const std::string& path, const nlohmann::json& value, bool skipPropagation)
