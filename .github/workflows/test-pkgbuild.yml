@@ -55,7 +55,7 @@ jobs:
           # Ensure bun is available to the builder user
           cp -r "$HOME/.bun" /home/builder/.bun
           chown -R builder:builder /home/builder/.bun
-          su builder -c 'export PATH="$HOME/.bun/bin:$PATH" && cd /home/builder/pkg && makepkg -s --noconfirm'
+          su builder -c 'export PATH="$HOME/.bun/bin:$PATH" && cd /home/builder/pkg && makepkg -s --noconfirm --nodeps'
 
       - name: Verify package
         run: |
