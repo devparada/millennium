@@ -20,6 +20,7 @@ jobs:
           # Enable multilib for 32-bit builds
           printf '\n[multilib]\nInclude = /etc/pacman.d/mirrorlist\n' >> /etc/pacman.conf
           pacman -Syu --noconfirm
+          pacman -S --noconfirm git
 
           # Create build user (makepkg refuses to run as root)
           useradd -m builder
