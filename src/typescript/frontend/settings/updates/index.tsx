@@ -28,6 +28,7 @@
  * SOFTWARE.
  */
 
+import React, { useState } from 'react';
 import { DialogButton, DialogControlsSection, IconsModule, pluginSelf, SteamSpinner } from '@steambrew/client';
 import { MillenniumUpdateCard } from './MillenniumUpdateCard';
 import { ThemeUpdateCard } from './ThemeUpdateCards';
@@ -36,6 +37,7 @@ import { PluginUpdateCard } from './PluginUpdateCards';
 import { locale } from '../../utils/localization-manager';
 import { Placeholder } from '../../components/Placeholder';
 import { settingsClasses } from '../../utils/classes';
+import { MillenniumIcons } from '../../components/Icons';
 
 // TODO: Type this properly, this is a mess. Im too lazy to do it right now
 interface UpdateProps {
@@ -63,6 +65,13 @@ const parseUpdateErrorMessage = () => {
 
 const UpdatesViewModal: React.FC = () => {
 	const { themeUpdates, pluginUpdates, hasUpdateError, hasReceivedUpdates, hasAnyUpdates, fetchAvailableUpdates } = useUpdateContext();
+	const [isRechecking, setIsRechecking] = useState(false);
+
+	const handleRecheck = async () => {
+		setIsRechecking(true);
+		await fetchAvailableUpdates(true);
+		setIsRechecking(false);
+	};
 
 	if (hasUpdateError) {
 		return (
@@ -78,7 +87,8 @@ const UpdatesViewModal: React.FC = () => {
 	if (!hasAnyUpdates()) {
 		return (
 			<Placeholder icon={<IconsModule.Checkmark />} header={locale.updatePanelNoUpdatesFoundHeader} body={locale.updatePanelNoUpdatesFound}>
-				<DialogButton className={settingsClasses.SettingsDialogButton} onClick={fetchAvailableUpdates.spread(true)}>
+				<DialogButton className={settingsClasses.SettingsDialogButton} onClick={handleRecheck} disabled={isRechecking}>
+					{isRechecking && <MillenniumIcons.LoadingSpinner />}
 					{locale.updatePanelCheckForUpdates}
 				</DialogButton>
 			</Placeholder>
