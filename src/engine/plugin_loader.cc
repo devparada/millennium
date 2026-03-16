@@ -652,8 +652,10 @@ void plugin_loader::set_plugins_enabled(const std::vector<std::pair<std::string,
     }
 
     /** destroy all plugins that need to be disabled */
-    for (const auto& name : plugins_to_disable)
+    for (const auto& name : plugins_to_disable) {
         m_backend_manager->destroy_plugin(name);
+        mep::crash_event_bus::instance().acknowledge_crash(name);
+    }
 
     /* Refresh stale snapshots so start_plugin_backends() and log_enabled_plugins()
        see the updated enabled-plugin list rather than the init()-time snapshot. */
