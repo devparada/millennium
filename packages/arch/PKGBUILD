@@ -9,7 +9,7 @@ arch=('x86_64')
 url="https://github.com/SteamClientHomebrew/Millennium"
 license=('MIT')
 depends=('git' 'steam' 'luajit')
-makedepends=('bun' 'curl' 'zip' 'unzip' 'tar' 'cmake' 'ninja' 'lib32-gcc-libs' 'libx11' 'libxtst' 'luajit')
+makedepends=('bun' 'curl' 'zip' 'unzip' 'tar' 'cmake' 'ninja' 'lib32-gcc-libs' 'lib32-openssl' 'libx11' 'libxtst' 'luajit')
 source=("git+$url.git#commit=6a8d04aa79cafc682207cd14e516fe5a7deac152") # TODO: update to commit on main branch when we merge.
 sha256sums=('SKIP')
 options=(!debug)
