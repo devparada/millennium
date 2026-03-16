@@ -334,6 +334,14 @@ const styles = /* css */ `
 /**
  * Updates
  */
+
+.MillenniumUpdates_CheckForUpdates {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+}
+
 .MillenniumUpdates_Description {
     display: flex;
     flex-direction: column;

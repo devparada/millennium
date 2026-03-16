@@ -29,7 +29,7 @@
  */
 
 import React, { useState } from 'react';
-import { DialogButton, DialogControlsSection, IconsModule, pluginSelf, SteamSpinner } from '@steambrew/client';
+import { DialogButton, DialogControlsSection, IconsModule, joinClassNames, pluginSelf, SteamSpinner } from '@steambrew/client';
 import { MillenniumUpdateCard } from './MillenniumUpdateCard';
 import { ThemeUpdateCard } from './ThemeUpdateCards';
 import { useUpdateContext } from './useUpdateContext';
@@ -65,7 +65,7 @@ const parseUpdateErrorMessage = () => {
 
 const UpdatesViewModal: React.FC = () => {
 	const { themeUpdates, pluginUpdates, hasUpdateError, hasReceivedUpdates, hasAnyUpdates, fetchAvailableUpdates } = useUpdateContext();
-	const [isRechecking, setIsRechecking] = useState(false);
+	const [isRechecking, setIsRechecking] = useState(true);
 
 	const handleRecheck = async () => {
 		setIsRechecking(true);
@@ -76,7 +76,7 @@ const UpdatesViewModal: React.FC = () => {
 	if (hasUpdateError) {
 		return (
 			<Placeholder icon={<IconsModule.ExclamationPoint />} header={locale.updatePanelErrorHeader} body={locale.updatePanelErrorBody + parseUpdateErrorMessage()}>
-				<DialogButton className={settingsClasses.SettingsDialogButton} onClick={fetchAvailableUpdates.spread(true)}>
+				<DialogButton className={joinClassNames(settingsClasses.SettingsDialogButton, "MillenniumUpdates_CheckForUpdates")} onClick={fetchAvailableUpdates.spread(true)}>
 					{locale.updatePanelErrorButton}
 				</DialogButton>
 			</Placeholder>
