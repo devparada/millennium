@@ -662,8 +662,28 @@ void plugin_loader::set_plugins_enabled(const std::vector<std::pair<std::string,
     *m_plugin_ptr = m_plugin_manager->get_all_plugins();
     *m_enabledPluginsPtr = m_plugin_manager->get_enabled_backends();
 
-    /** if any new backends were enabled, we need to start them */
-    if (should_start_backends) start_plugin_backends();
+    /** only spawn the plugins that were just enabled — not all non-running
+        enabled plugins.  start_plugin_backends() would re-spawn crashed plugins
+        that the user didn't ask to restart. */
+    if (should_start_backends) {
+        if (!m_child_handler_installed) {
+            this->setup_child_request_handler();
+            m_child_handler_installed = true;
+        }
+        this->log_enabled_plugins();
+
+        for (const auto& [name, enabled] : plugins) {
+            if (!enabled) continue;
+            if (m_backend_manager->is_any_backend_running(name)) continue;
+
+            for (auto& plugin : *m_enabledPluginsPtr) {
+                if (plugin.plugin_name == name) {
+                    m_backend_manager->spawn_plugin(plugin);
+                    break;
+                }
+            }
+        }
+    }
 
     inject_frontend_shims(true);
 }
