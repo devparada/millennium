@@ -143,7 +143,7 @@ for (const filter of steps) {
   process.stdout.write(`building ${chalk.yellow(filter)}... `);
   const start = performance.now();
   try {
-    await $`cd ${packageDirs[filter]} && bun run build`.quiet();
+    await $`cd ${packageDirs[filter]} && bun run build`.env({ ...process.env, PATH: `${ROOT}/node_modules/.bin:${process.env.PATH}` }).quiet();
     rebuilt.add(filter);
     cache[filter] = hash;
     console.log(
