@@ -37,12 +37,14 @@ jobs:
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           # Prepare build directory with PKGBUILD
           cp -r packages/arch /home/builder/pkg
+          # Remove steam from runtime depends (unavailable in CI)
+          sed -i "s/'steam'//" /home/builder/pkg/PKGBUILD
           # Pre-populate srcdir with the local checkout so makepkg skips cloning
           mkdir -p /home/builder/pkg/src
           cp -r "$GITHUB_WORKSPACE" /home/builder/pkg/src/Millennium
           chown -R builder:builder /home/builder/pkg
           su builder -c "git config --global --add safe.directory /home/builder/pkg/src/Millennium"
-          su builder -c 'cd /home/builder/pkg && makepkg -s --noconfirm --nodeps --noextract'
+          su builder -c 'cd /home/builder/pkg && makepkg -s --noconfirm --noextract'
 
       - name: Verify package
         run: |
