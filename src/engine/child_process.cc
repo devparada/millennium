@@ -550,7 +550,7 @@ std::unique_ptr<PluginProcess> spawn_plugin_process(const std::string& plugin_na
         DWORD creation_flags = CommandLineArguments::has_argument("-dev") ? 0 : CREATE_NO_WINDOW;
 
         if (!CreateProcessA(nullptr, const_cast<char*>(cmd.c_str()), nullptr, nullptr, FALSE, creation_flags, nullptr, nullptr, &si, &pi)) {
-            LOG_ERROR("[spawn] CreateProcess failed for plugin '{}'", plugin_name);
+            LOG_ERROR("[spawn] CreateProcess failed for plugin '{}' (error: {}, cmd: {})", plugin_name, GetLastError(), cmd);
             plugin_ipc::close_fd(server_fd);
             return nullptr;
         }
