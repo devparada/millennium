@@ -60,7 +60,11 @@ void head::library_updater::init(std::shared_ptr<plugin_manager> plugin_manager)
 
 bool head::library_updater::download_plugin_update(const std::string& id, const std::string& name)
 {
-    return plugin_updater->update_plugin(id, name);
+    bool ok = plugin_updater->update_plugin(id, name);
+    if (ok) {
+        cached_updates.reset();
+    }
+    return ok;
 }
 
 bool head::library_updater::download_theme_update(std::shared_ptr<theme_config_store> themeConfig, const std::string& native)
