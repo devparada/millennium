@@ -39,6 +39,7 @@ jobs:
 
       - name: Patch PKGBUILD to use local source
         run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
           COMMIT=$(git rev-parse HEAD)
           REPO_DIR=$(pwd)
           cd packages/arch
