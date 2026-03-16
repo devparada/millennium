@@ -76,7 +76,13 @@ const UpdatesViewModal: React.FC = () => {
 
 	if (!hasReceivedUpdates) return <SteamSpinner background="transparent" />;
 	if (!hasAnyUpdates()) {
-		return <Placeholder icon={<IconsModule.Checkmark />} header={locale.updatePanelNoUpdatesFoundHeader} body={locale.updatePanelNoUpdatesFound} />;
+		return (
+			<Placeholder icon={<IconsModule.Checkmark />} header={locale.updatePanelNoUpdatesFoundHeader} body={locale.updatePanelNoUpdatesFound}>
+				<DialogButton className={settingsClasses.SettingsDialogButton} onClick={fetchAvailableUpdates.spread(true)}>
+					{locale.updatePanelCheckForUpdates}
+				</DialogButton>
+			</Placeholder>
+		);
 	}
 
 	return (
