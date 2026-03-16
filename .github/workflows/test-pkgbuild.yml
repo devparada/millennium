@@ -15,30 +15,27 @@ jobs:
       image: archlinux:base-devel
 
     steps:
-      - name: Setup pacman and paru
+      - name: Setup pacman and dependencies
         run: |
           # Enable multilib for 32-bit builds
           sed -i '/\[multilib\]/,/Include/s/^#//' /etc/pacman.conf
           pacman -Syu --noconfirm
-          pacman -S --noconfirm git curl
+          # Install all build deps from official repos
+          pacman -S --noconfirm git curl zip unzip tar cmake ninja \
+            lib32-gcc-libs libx11 libxtst lib32-curl
+          # Install bun (AUR package, not in official repos)
+          curl -fsSL https://bun.sh/install | bash
+          ln -s "$HOME/.bun/bin/bun" /usr/local/bin/bun
 
-          # Create build user (paru/makepkg refuse to run as root)
+      - name: Create build user
+        run: |
           useradd -m builder
           echo "builder ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
-
-          # Install paru-bin from AUR
-          su builder -c 'cd /tmp && git clone https://aur.archlinux.org/paru-bin.git && cd paru-bin && makepkg -si --noconfirm'
 
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           submodules: true
-
-      - name: Install PKGBUILD dependencies
-        run: |
-          # Install all makedepends + depends (except steam) via paru so AUR packages like bun are resolved
-          su builder -c 'paru -S --noconfirm --needed --skipreview \
-            bun curl zip unzip tar cmake ninja lib32-gcc-libs libx11 libxtst lib32-curl'
 
       - name: Build package
         run: |
