@@ -34,6 +34,7 @@
 #include "millennium/cmdline_parse.h"
 #include "millennium/plat_msg.h"
 #include "millennium/environment.h"
+#include "millennium/encoding.h"
 #include "millennium/http_hooks.h"
 #include "millennium/plugin_loader.h"
 #include "millennium/steam_hooks.h"
@@ -42,6 +43,8 @@
 #include "shared/crash_handler.h"
 
 #include <thread>
+
+namespace fs = std::filesystem;
 
 /** forward declare function */
 std::thread g_millenniumThread;
@@ -133,9 +136,132 @@ VOID Win32_MoveVersionHook(VOID)
     }
 }
 
+/* move a single file to a temp directory. Uses MoveFileExW so it can handle in-use files.*/
+static void move_to_temp(const fs::path& file, const fs::path& temp_dir)
+{
+    std::error_code ec;
+    if (!fs::exists(file, ec)) return;
+
+    fs::path dest = temp_dir / fmt::format("{}.{}.tmp", file.filename().string(), GenerateUUID());
+    if (!MoveFileExW(file.wstring().c_str(), dest.wstring().c_str(), MOVEFILE_REPLACE_EXISTING)) {
+        logger.warn("Migration: could not move {} (error: {})", file.string(), GetLastError());
+    } else {
+        logger.log("Migration: moved {} -> temp", file.filename().string());
+    }
+}
+
+/**
+ * move each entry (file, dir, or symlink) from src_dir into dst_dir individually.
+ * moves symlinks/junctions as-is (no admin rights needed).
+ */
+static void move_directory_entries(const fs::path& src_dir, const fs::path& dst_dir)
+{
+    std::error_code ec;
+    if (!fs::exists(src_dir, ec) || !fs::is_directory(src_dir, ec)) return;
+
+    for (const auto& entry : fs::directory_iterator(src_dir, ec)) {
+        if (ec) break;
+
+        fs::path dest = dst_dir / entry.path().filename();
+        if (fs::exists(dest, ec)) continue;
+
+        fs::rename(entry.path(), dest, ec);
+        if (ec) {
+            logger.warn("Migration: failed to move {}: {}", entry.path().filename().string(), ec.message());
+            ec.clear();
+        }
+    }
+}
+
+/**
+ * migrate the old flat <steam>/ext/ layout to the new <steam>/millennium/ structure.
+ * runs once, skipped if ext/ is already gone or millennium/ is already populated.
+ */
+static VOID Win32_MigrateLegacyLayout(VOID)
+{
+    try {
+        const auto steam = platform::get_steam_path();
+        const auto millennium = platform::get_millennium_path();
+
+        std::error_code ec;
+        const bool hasLegacyExt = fs::exists(steam / "ext", ec);
+        const bool hasLegacyPlugins = fs::exists(steam / "plugins", ec);
+        const bool hasLegacySkins = fs::exists(steam / "steamui" / "skins", ec);
+
+        if (!hasLegacyExt && !hasLegacyPlugins && !hasLegacySkins) return;
+
+        logger.log("Migration: legacy layout detected, migrating...");
+
+        /** create directory skeleton */
+        for (const auto& dir : { "ext/data/assets", "ext/data/shims", "plugins", "logs", "themes", "config", "crashes" }) {
+            fs::create_directories(millennium / dir, ec);
+        }
+
+        /** move data directories */
+        auto safe_rename = [&](const fs::path& src, const fs::path& dst) {
+            if (fs::exists(src, ec) && !fs::exists(dst, ec)) {
+                fs::rename(src, dst, ec);
+                if (ec) { logger.warn("Migration: rename {} failed: {}", src.string(), ec.message()); ec.clear(); }
+            }
+        };
+
+        safe_rename(steam / "ext" / "data" / "assets", millennium / "ext" / "data" / "assets");
+        safe_rename(steam / "ext" / "data" / "shims",  millennium / "ext" / "data" / "shims");
+
+        /** move plugins and themes (entry-by-entry so symlinks are preserved) */
+        move_directory_entries(steam / "plugins", millennium / "plugins");
+        move_directory_entries(steam / "steamui" / "skins", millennium / "themes");
+
+        /** move logs */
+        move_directory_entries(steam / "ext" / "logs", millennium / "logs");
+
+        /** move config files */
+        safe_rename(steam / "ext" / "config.json", millennium / "config" / "config.json");
+        safe_rename(steam / "ext" / "quickcss.css", millennium / "config" / "quick.css");
+
+        /** move legacy DLLs to temp (they may be loaded, so move rather than delete) */
+        fs::path temp_dir = steam / "millennium-migration-temp";
+        fs::create_directories(temp_dir, ec);
+
+        const fs::path legacy_files[] = {
+            steam / "user32.dll",
+            steam / "version.dll",
+            steam / "ext" / "compat32" / "millennium_x86.dll",
+            steam / "ext" / "compat32" / "python311.dll",
+            steam / "ext" / "compat64" / "millennium_x64.dll",
+            steam / "ext" / "compat64" / "python311.dll",
+            steam / "millennium.hhx64.dll",
+            steam / "millennium.dll",
+            steam / "python311.dll",
+            steam / "millennium-legacy.version.dll",
+        };
+
+        for (const auto& file : legacy_files) {
+            move_to_temp(file, temp_dir);
+        }
+
+        /** clean up legacy directories */
+        if (fs::exists(steam / "ext", ec)) {
+            fs::rename(steam / "ext", temp_dir / "ext", ec);
+            if (ec) {
+                logger.warn("Migration: could not move ext/ to temp: {}", ec.message());
+                ec.clear();
+            }
+        }
+        fs::remove_all(steam / "plugins", ec);
+        fs::remove_all(steam / "steamui" / "skins", ec);
+
+        logger.log("Migration: completed.");
+    } catch (const std::exception& e) {
+        LOG_ERROR("Migration failed: {}", e.what());
+    }
+}
+
 VOID Win32_AttachMillennium(VOID)
 {
     install_millennium_crash_handler();
+
+    Win32_MigrateLegacyLayout();
 
     /** Starts the CEF arg hook, it doesn't wait for the hook to be installed, it waits for the hook to be setup */
     if (!Plat_InitializeSteamHooks()) {
