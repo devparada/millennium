@@ -78,6 +78,8 @@ constexpr const char* INSTALL_PATH = "install_path";
 constexpr const char* IS_PLUGIN_ENABLED = "is_plugin_enabled";
 constexpr const char* CMP_VERSION = "cmp_version";
 constexpr const char* PATCHES = "patches";
+constexpr const char* HTTP_REQUEST = "http_request";
+constexpr const char* HTTP_DOWNLOAD = "http_download";
 } // namespace child_method
 
 namespace parent_method

@@ -48,6 +48,8 @@
 #include "millennium/plugin_webkit_store.h"
 #include "millennium/semver.h"
 #include "millennium/auth.h"
+#include <curl/curl.h>
+#include <cstdio>
 #include "state/shared_memory.h"
 #include "mep/console_capture.h"
 #include <memory>
@@ -578,6 +580,197 @@ void plugin_loader::setup_child_request_handler()
                     { "result", -2 }
                 };
             }
+        }
+
+        if (method == plugin_ipc::child_method::HTTP_REQUEST) {
+            const std::string url = params.value("url", "");
+            const std::string http_method = params.value("method", "GET");
+            const std::string data = params.value("data", "");
+            const long timeout = params.value("timeout", 30L);
+            const bool follow_redirects = params.value("follow_redirects", true);
+            const bool verify_ssl = params.value("verify_ssl", true);
+            const std::string user_agent = params.value("user_agent", "Millennium/1.0");
+            const std::string proxy = params.value("proxy", "");
+
+            CURL* curl = curl_easy_init();
+            if (!curl) {
+                return {{ "error", "failed to initialize curl" }};
+            }
+
+            static constexpr size_t MAX_RESPONSE_BODY = 64u * 1024u * 1024u; /* 64 MB */
+
+            struct body_ctx { std::string data; bool exceeded; };
+            body_ctx body{ {}, false };
+            nlohmann::json response_headers = nlohmann::json::object();
+
+            auto write_cb = +[](char* ptr, size_t size, size_t nmemb, void* ud) -> size_t {
+                auto* ctx = static_cast<body_ctx*>(ud);
+                size_t bytes = size * nmemb;
+                if (ctx->data.size() + bytes > MAX_RESPONSE_BODY) {
+                    ctx->exceeded = true;
+                    return 0; /* abort transfer */
+                }
+                ctx->data.append(ptr, bytes);
+                return bytes;
+            };
+
+            struct header_ctx { nlohmann::json* headers; };
+            header_ctx hctx{ &response_headers };
+
+            auto header_cb = +[](char* buf, size_t size, size_t nitems, void* ud) -> size_t {
+                size_t len = size * nitems;
+                auto* ctx = static_cast<header_ctx*>(ud);
+                std::string line(buf, len);
+                while (!line.empty() && (line.back() == '\r' || line.back() == '\n')) line.pop_back();
+                auto colon = line.find(':');
+                if (colon != std::string::npos && !line.empty()) {
+                    std::string key = line.substr(0, colon);
+                    std::string val = line.substr(colon + 1);
+                    while (!val.empty() && val.front() == ' ') val.erase(val.begin());
+                    (*ctx->headers)[key] = val;
+                }
+                return len;
+            };
+
+            curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+            curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_cb);
+            curl_easy_setopt(curl, CURLOPT_WRITEDATA, &body);
+            curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, header_cb);
+            curl_easy_setopt(curl, CURLOPT_HEADERDATA, &hctx);
+            curl_easy_setopt(curl, CURLOPT_TIMEOUT, timeout);
+            curl_easy_setopt(curl, CURLOPT_USERAGENT, user_agent.c_str());
+            curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, follow_redirects ? 1L : 0L);
+            curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, verify_ssl ? 1L : 0L);
+            curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, verify_ssl ? 2L : 0L);
+            curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
+
+            struct curl_slist* req_headers = nullptr;
+            if (params.contains("headers") && params["headers"].is_object()) {
+                for (auto& [k, v] : params["headers"].items()) {
+                    req_headers = curl_slist_append(req_headers, (k + ": " + v.get<std::string>()).c_str());
+                }
+                curl_easy_setopt(curl, CURLOPT_HTTPHEADER, req_headers);
+            }
+
+            if (http_method == "POST") {
+                curl_easy_setopt(curl, CURLOPT_POST, 1L);
+                if (!data.empty()) {
+                    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, data.c_str());
+                    curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, static_cast<long>(data.size()));
+                }
+            } else if (http_method == "PUT" || http_method == "PATCH" || http_method == "DELETE" || http_method == "OPTIONS") {
+                curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, http_method.c_str());
+                if (!data.empty()) {
+                    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, data.c_str());
+                    curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, static_cast<long>(data.size()));
+                }
+            } else if (http_method == "HEAD") {
+                curl_easy_setopt(curl, CURLOPT_NOBODY, 1L);
+            }
+
+            if (params.contains("auth") && params["auth"].is_object()) {
+                std::string auth_str = params["auth"].value("user", "") + ":" + params["auth"].value("pass", "");
+                curl_easy_setopt(curl, CURLOPT_USERPWD, auth_str.c_str());
+                curl_easy_setopt(curl, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
+            }
+
+            if (!proxy.empty()) {
+                curl_easy_setopt(curl, CURLOPT_PROXY, proxy.c_str());
+            }
+
+            CURLcode res = curl_easy_perform(curl);
+            long status_code = 0;
+            curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &status_code);
+
+            curl_slist_free_all(req_headers);
+            curl_easy_cleanup(curl);
+
+            if (body.exceeded) {
+                return {{ "error", "response body exceeded 64 MB limit" }};
+            }
+
+            if (res != CURLE_OK) {
+                return {{ "error", curl_easy_strerror(res) }};
+            }
+
+            return {
+                { "body",    body.data        },
+                { "status",  status_code      },
+                { "headers", response_headers }
+            };
+        }
+
+        if (method == plugin_ipc::child_method::HTTP_DOWNLOAD) {
+            const std::string url = params.value("url", "");
+            const std::string dest = params.value("path", "");
+            const long timeout = params.value("timeout", 0L); /* 0 = no timeout for downloads */
+            const bool follow_redirects = params.value("follow_redirects", true);
+            const bool verify_ssl = params.value("verify_ssl", true);
+            const std::string user_agent = params.value("user_agent", "Millennium/1.0");
+
+            if (dest.empty()) {
+                return {{ "error", "path is required" }};
+            }
+
+            FILE* fp = fopen(dest.c_str(), "wb");
+            if (!fp) {
+                return {{ "error", "failed to open file: " + dest }};
+            }
+
+            CURL* curl = curl_easy_init();
+            if (!curl) {
+                fclose(fp);
+                return {{ "error", "failed to initialize curl" }};
+            }
+
+            struct dl_ctx { FILE* fp; size_t written; };
+            dl_ctx ctx{ fp, 0 };
+
+            auto write_cb = +[](char* ptr, size_t size, size_t nmemb, void* ud) -> size_t {
+                auto* c = static_cast<dl_ctx*>(ud);
+                size_t bytes = fwrite(ptr, size, nmemb, c->fp);
+                c->written += bytes * size;
+                return bytes;
+            };
+
+            curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+            curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_cb);
+            curl_easy_setopt(curl, CURLOPT_WRITEDATA, &ctx);
+            curl_easy_setopt(curl, CURLOPT_USERAGENT, user_agent.c_str());
+            curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, follow_redirects ? 1L : 0L);
+            curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, verify_ssl ? 1L : 0L);
+            curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, verify_ssl ? 2L : 0L);
+            curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
+            if (timeout > 0) {
+                curl_easy_setopt(curl, CURLOPT_TIMEOUT, timeout);
+            }
+
+            struct curl_slist* req_headers = nullptr;
+            if (params.contains("headers") && params["headers"].is_object()) {
+                for (auto& [k, v] : params["headers"].items()) {
+                    req_headers = curl_slist_append(req_headers, (k + ": " + v.get<std::string>()).c_str());
+                }
+                curl_easy_setopt(curl, CURLOPT_HTTPHEADER, req_headers);
+            }
+
+            CURLcode res = curl_easy_perform(curl);
+            long status_code = 0;
+            curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &status_code);
+
+            curl_slist_free_all(req_headers);
+            curl_easy_cleanup(curl);
+            fclose(fp);
+
+            if (res != CURLE_OK) {
+                std::filesystem::remove(dest);
+                return {{ "error", curl_easy_strerror(res) }};
+            }
+
+            return {
+                { "success",      true         },
+                { "status",       status_code  },
+                { "bytes_written", ctx.written  }
+            };
         }
 
         if (method == plugin_ipc::child_method::PATCHES) {
