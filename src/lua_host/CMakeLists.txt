@@ -1,5 +1,15 @@
 cmake_minimum_required(VERSION 3.21)
 
+# The parent CMakeLists sets -m32 globally (also cached) for the 32-bit
+# Millennium library.  lua_host is an independent native-64-bit process,
+# so strip -m32 from this directory's flags before any targets are created.
+if(UNIX AND NOT APPLE)
+    string(REPLACE "-m32" "" CMAKE_C_FLAGS       "${CMAKE_C_FLAGS}")
+    string(REPLACE "-m32" "" CMAKE_CXX_FLAGS     "${CMAKE_CXX_FLAGS}")
+    string(REPLACE "-m32" "" CMAKE_ASM_FLAGS     "${CMAKE_ASM_FLAGS}")
+    string(REPLACE "-m32" "" CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS}")
+endif()
+
 set(LUA_HOST_SOURCES
     main.cc
     rpc.cc

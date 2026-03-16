@@ -20,7 +20,7 @@ jobs:
           # Enable multilib for 32-bit builds
           sed -i '/\[multilib\]/,/Include/s/^#//' /etc/pacman.conf
           pacman -Syu --noconfirm
-          pacman -S --noconfirm git rust
+          pacman -S --noconfirm git rust lib32-openssl
 
           # Create build user (paru/makepkg refuse to run as root)
           useradd -m builder
