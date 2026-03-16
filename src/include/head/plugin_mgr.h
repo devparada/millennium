@@ -45,7 +45,7 @@ class plugin_installer
 
     bool is_plugin_installed(const std::string& pluginName);
     bool uninstall_plugin(const std::string& pluginName);
-    bool update_plugin(const std::string& id, const std::string& name);
+    bool update_plugin(const std::string& id, const std::string& name, const std::string& commit);
     nlohmann::json install_plugin(const std::string& downloadUrl, size_t totalSize);
     nlohmann::json get_updater_request_body();
 

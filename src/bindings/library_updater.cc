@@ -58,9 +58,9 @@ void head::library_updater::init(std::shared_ptr<plugin_manager> plugin_manager)
     m_has_checked_for_updates = true;
 }
 
-bool head::library_updater::download_plugin_update(const std::string& id, const std::string& name)
+bool head::library_updater::download_plugin_update(const std::string& id, const std::string& name, const std::string& commit)
 {
-    bool ok = plugin_updater->update_plugin(id, name);
+    bool ok = plugin_updater->update_plugin(id, name, commit);
     if (ok) {
         cached_updates.reset();
     }

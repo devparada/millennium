@@ -391,12 +391,13 @@ builtin_payload head::millennium_backend::Core_DownloadPluginUpdate(const builti
     auto updater = m_updater;
     auto id = args["id"].get<std::string>();
     auto name = args["name"].get<std::string>();
+    auto commit = args.value("commit", std::string{});
     int op_id = updater->start_operation();
 
-    std::thread([updater, id, name, op_id]() {
+    std::thread([updater, id, name, commit, op_id]() {
         updater->set_thread_op_id(op_id);
         try {
-            bool success = updater->download_plugin_update(id, name);
+            bool success = updater->download_plugin_update(id, name, commit);
             if (!success) {
                 updater->dispatch_progress("Update failed", 0, true, false);
             }

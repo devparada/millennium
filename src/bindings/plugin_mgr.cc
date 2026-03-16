@@ -171,7 +171,7 @@ std::vector<nlohmann::json> head::plugin_installer::get_plugin_data()
     return pluginData;
 }
 
-bool head::plugin_installer::update_plugin(const std::string& id, const std::string& name)
+bool head::plugin_installer::update_plugin(const std::string& id, const std::string& name, const std::string& commit)
 {
     std::filesystem::path tempDir;
     try {
@@ -235,6 +235,22 @@ bool head::plugin_installer::update_plugin(const std::string& id, const std::str
             } else {
                 std::filesystem::copy_file(p, dest, std::filesystem::copy_options::overwrite_existing);
             }
+        }
+
+        // Update metadata.json with the new commit hash so the next update check
+        // sees the current version and doesn't report a stale update.
+        if (!commit.empty()) {
+            std::filesystem::path metadataPath = targetFolder / "metadata.json";
+            nlohmann::json metadata;
+            if (std::filesystem::exists(metadataPath)) {
+                std::ifstream in(metadataPath);
+                in >> metadata;
+            }
+            metadata["id"] = id;
+            metadata["commit"] = commit;
+            std::ofstream out(metadataPath);
+            out << metadata.dump(4);
+            logger.log("Updated metadata.json for '{}' with commit '{}'", name, commit);
         }
 
         logger.log("Plugin '{}' installed successfully to '{}'", name, targetFolder.string());

@@ -50,7 +50,7 @@ class library_updater : public std::enable_shared_from_this<library_updater>
     library_updater(std::weak_ptr<millennium_backend> millennium_backend, std::shared_ptr<ipc_main> ipc_main);
     void init(std::shared_ptr<plugin_manager> plugin_manager);
 
-    bool download_plugin_update(const std::string& id, const std::string& name);
+    bool download_plugin_update(const std::string& id, const std::string& name, const std::string& commit);
     bool download_theme_update(std::shared_ptr<theme_config_store> themeConfig, const std::string& native);
 
     std::optional<json> get_cached_updates() const;

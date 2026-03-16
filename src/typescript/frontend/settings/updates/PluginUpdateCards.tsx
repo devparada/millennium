@@ -59,7 +59,7 @@ const StartPluginUpdate = async (ctx: UpdateContextProviderState, updateObject: 
 		await PyKillPluginBackend({ pluginName });
 	}
 
-	const result: any = await PyUpdatePlugin({ id: updateObject?.id, name: updateObject?.pluginDirectory });
+	const result: any = await PyUpdatePlugin({ id: updateObject?.id, name: updateObject?.pluginDirectory, commit: updateObject?.pluginInfo?.commit });
 	const parsed = typeof result === 'string' ? JSON.parse(result) : result;
 	const opId: number = parsed?.opId ?? 0;
 
