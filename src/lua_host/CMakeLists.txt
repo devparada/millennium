@@ -24,21 +24,40 @@ target_compile_definitions(${MILLENNIUM_RTB_NAME} PRIVATE
 target_include_directories(${MILLENNIUM_RTB_NAME} PRIVATE
     ${MILLENNIUM_BASE}/src
     ${MILLENNIUM_BASE}/src/include
-    ${luajit_BINARY_DIR}
-    ${luajit_SOURCE_DIR}/src
-)
-
-target_link_libraries(${MILLENNIUM_RTB_NAME}
-    luajit::lib
-    libcurl
-    cjson
-    nlohmann_json
-    fmt::fmt
 )
 
 if(UNIX AND NOT APPLE)
-    set_target_properties(${MILLENNIUM_RTB_NAME} PROPERTIES COMPILE_FLAGS "-m32" LINK_FLAGS "-m32")
-    target_compile_options(${MILLENNIUM_RTB_NAME} PRIVATE -m32)
+    # The lua sandbox is an independent process (IPC over unix sockets), so it
+    # does not need to match the 32-bit Millennium library.  Building it as
+    # native 64-bit avoids the need for 32-bit system libraries (openssl, etc.).
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(LUAJIT REQUIRED IMPORTED_TARGET luajit)
+    pkg_check_modules(LIBCURL REQUIRED IMPORTED_TARGET libcurl)
+
+    target_link_libraries(${MILLENNIUM_RTB_NAME}
+        PkgConfig::LUAJIT
+        PkgConfig::LIBCURL
+        nlohmann_json
+        fmt::fmt
+    )
+
+    target_include_directories(${MILLENNIUM_RTB_NAME} PRIVATE
+        ${LUAJIT_INCLUDE_DIRS}
+    )
+    # cjson sources are added by the parent CMakeLists.txt after deps are fetched
+else()
+    target_include_directories(${MILLENNIUM_RTB_NAME} PRIVATE
+        ${luajit_BINARY_DIR}
+        ${luajit_SOURCE_DIR}/src
+    )
+
+    target_link_libraries(${MILLENNIUM_RTB_NAME}
+        luajit::lib
+        libcurl
+        cjson
+        nlohmann_json
+        fmt::fmt
+    )
 endif()
 
 # Always ship with debug info so crash dumps are useful

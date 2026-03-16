@@ -144,7 +144,18 @@ endif()
 
 include(${MILLENNIUM_BASE}/scripts/cmake/bootstrap_deps.cmake)
 
-if(WIN32 OR UNIX)
+if(UNIX AND NOT APPLE)
+    # lua_host builds as native 64-bit using system luajit/curl.
+    # cjson is tiny so we compile it directly into the lua_host target.
+    target_sources(${MILLENNIUM_RTB_NAME} PRIVATE
+        ${lua_cjson_SOURCE_DIR}/lua_cjson.c
+        ${lua_cjson_SOURCE_DIR}/strbuf.c
+        ${lua_cjson_SOURCE_DIR}/g_fmt.c
+        ${lua_cjson_SOURCE_DIR}/dtoa.c
+    )
+    target_include_directories(${MILLENNIUM_RTB_NAME} PRIVATE ${lua_cjson_SOURCE_DIR})
+    target_compile_definitions(${MILLENNIUM_RTB_NAME} PRIVATE USE_INTERNAL_FPCONV)
+elseif(WIN32 OR APPLE)
     target_include_directories(${MILLENNIUM_RTB_NAME} PRIVATE "${luajit_BINARY_DIR}")
 endif()
 
