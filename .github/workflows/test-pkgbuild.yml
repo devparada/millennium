@@ -1,12 +1,7 @@
 name: Test Arch PKGBUILD
 
 on:
-  pull_request:
-    paths:
-      - "packages/arch/**"
-      - "src/**"
-      - "CMakeLists.txt"
-      - "CMakePresets.json"
+  workflow_call:
   workflow_dispatch:
 
 concurrency:
