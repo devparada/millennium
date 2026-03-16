@@ -1,7 +1,7 @@
 {
   "scripts": {
-    "build": "millennium-ttc --build dev --millennium-internal",
-    "prod": "millennium-ttc --build prod --millennium-internal"
+    "build": "bun ../ttc/dist/index.js --build dev --millennium-internal",
+    "prod": "bun ../ttc/dist/index.js --build prod --millennium-internal"
   },
   "devDependencies": {
     "@steambrew/client": "../sdk/packages/client",
