@@ -22,16 +22,12 @@ jobs:
           pacman -Syu --noconfirm
           pacman -S --noconfirm git curl
 
-          # Install paru from prebuilt binary
-          PARU_URL=$(curl -fsSL https://api.github.com/repos/Morganamilo/paru/releases/latest \
-            | grep -o '"browser_download_url": *"[^"]*x86_64[^"]*"' \
-            | head -1 | cut -d'"' -f4)
-          curl -fsSL "$PARU_URL" -o /tmp/paru.tar.zst
-          tar -xf /tmp/paru.tar.zst -C /usr/local/bin paru
-
-          # Create build user (paru refuses to run as root)
+          # Create build user (paru/makepkg refuse to run as root)
           useradd -m builder
           echo "builder ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+
+          # Install paru-bin from AUR
+          su builder -c 'cd /tmp && git clone https://aur.archlinux.org/paru-bin.git && cd paru-bin && makepkg -si --noconfirm'
 
       - name: Checkout repository
         uses: actions/checkout@v4
