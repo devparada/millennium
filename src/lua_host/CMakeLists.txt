@@ -30,13 +30,12 @@ if(UNIX AND NOT APPLE)
     # The lua sandbox is an independent process (IPC over unix sockets), so it
     # does not need to match the 32-bit Millennium library.  Building it as
     # native 64-bit avoids the need for 32-bit system libraries (openssl, etc.).
+    # HTTP is handled by the parent process over RPC, so no curl needed here.
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(LUAJIT REQUIRED IMPORTED_TARGET luajit)
-    pkg_check_modules(LIBCURL REQUIRED IMPORTED_TARGET libcurl)
 
     target_link_libraries(${MILLENNIUM_RTB_NAME}
         PkgConfig::LUAJIT
-        PkgConfig::LIBCURL
         nlohmann_json
         fmt::fmt
     )
@@ -53,7 +52,6 @@ else()
 
     target_link_libraries(${MILLENNIUM_RTB_NAME}
         luajit::lib
-        libcurl
         cjson
         nlohmann_json
         fmt::fmt
@@ -64,7 +62,7 @@ endif()
 if(MSVC)
     target_compile_options(${MILLENNIUM_RTB_NAME} PRIVATE /Z7)
     target_link_options(${MILLENNIUM_RTB_NAME} PRIVATE /DEBUG)
-    target_link_libraries(${MILLENNIUM_RTB_NAME} dbghelp)
+    target_link_libraries(${MILLENNIUM_RTB_NAME} dbghelp ws2_32)
 else()
     target_compile_options(${MILLENNIUM_RTB_NAME} PRIVATE -g)
     target_link_options(${MILLENNIUM_RTB_NAME} PRIVATE -rdynamic)
