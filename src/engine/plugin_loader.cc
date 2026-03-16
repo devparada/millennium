@@ -685,7 +685,7 @@ void plugin_loader::set_plugins_enabled(const std::vector<std::pair<std::string,
         }
     }
 
-    inject_frontend_shims(true);
+    inject_frontend_shims(should_start_backends);
 }
 
 std::shared_ptr<ipc_main> plugin_loader::get_ipc_main()
