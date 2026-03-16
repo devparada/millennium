@@ -226,6 +226,7 @@ export interface SettingsProps {
 	platformType: OSType;
 	millenniumLinuxUpdateScript?: string;
 	quickCss: string;
+	pendingCrashes?: PluginCrashInfo[];
 }
 
 export interface ColorProp {

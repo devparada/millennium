@@ -165,6 +165,34 @@ builtin_payload head::millennium_backend::Core_ChangePluginStatus(const builtin_
  */
 builtin_payload head::millennium_backend::Core_GetStartConfig(const builtin_payload&)
 {
+    /* Build pending-crash array inline so the frontend receives it
+       synchronously on init — no separate poll/timing needed. */
+    nlohmann::json pending_crashes_json = nlohmann::json::array();
+    {
+        const auto crashes = mep::crash_event_bus::instance().get_pending_crashes();
+        const auto all_plugins = m_plugin_manager->get_all_plugins();
+
+        for (const auto& ev : crashes) {
+            std::string display_name = ev.display_name;
+            if (display_name.empty()) {
+                for (const auto& p : all_plugins) {
+                    if (p.plugin_name == ev.plugin_name) {
+                        display_name = p.plugin_json.value("common_name", ev.plugin_name);
+                        break;
+                    }
+                }
+            }
+            if (display_name.empty()) display_name = ev.plugin_name;
+
+            pending_crashes_json.push_back({
+                { "plugin",       ev.plugin_name         },
+                { "displayName",  display_name           },
+                { "exitCode",     (uint32_t)ev.exit_code },
+                { "crashDumpDir", ev.crash_dump_dir      }
+            });
+        }
+    }
+
     return {
         { "accent_color", m_theme_config->get_accent_color() },
         { "conditions", CONFIG.get({"themes", "conditions"}, nlohmann::json::object()) },
@@ -181,7 +209,8 @@ builtin_payload head::millennium_backend::Core_GetStartConfig(const builtin_payl
         { "buildDate", GetBuildTimestamp() },
         { "platformType", get_operating_system() },
         { "millenniumLinuxUpdateScript", this->get_millennium_updater_script() },
-        { "quickCss", Core_LoadQuickCss(nullptr) }  // TODO check this works
+        { "quickCss", Core_LoadQuickCss(nullptr) },
+        { "pendingCrashes", pending_crashes_json }
     };
 }
 

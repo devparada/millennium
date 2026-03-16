@@ -28,7 +28,7 @@
  * SOFTWARE.
  */
 
-import { EUIMode, Millennium, pluginSelf, routerHook, sleep } from '@steambrew/client';
+import { EUIMode, Millennium, pluginSelf, routerHook } from '@steambrew/client';
 import { WelcomeModalComponent } from './components/WelcomeModal';
 import { onWindowCreatedCallback, patchMissedDocuments } from './patcher';
 import { DispatchSystemColors } from './patcher/SystemColors';
@@ -45,7 +45,6 @@ import { useQuickCssState } from './utils/quick-css-state';
 import { NotificationService } from './utils/update-notification-service';
 import { OnRunSteamURL } from './utils/url-scheme-handler';
 import { showPluginCrashToast } from './components/PluginCrashModal';
-import { PyGetPendingCrashes } from './utils/ffi';
 
 async function initializeMillennium(settings: SettingsProps) {
 	Logger.Log(`Received props`, settings);
@@ -96,15 +95,18 @@ async function initializeMillennium(settings: SettingsProps) {
 
 	window.addEventListener('millennium-plugin-crash', (e: Event) => {
 		const detail = (e as CustomEvent).detail;
+		Logger.Log('Received real-time crash event for plugin:', detail?.plugin);
 		setTimeout(() => showPluginCrashToast(detail), 3000);
 	});
 
-	setTimeout(async () => {
-		try {
-			const pending = JSON.parse(await PyGetPendingCrashes()) as Array<{ plugin: string; exitCode: number; displayName?: string; crashDumpDir?: string }>;
-			pending?.forEach?.(showPluginCrashToast);
-		} catch {}
-	}, 5000);
+	/* Show crash modals for any plugins that crashed before this init.
+	   The data comes from Core_GetStartConfig — no async poll needed. */
+	if (settings?.pendingCrashes?.length) {
+		Logger.Log(`Startup config contains ${settings.pendingCrashes.length} pending crash(es)`);
+		setTimeout(() => {
+			settings.pendingCrashes.forEach(showPluginCrashToast);
+		}, 3000);
+	}
 }
 
 // Entry point on the front end of your plugin
