@@ -42,7 +42,7 @@ plugin_manager::plugin_manager() {}
 
 nlohmann::json reset_enabled_plugins()
 {
-    CONFIG.set("plugins.enabledPlugins", std::vector<std::string>{});
+    CONFIG.set({"plugins", "enabledPlugins"}, std::vector<std::string>{});
     return {};
 }
 
@@ -51,7 +51,7 @@ nlohmann::json reset_enabled_plugins()
  */
 int plugin_manager::init()
 {
-    nlohmann::json enabledPlugins = CONFIG.get("plugins.enabledPlugins", std::vector<std::string>{});
+    nlohmann::json enabledPlugins = CONFIG.get({"plugins", "enabledPlugins"}, std::vector<std::string>{});
 
     if (!enabledPlugins.is_array()) {
         enabledPlugins = reset_enabled_plugins();
@@ -75,7 +75,7 @@ int plugin_manager::init()
 bool plugin_manager::set_plugin_enabled(std::string pluginName, bool enabled)
 {
     logger.log("Opting to {} {}", enabled ? "enable" : "disable", pluginName);
-    nlohmann::json enabledPluginsJson = CONFIG.get("plugins.enabledPlugins", std::vector<std::string>{});
+    nlohmann::json enabledPluginsJson = CONFIG.get({"plugins", "enabledPlugins"}, std::vector<std::string>{});
 
     std::vector<std::string> enabledPlugins;
     if (enabledPluginsJson.is_array()) {
@@ -97,7 +97,7 @@ bool plugin_manager::set_plugin_enabled(std::string pluginName, bool enabled)
         }
     }
 
-    CONFIG.set("plugins.enabledPlugins", enabledPlugins);
+    CONFIG.set({"plugins", "enabledPlugins"}, enabledPlugins);
     return true;
 }
 
@@ -107,7 +107,7 @@ bool plugin_manager::set_plugin_enabled(std::string pluginName, bool enabled)
  */
 bool plugin_manager::is_enabled(std::string plugin_name)
 {
-    nlohmann::json enabledPluginsJson = CONFIG.get("plugins.enabledPlugins", std::vector<std::string>{});
+    nlohmann::json enabledPluginsJson = CONFIG.get({"plugins", "enabledPlugins"}, std::vector<std::string>{});
 
     if (!enabledPluginsJson.is_array()) {
         return false;

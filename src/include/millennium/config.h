@@ -55,11 +55,12 @@ class config_manager : public singleton<config_manager>
 
     void merge_default_config(json& current, const json& incoming, const std::string& path);
 
-    json get(const std::string& path, const json& def = nullptr);
     json get(std::initializer_list<std::string> segments, const json& def = nullptr);
-
-    void set(const std::string& path, const json& value, bool skipPropagation = false);
     void set(std::initializer_list<std::string> segments, const json& value, bool skipPropagation = false);
+
+    /** runtime dot-separated path variants (for frontend API boundary) */
+    json get_path(const std::string& path, const json& def = nullptr);
+    void set_path(const std::string& path, const json& value, bool skipPropagation = false);
 
     config_manager();
     ~config_manager();

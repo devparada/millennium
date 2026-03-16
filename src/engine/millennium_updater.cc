@@ -85,8 +85,8 @@ void millennium_updater::check_for_updates()
     return;
 #endif
 
-    const bool checkForUpdates = CONFIG.get("general.checkForMillenniumUpdates", true).get<bool>();
-    std::string channel = CONFIG.get("general.millenniumUpdateChannel", "stable").get<std::string>();
+    const bool checkForUpdates = CONFIG.get({"general", "checkForMillenniumUpdates"}, true).get<bool>();
+    std::string channel = CONFIG.get({"general", "millenniumUpdateChannel"}, "stable").get<std::string>();
 
     if (!checkForUpdates) {
         logger.warn("User has disabled update checking for Millennium.");

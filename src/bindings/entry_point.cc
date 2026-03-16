@@ -167,7 +167,7 @@ builtin_payload head::millennium_backend::Core_GetStartConfig(const builtin_payl
 {
     return {
         { "accent_color", m_theme_config->get_accent_color() },
-        { "conditions", CONFIG.get("themes.conditions", nlohmann::json::object()) },
+        { "conditions", CONFIG.get({"themes", "conditions"}, nlohmann::json::object()) },
         { "active_theme", m_theme_config->get_active_theme() },
         { "settings", CONFIG.get_all() },
         { "steamPath", platform::get_steam_path() },

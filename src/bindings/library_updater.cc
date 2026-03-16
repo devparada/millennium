@@ -49,7 +49,7 @@ void head::library_updater::init(std::shared_ptr<plugin_manager> plugin_manager)
     theme_updater = std::make_shared<theme_installer>(plugin_manager, shared_from_this());
     plugin_updater = std::make_shared<plugin_installer>(m_millennium_backend, plugin_manager, shared_from_this());
 
-    if (!CONFIG.get("general.checkForPluginAndThemeUpdates").get<bool>()) {
+    if (!CONFIG.get({"general", "checkForPluginAndThemeUpdates"}).get<bool>()) {
         logger.warn("User has disabled update checking for plugins and themes.");
         return;
     }

@@ -59,7 +59,7 @@ nlohmann::json config_manager::get(std::initializer_list<std::string> segments, 
     return def;
 }
 
-nlohmann::json config_manager::get(const std::string& path, const nlohmann::json& def)
+nlohmann::json config_manager::get_path(const std::string& path, const nlohmann::json& def)
 {
     std::lock_guard<std::recursive_mutex> lock(_mutex);
     const nlohmann::json* current = &_data;
@@ -118,7 +118,7 @@ void config_manager::set(std::initializer_list<std::string> segments, const nloh
     }
 }
 
-void config_manager::set(const std::string& path, const nlohmann::json& value, bool skipPropagation)
+void config_manager::set_path(const std::string& path, const nlohmann::json& value, bool skipPropagation)
 {
     std::lock_guard<std::recursive_mutex> lock(_mutex);
     nlohmann::json* current = &_data;

@@ -83,7 +83,7 @@ void head::theme_config_store::migrate_old_config()
     /** Migrate themes.conditions */
     if (old_config.contains("conditions") && old_config["conditions"].is_object()) {
         for (auto& [theme_name, conditions] : old_config["conditions"].items()) {
-            if (!CONFIG.get("themes.conditions").is_object()) CONFIG.set("themes.conditions", nlohmann::json::object(), true);
+            if (!CONFIG.get({"themes", "conditions"}).is_object()) CONFIG.set({"themes", "conditions"}, nlohmann::json::object(), true);
 
             if (!CONFIG.get({"themes", "conditions", theme_name}).is_object()) CONFIG.set({"themes", "conditions", theme_name}, nlohmann::json::object(), true);
 
@@ -97,7 +97,7 @@ void head::theme_config_store::migrate_old_config()
     /** Migrate theme colors */
     if (old_config.contains("colors") && old_config["colors"].is_object()) {
         for (auto& [theme_name, colors_obj] : old_config["colors"].items()) {
-            if (!CONFIG.get("themes.themeColors").is_object()) CONFIG.set("themes.themeColors", nlohmann::json::object(), true);
+            if (!CONFIG.get({"themes", "themeColors"}).is_object()) CONFIG.set({"themes", "themeColors"}, nlohmann::json::object(), true);
 
             if (!CONFIG.get({"themes", "themeColors", theme_name}).is_object()) CONFIG.set({"themes", "themeColors", theme_name}, nlohmann::json::object(), true);
 
@@ -111,19 +111,19 @@ void head::theme_config_store::migrate_old_config()
     /** Migrate active theme */
     if (old_config.contains("active")) {
         logger.log("Migrating active theme from old config: " + old_config["active"].get<std::string>());
-        CONFIG.set("themes.activeTheme", old_config["active"], true);
+        CONFIG.set({"themes", "activeTheme"}, old_config["active"], true);
     }
 
     /** Migrate accent color */
     if (old_config.contains("accentColor")) {
         logger.log("Migrating accent color from old config: " + old_config["accentColor"].get<std::string>());
-        CONFIG.set("general.accentColor", old_config["accentColor"], true);
+        CONFIG.set({"general", "accentColor"}, old_config["accentColor"], true);
     }
 
     /** Migrate allowed styles/scripts */
-    if (old_config.contains("styles")) CONFIG.set("themes.allowedStyles", old_config["styles"], true);
+    if (old_config.contains("styles")) CONFIG.set({"themes", "allowedStyles"}, old_config["styles"], true);
 
-    if (old_config.contains("scripts")) CONFIG.set("themes.allowedScripts", old_config["scripts"], true);
+    if (old_config.contains("scripts")) CONFIG.set({"themes", "allowedScripts"}, old_config["scripts"], true);
 
     /** Delete old config */
     std::error_code ec;
@@ -133,12 +133,12 @@ void head::theme_config_store::migrate_old_config()
 
 void head::theme_config_store::validate_theme()
 {
-    if (CONFIG.get("themes.activeTheme").is_null()) CONFIG.set("themes.activeTheme", "default");
+    if (CONFIG.get({"themes", "activeTheme"}).is_null()) CONFIG.set({"themes", "activeTheme"}, "default");
 
-    std::string active = CONFIG.get("themes.activeTheme").get<std::string>();
+    std::string active = CONFIG.get({"themes", "activeTheme"}).get<std::string>();
     if (active != "default" && !head::Themes::IsValid(active)) {
         logger.log("Theme '" + active + "' is invalid. Resetting to default.");
-        CONFIG.set("themes.activeTheme", "default");
+        CONFIG.set({"themes", "activeTheme"}, "default");
     }
 }
 
@@ -149,22 +149,22 @@ nlohmann::json head::theme_config_store::get_config()
 
 void head::theme_config_store::set_config(const std::string& path, const nlohmann::json& value)
 {
-    CONFIG.set(path, value);
+    CONFIG.set_path(path, value);
 }
 
 void head::theme_config_store::change_theme(const std::string& theme_name)
 {
-    CONFIG.set("themes.activeTheme", theme_name);
+    CONFIG.set({"themes", "activeTheme"}, theme_name);
 }
 
 nlohmann::json head::theme_config_store::get_accent_color()
 {
-    return head::system_accent_color::plat_get_accent_color(CONFIG.get("general.accentColor").get<std::string>());
+    return head::system_accent_color::plat_get_accent_color(CONFIG.get({"general", "accentColor"}).get<std::string>());
 }
 
 nlohmann::json head::theme_config_store::get_active_theme()
 {
-    std::string active = CONFIG.get("themes.activeTheme").get<std::string>();
+    std::string active = CONFIG.get({"themes", "activeTheme"}).get<std::string>();
     std::filesystem::path path = themes_path / active / "skin.json";
 
     try {
@@ -185,7 +185,7 @@ nlohmann::json head::theme_config_store::get_active_theme()
 void head::theme_config_store::setup_theme_hooks()
 {
     theme_data = get_active_theme();
-    active_theme_name = CONFIG.get("themes.activeTheme").get<std::string>();
+    active_theme_name = CONFIG.get({"themes", "activeTheme"}).get<std::string>();
 
     setup_conditionals();
     start_webkit_hook(theme_data, active_theme_name);
@@ -230,7 +230,7 @@ void head::theme_config_store::setup_colors()
 
         colors[nativeName] = head::css_parser::parse_root_colors(colorsPath.generic_string());
 
-        if (CONFIG.get("themes.themeColors", nullptr).is_null()) CONFIG.set("themes.themeColors", nlohmann::json::object(), /*skipPropagation=*/true);
+        if (CONFIG.get({"themes", "themeColors"}, nullptr).is_null()) CONFIG.set({"themes", "themeColors"}, nlohmann::json::object(), /*skipPropagation=*/true);
 
         if (CONFIG.get({"themes", "themeColors", nativeName}, nullptr).is_null()) CONFIG.set({"themes", "themeColors", nativeName}, nlohmann::json::object(), /*skipPropagation=*/true);
 
@@ -326,17 +326,17 @@ nlohmann::json head::theme_config_store::set_theme_color(const std::string& them
 
 void head::theme_config_store::set_accent_color(const std::string& new_color)
 {
-    CONFIG.set("general.accentColor", new_color);
+    CONFIG.set({"general", "accentColor"}, new_color);
 }
 
 void head::theme_config_store::reset_accent_color()
 {
-    CONFIG.set("general.accentColor", "DEFAULT_ACCENT_COLOR");
+    CONFIG.set({"general", "accentColor"}, "DEFAULT_ACCENT_COLOR");
 }
 
 void head::theme_config_store::setup_conditionals()
 {
-    if (!CONFIG.get("themes.conditions", nlohmann::json::object()).is_object()) CONFIG.set("themes.conditions", nlohmann::json::object());
+    if (!CONFIG.get({"themes", "conditions"}, nlohmann::json::object()).is_object()) CONFIG.set({"themes", "conditions"}, nlohmann::json::object());
 
     nlohmann::json themes = head::Themes::FindAllThemes();
 
@@ -419,9 +419,9 @@ nlohmann::json head::theme_config_store::set_condition(const std::string& theme,
 
 std::string head::theme_config_store::get_theme_conditionals()
 {
-    if (!CONFIG.get("themes.conditions").is_object()) return "{}";
+    if (!CONFIG.get({"themes", "conditions"}).is_object()) return "{}";
 
-    return CONFIG.get("themes.conditions").dump(4);
+    return CONFIG.get({"themes", "conditions"}).dump(4);
 }
 
 std::set<std::string> head::theme_config_store::get_all_imports(const std::filesystem::path& css_path, std::set<std::string> visited)
