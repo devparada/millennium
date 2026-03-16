@@ -17,8 +17,7 @@ jobs:
     steps:
       - name: Setup pacman and paru
         run: |
-          # Enable multilib for 32-bit builds (the base-devel image may not
-          # have the section at all, so append it unconditionally).
+          # Enable multilib for 32-bit builds
           printf '\n[multilib]\nInclude = /etc/pacman.d/mirrorlist\n' >> /etc/pacman.conf
           pacman -Syu --noconfirm
           pacman -S --noconfirm git rust lib32-openssl
