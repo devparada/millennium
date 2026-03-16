@@ -182,22 +182,26 @@ bool backend_manager::destroy_plugin(const std::string& pluginName, bool isShutt
     {
         std::lock_guard<std::mutex> lock(m_processes_mutex);
         auto it = m_processes.find(pluginName);
-        if (it == m_processes.end()) return false;
-
-        process = std::move(it->second);
-        m_processes.erase(it);
+        if (it != m_processes.end()) {
+            process = std::move(it->second);
+            m_processes.erase(it);
+        }
     }
 
-    logger.log("Stopping plugin '{}'...", pluginName);
-    process->shutdown();
+    if (process) {
+        logger.log("Stopping plugin '{}'...", pluginName);
+        process->shutdown();
 
-    /* remove patches from shared memory */
-    if (g_lb_patch_arena) {
-        hashmap_remove(g_lb_patch_arena, pluginName.c_str());
+        /* remove patches from shared memory */
+        if (g_lb_patch_arena) {
+            hashmap_remove(g_lb_patch_arena, pluginName.c_str());
+        }
+
+        process.reset();
     }
 
-    process.reset();
-
+    /* Always clean up emittedPlugins — even if the process was never in m_processes
+       (e.g. spawn failed but backend_loaded_event_hdlr recorded BACKEND_LOAD_FAILED). */
     m_backend_event_dispatcher->backend_unloaded_event_hdlr({ pluginName }, isShuttingDown);
 
     {
