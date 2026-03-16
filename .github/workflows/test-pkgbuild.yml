@@ -20,7 +20,13 @@ jobs:
           # Enable multilib for 32-bit builds
           sed -i '/\[multilib\]/,/Include/s/^#//' /etc/pacman.conf
           pacman -Syu --noconfirm
-          pacman -S --noconfirm git curl zip unzip tar cmake ninja lib32-gcc-libs
+          pacman -S --noconfirm git curl zip unzip tar cmake ninja \
+            lib32-gcc-libs libx11 libxtst lib32-curl
+
+      - name: Install bun
+        run: |
+          curl -fsSL https://bun.sh/install | bash
+          ln -s "$HOME/.bun/bin/bun" /usr/local/bin/bun
 
       - name: Create build user
         run: |
@@ -44,7 +50,7 @@ jobs:
           cp -r "$GITHUB_WORKSPACE" /home/builder/pkg/src/Millennium
           chown -R builder:builder /home/builder/pkg
           su builder -c "git config --global --add safe.directory /home/builder/pkg/src/Millennium"
-          su builder -c 'cd /home/builder/pkg && makepkg -s --noconfirm --noextract'
+          su builder -c 'cd /home/builder/pkg && makepkg --noconfirm --noextract --nodeps'
 
       - name: Verify package
         run: |
