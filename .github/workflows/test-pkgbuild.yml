@@ -32,23 +32,17 @@ jobs:
         with:
           submodules: true
 
-      - name: Patch PKGBUILD to use local source
-        run: |
-          git config --global --add safe.directory "$GITHUB_WORKSPACE"
-          COMMIT=$(git rev-parse HEAD)
-          REPO_DIR=$(pwd)
-          cd packages/arch
-          # Point source at the local checkout instead of cloning from GitHub
-          sed -i "s|source=(\"git+\$url\.git.*\")|source=(\"git+file://${REPO_DIR}/.git#commit=${COMMIT}\")|" PKGBUILD
-
       - name: Build package
         run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          # Prepare build directory with PKGBUILD
           cp -r packages/arch /home/builder/pkg
+          # Pre-populate srcdir with the local checkout so makepkg skips cloning
+          mkdir -p /home/builder/pkg/src
+          cp -r "$GITHUB_WORKSPACE" /home/builder/pkg/src/Millennium
           chown -R builder:builder /home/builder/pkg
-          # Allow builder to clone from the workspace repo
-          chmod -R a+rX "$GITHUB_WORKSPACE"
-          su builder -c "git config --global --add safe.directory $GITHUB_WORKSPACE"
-          su builder -c 'cd /home/builder/pkg && makepkg -s --noconfirm --nodeps'
+          su builder -c "git config --global --add safe.directory /home/builder/pkg/src/Millennium"
+          su builder -c 'cd /home/builder/pkg && makepkg -s --noconfirm --nodeps --noextract'
 
       - name: Verify package
         run: |
