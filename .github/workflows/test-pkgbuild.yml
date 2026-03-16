@@ -15,19 +15,15 @@ jobs:
       image: archlinux:base-devel
 
     steps:
-      - name: Setup pacman and paru
+      - name: Setup pacman
         run: |
           # Enable multilib for 32-bit builds
           printf '\n[multilib]\nInclude = /etc/pacman.d/mirrorlist\n' >> /etc/pacman.conf
           pacman -Syu --noconfirm
-          pacman -S --noconfirm git rust lib32-openssl
 
-          # Create build user (paru/makepkg refuse to run as root)
+          # Create build user (makepkg refuses to run as root)
           useradd -m builder
           echo "builder ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
-
-          # Build paru from source so it links against the current libalpm
-          su builder -c 'cd /tmp && git clone https://aur.archlinux.org/paru.git && cd paru && makepkg -si --noconfirm'
 
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -46,8 +42,7 @@ jobs:
           cp -r "$GITHUB_WORKSPACE" /home/builder/pkg/src/Millennium
           chown -R builder:builder /home/builder/pkg
           su builder -c "git config --global --add safe.directory /home/builder/pkg/src/Millennium"
-          # Use paru as the pacman command so makepkg can resolve AUR deps (e.g. bun)
-          su builder -c 'cd /home/builder/pkg && PACMAN=paru makepkg -s --noconfirm --noextract'
+          su builder -c 'cd /home/builder/pkg && makepkg -s --noconfirm --noextract'
 
       - name: Verify package
         run: |
