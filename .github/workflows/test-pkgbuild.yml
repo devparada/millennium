@@ -49,8 +49,8 @@ jobs:
           cd packages/arch
           # Point source at the local checkout instead of cloning from GitHub
           sed -i "s|source=(\"git+\$url\.git.*\")|source=(\"git+file://${REPO_DIR}/.git#commit=${COMMIT}\")|" PKGBUILD
-          # Remove bun-bin makedepend since we installed bun directly
-          sed -i "s/'bun-bin' //" PKGBUILD
+          # Remove bun makedepend since we installed bun directly
+          sed -i "s/'bun' //" PKGBUILD
 
       - name: Build package
         run: |
