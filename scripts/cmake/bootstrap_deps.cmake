@@ -52,6 +52,19 @@ else()
     set(CURL_WINDOWS_SSPI           OFF CACHE INTERNAL "" FORCE)
 endif()
 
+# On 32-bit Linux builds, disable optional curl features that would pull in
+# 64-bit system libraries the linker can't use.
+if(UNIX AND NOT APPLE AND CMAKE_C_FLAGS MATCHES "-m32")
+    set(CURL_USE_LIBIDN2            OFF CACHE BOOL     "Disable libidn2 (no lib32 available)" FORCE)
+    set(CURL_BROTLI                  OFF CACHE BOOL     "Disable brotli (no lib32 available)"  FORCE)
+    set(CURL_ZSTD                    OFF CACHE BOOL     "Disable zstd (no lib32 available)"    FORCE)
+    set(USE_NGHTTP2                  OFF CACHE BOOL     "Disable nghttp2 (no lib32 available)" FORCE)
+    set(CURL_USE_LIBPSL              OFF CACHE BOOL     "Disable libpsl (no lib32 available)"  FORCE)
+
+    # Point cmake at 32-bit OpenSSL (e.g. lib32-openssl on Arch)
+    set(CMAKE_FIND_LIBRARY_CUSTOM_LIB_SUFFIX "32" CACHE STRING "Find 32-bit libraries" FORCE)
+endif()
+
 
 # Patch the minimum cmake version in a "submodule".
 # Mingw decided they would force the new version of cmake which completely breaks older deps
