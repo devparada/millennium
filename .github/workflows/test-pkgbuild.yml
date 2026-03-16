@@ -22,11 +22,6 @@ jobs:
           pacman -Syu --noconfirm
           pacman -S --noconfirm git curl zip unzip tar cmake ninja lib32-gcc-libs
 
-      - name: Install bun
-        run: |
-          curl -fsSL https://bun.sh/install | bash
-          echo "$HOME/.bun/bin" >> $GITHUB_PATH
-
       - name: Create build user
         run: |
           useradd -m builder
@@ -45,8 +40,6 @@ jobs:
           cd packages/arch
           # Point source at the local checkout instead of cloning from GitHub
           sed -i "s|source=(\"git+\$url\.git.*\")|source=(\"git+file://${REPO_DIR}/.git#commit=${COMMIT}\")|" PKGBUILD
-          # Remove bun makedepend since we installed bun directly
-          sed -i "s/'bun' //" PKGBUILD
 
       - name: Build package
         run: |
@@ -55,10 +48,7 @@ jobs:
           # Allow builder to clone from the workspace repo
           chmod -R a+rX "$GITHUB_WORKSPACE"
           su builder -c "git config --global --add safe.directory $GITHUB_WORKSPACE"
-          # Ensure bun is available to the builder user
-          cp -r "$HOME/.bun" /home/builder/.bun
-          chown -R builder:builder /home/builder/.bun
-          su builder -c 'export PATH="$HOME/.bun/bin:$PATH" && cd /home/builder/pkg && makepkg -s --noconfirm --nodeps'
+          su builder -c 'cd /home/builder/pkg && makepkg -s --noconfirm --nodeps'
 
       - name: Verify package
         run: |
