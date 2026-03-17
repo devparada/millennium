@@ -57,16 +57,16 @@ static std::string get_lua_host_exe()
 #if defined(__LUA_HOST_OUTPUT_ABSPATH__)
     return __LUA_HOST_OUTPUT_ABSPATH__;
 #elif defined(_WIN32)
-    return (platform::get_millennium_path() / "bin" / "millennium.luasb64.exe").string();
+    return (platform::get_millennium_path() / "bin" / "millennium.luavm64.exe").string();
 #else
     Dl_info info;
     if (dladdr(reinterpret_cast<void*>(&get_lua_host_exe), &info) && info.dli_fname)
     {
-        auto exe = std::filesystem::path(info.dli_fname).parent_path() / "millennium_luasb86";
+        auto exe = std::filesystem::path(info.dli_fname).parent_path() / "libmillennium_luavm_x86";
         if (std::filesystem::exists(exe))
             return exe.string();
     }
-    return "millennium_luasb86";
+    return "libmillennium_luavm_x86";
 #endif
 }
 

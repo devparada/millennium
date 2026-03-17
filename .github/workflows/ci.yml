@@ -97,7 +97,7 @@ jobs:
           Copy-Item ./build/millennium.bootstrap64.dll    D:/a/millennium-build/wsock32.dll
           Copy-Item ./build/millennium.dll               D:/a/millennium-build/millennium/lib/millennium.dll
           Copy-Item ./build/millennium.hhx64.dll         D:/a/millennium-build/millennium/lib/millennium.hhx64.dll
-          Copy-Item ./build/millennium.luasb64.exe        D:/a/millennium-build/millennium/bin/millennium.luasb64.exe
+          Copy-Item ./build/millennium.luavm64.exe        D:/a/millennium-build/millennium/bin/millennium.luavm64.exe
           Copy-Item ./build/millennium.crashhandler64.exe D:/a/millennium-build/millennium/bin/millennium.crashhandler64.exe
 
           # Collect PDB files for debug symbols
@@ -207,10 +207,10 @@ jobs:
 
           # Copy binaries and libraries directly to final locations
           cp build/libmillennium_x86.so ~/build/usr/lib/millennium/
-          cp build/libmillennium_bootstrap_86x.so ~/build/usr/lib/millennium/
+          cp build/libmillennium_bootstrap_x86.so ~/build/usr/lib/millennium/
           cp build/libmillennium_bootstrap_hhx64.so ~/build/usr/lib/millennium/
           cp build/libmillennium_hhx64.so ~/build/usr/lib/millennium/
-          cp build/millennium_luasb86 ~/build/usr/lib/millennium/
+          cp build/libmillennium_luavm_x86 ~/build/usr/lib/millennium/
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4

@@ -142,7 +142,7 @@ post_install() {
     fi
 
     # create symlinks for millenniums preload bootstraps.
-    [ -d "${HOME}/.steam/steam/ubuntu12_32" ] && ln -sf /usr/lib/millennium/libmillennium_bootstrap_86x.so "${HOME}/.steam/steam/ubuntu12_32/libXtst.so.6"
+    [ -d "${HOME}/.steam/steam/ubuntu12_32" ] && ln -sf /usr/lib/millennium/libmillennium_bootstrap_x86.so "${HOME}/.steam/steam/ubuntu12_32/libXtst.so.6"
     [ -d "${HOME}/.steam/steam/ubuntu12_64" ] && ln -sf /usr/lib/millennium/libmillennium_bootstrap_hhx64.so "${HOME}/.steam/steam/ubuntu12_64/libXtst.so.6"
     [ -d "${HOME}/.steam/steam/ubuntu12_64" ] && ln -sf /usr/lib/millennium/libmillennium_hhx64.so "${HOME}/.steam/steam/ubuntu12_64/libmillennium_hhx64.so"
 }

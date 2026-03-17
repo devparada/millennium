@@ -20,15 +20,15 @@ else()
     # Linux build names
     set(MILLENNIUM_OUTPUT_NAME                     "libmillennium_x86.so"          )
     set(MILLENNIUM_HOOK_HELPER_OUTPUT_NAME         "libmillennium_hhx64.so"        )
-    set(MILLENNIUM_BOOTLOADER_OUTPUT_NAME          "libmillennium_bootstrap_86x.so")
+    set(MILLENNIUM_BOOTLOADER_OUTPUT_NAME          "libmillennium_bootstrap_x86.so")
 endif()
 
 # Millennium lua host that runs the backend in a sandbox.
 if(WIN32)
-    set(MILLENNIUM_RTB_NAME "millennium.luasb64" CACHE STRING "Lua sandbox executable name")
+    set(MILLENNIUM_RTB_NAME "millennium.luavm64" CACHE STRING "Lua VM executable name")
     set(MILLENNIUM_CRASH_HANDLER_NAME "millennium.crashhandler64" CACHE STRING "Crash handler executable name")
 else()
-    set(MILLENNIUM_RTB_NAME "millennium_luasb86" CACHE STRING "Lua sandbox executable name")
+    set(MILLENNIUM_RTB_NAME "libmillennium_luavm_x86" CACHE STRING "Lua VM executable name")
 endif()
 
 add_compile_definitions(__MILLENNIUM_OUTPUT_NAME__="${MILLENNIUM_OUTPUT_NAME}")

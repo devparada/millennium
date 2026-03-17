@@ -29,7 +29,7 @@
  */
 
 /*
- * millennium_luasb — standalone child process for a single plugin backend.
+ * millennium_luavm — standalone child process for a single plugin backend.
  *
  * Gets forked by the parent, connects back over the unix socket it was given,
  * spins up a LuaJIT VM, runs the plugin's main.lua, and then sits in an event

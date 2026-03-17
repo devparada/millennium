@@ -122,7 +122,7 @@ pkgsi686Linux.stdenv.mkDerivation (finalAttrs: {
 
     mkdir -p $out/lib/
     install -Dm755 src/libmillennium_x86.so                      $out/lib/libmillennium_x86.so
-    install -Dm755 src/boot/linux/libmillennium_bootstrap_86x.so $out/lib/libmillennium_bootstrap_86x.so
+    install -Dm755 src/boot/linux/libmillennium_bootstrap_x86.so $out/lib/libmillennium_bootstrap_x86.so
 
     runHook postInstall
   '';
