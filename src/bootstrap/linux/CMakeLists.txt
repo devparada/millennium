@@ -39,7 +39,7 @@ target_compile_definitions(bootstrap64 PRIVATE MILLENNIUM_HHX64_NAME="${MILLENNI
 
 set_target_properties(bootstrap64 PROPERTIES
     PREFIX ""
-    OUTPUT_NAME "libXtst.so.6"
+    OUTPUT_NAME "libmillennium_bootstrap_hhx64.so"
     SUFFIX ""
 )
 
