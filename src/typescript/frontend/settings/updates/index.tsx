@@ -65,7 +65,7 @@ const parseUpdateErrorMessage = () => {
 
 const UpdatesViewModal: React.FC = () => {
 	const { themeUpdates, pluginUpdates, hasUpdateError, hasReceivedUpdates, hasAnyUpdates, fetchAvailableUpdates } = useUpdateContext();
-	const [isRechecking, setIsRechecking] = useState(true);
+	const [isRechecking, setIsRechecking] = useState(false);
 
 	const handleRecheck = async () => {
 		setIsRechecking(true);
@@ -87,7 +87,7 @@ const UpdatesViewModal: React.FC = () => {
 	if (!hasAnyUpdates()) {
 		return (
 			<Placeholder icon={<IconsModule.Checkmark />} header={locale.updatePanelNoUpdatesFoundHeader} body={locale.updatePanelNoUpdatesFound}>
-				<DialogButton className={settingsClasses.SettingsDialogButton} onClick={handleRecheck} disabled={isRechecking}>
+				<DialogButton className={joinClassNames(settingsClasses.SettingsDialogButton, "MillenniumUpdates_CheckForUpdates")} onClick={handleRecheck} disabled={isRechecking}>
 					{isRechecking && <MillenniumIcons.LoadingSpinner />}
 					{locale.updatePanelCheckForUpdates}
 				</DialogButton>
