@@ -128,12 +128,9 @@ install_millennium() {
 }
 
 post_install() {
-    sudo chmod +x /opt/python-i686-3.11.8/bin/python3.11
-
     log "installing for '${USER}'"
 
     beta_file="${HOME}/.steam/steam/package/beta"
-    target="${HOME}/.steam/steam/ubuntu12_32/libXtst.so.6"
 
     # make sure to force steam stable for the first install.
     # if the user wants beta they can set it after install.
@@ -144,8 +141,10 @@ post_install() {
         rm "${beta_file}"
     fi
 
-    # create a symlink for millenniums preload bootstrap.
-    [ -d "${HOME}/.steam/steam/ubuntu12_32" ] && ln -sf /usr/lib/millennium/libmillennium_bootstrap_86x.so "${target}"
+    # create symlinks for millenniums preload bootstraps.
+    [ -d "${HOME}/.steam/steam/ubuntu12_32" ] && ln -sf /usr/lib/millennium/libmillennium_bootstrap_86x.so "${HOME}/.steam/steam/ubuntu12_32/libXtst.so.6"
+    [ -d "${HOME}/.steam/steam/ubuntu12_64" ] && ln -sf /usr/lib/millennium/libmillennium_bootstrap_hhx64.so "${HOME}/.steam/steam/ubuntu12_64/libXtst.so.6"
+    [ -d "${HOME}/.steam/steam/ubuntu12_64" ] && ln -sf /usr/lib/millennium/libmillennium_hhx64.so "${HOME}/.steam/steam/ubuntu12_64/libmillennium_hhx64.so"
 }
 
 cleanup() {
