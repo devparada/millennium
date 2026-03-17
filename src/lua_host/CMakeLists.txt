@@ -37,19 +37,29 @@ if(UNIX AND NOT APPLE)
     set(_saved_pkg_config_libdir "$ENV{PKG_CONFIG_LIBDIR}")
     set(ENV{PKG_CONFIG_LIBDIR} "")
     find_package(PkgConfig REQUIRED)
-    pkg_check_modules(LUAJIT REQUIRED IMPORTED_TARGET luajit)
+    pkg_check_modules(LUAJIT IMPORTED_TARGET luajit)
     set(ENV{PKG_CONFIG_LIBDIR} "${_saved_pkg_config_libdir}")
 
-    target_link_libraries(${MILLENNIUM_RTB_NAME}
-        PkgConfig::LUAJIT
-        nlohmann_json
-        fmt::fmt
-    )
-
-    target_include_directories(${MILLENNIUM_RTB_NAME} PRIVATE
-        ${LUAJIT_INCLUDE_DIRS}
-    )
-    # cjson sources are added by the parent CMakeLists.txt after deps are fetched
+    if(LUAJIT_FOUND)
+        target_link_libraries(${MILLENNIUM_RTB_NAME}
+            PkgConfig::LUAJIT
+            nlohmann_json
+            fmt::fmt
+        )
+        target_include_directories(${MILLENNIUM_RTB_NAME} PRIVATE
+            ${LUAJIT_INCLUDE_DIRS}
+        )
+    else()
+        target_include_directories(${MILLENNIUM_RTB_NAME} PRIVATE
+            ${luajit_BINARY_DIR}
+            ${luajit_SOURCE_DIR}/src
+        )
+        target_link_libraries(${MILLENNIUM_RTB_NAME}
+            luajit::lib
+            nlohmann_json
+            fmt::fmt
+        )
+    endif()
 else()
     target_include_directories(${MILLENNIUM_RTB_NAME} PRIVATE
         ${luajit_BINARY_DIR}
