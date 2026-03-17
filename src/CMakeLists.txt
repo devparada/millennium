@@ -160,8 +160,16 @@ if(UNIX AND NOT APPLE)
         TARGET_DIRECTORY ${MILLENNIUM_RTB_NAME}
         PROPERTIES COMPILE_OPTIONS "-w;-include;strings.h"
     )
+    if(NOT LUAJIT_FOUND)
+        target_include_directories(${MILLENNIUM_RTB_NAME} PRIVATE
+            ${luajit_BINARY_DIR}
+            ${luajit_SOURCE_DIR}/src
+        )
+        target_link_libraries(${MILLENNIUM_RTB_NAME} luajit::lib)
+    endif()
 elseif(WIN32 OR APPLE)
     target_include_directories(${MILLENNIUM_RTB_NAME} PRIVATE "${luajit_BINARY_DIR}")
+    target_link_libraries(${MILLENNIUM_RTB_NAME} luajit::lib cjson)
 endif()
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")

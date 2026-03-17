@@ -50,25 +50,13 @@ if(UNIX AND NOT APPLE)
             ${LUAJIT_INCLUDE_DIRS}
         )
     else()
-        target_include_directories(${MILLENNIUM_RTB_NAME} PRIVATE
-            ${luajit_BINARY_DIR}
-            ${luajit_SOURCE_DIR}/src
-        )
         target_link_libraries(${MILLENNIUM_RTB_NAME}
-            luajit::lib
             nlohmann_json
             fmt::fmt
         )
     endif()
 else()
-    target_include_directories(${MILLENNIUM_RTB_NAME} PRIVATE
-        ${luajit_BINARY_DIR}
-        ${luajit_SOURCE_DIR}/src
-    )
-
     target_link_libraries(${MILLENNIUM_RTB_NAME}
-        luajit::lib
-        cjson
         nlohmann_json
         fmt::fmt
     )
