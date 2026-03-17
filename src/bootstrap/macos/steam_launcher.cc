@@ -575,6 +575,7 @@ static bool resolve_bootstrap_asset_sources(const char* wrapper_directory, std::
         }
     }
 
+#ifdef MILLENNIUM_ROOT
     const std::filesystem::path repo_root(MILLENNIUM_ROOT);
     const std::filesystem::path legacy_loader_dir = repo_root / "src" / "typescript" / "sdk" / "packages" / "loader" / "build";
     const std::filesystem::path legacy_frontend_candidates[] = {
@@ -594,6 +595,7 @@ static bool resolve_bootstrap_asset_sources(const char* wrapper_directory, std::
             }
         }
     }
+#endif
 
     return false;
 }

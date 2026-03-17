@@ -118,6 +118,7 @@ std::filesystem::path network_hook_ctl::path_from_url(const std::string& request
     return utils::url::get_path_from_url(requestUrl);
 }
 
+#ifdef MILLENNIUM_ROOT
 static std::optional<std::filesystem::path> resolve_internal_ftp_asset_path(const std::string& requestUrl, const char* ftpHookAddress)
 {
     if (!ftpHookAddress) {
@@ -169,6 +170,7 @@ static std::optional<std::filesystem::path> resolve_internal_ftp_asset_path(cons
 
     return std::nullopt;
 }
+#endif
 
 void network_hook_ctl::vfs_request_handler(const nlohmann::basic_json<>& message)
 {
@@ -189,7 +191,11 @@ void network_hook_ctl::vfs_request_handler(const nlohmann::basic_json<>& message
     }
     /** Handle normal disk request */
     else {
+#ifdef MILLENNIUM_ROOT
         std::filesystem::path localFilePath = resolve_internal_ftp_asset_path(strRequestFile, this->m_ftp_url).value_or(this->path_from_url(strRequestFile));
+#else
+        std::filesystem::path localFilePath = this->path_from_url(strRequestFile);
+#endif
         std::ifstream localFileStream(localFilePath);
 
         bool bFailedRead = !localFileStream.is_open();

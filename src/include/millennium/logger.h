@@ -78,9 +78,12 @@ constexpr std::array<char, 1024> __sanitize_nt(const char* path)
 constexpr std::string_view __get_source_loc(const char* file)
 {
     std::string_view srcPath(file);
+#ifdef MILLENNIUM_ROOT
     std::string_view root(MILLENNIUM_ROOT);
-
     return srcPath.size() >= root.size() && srcPath.compare(0, root.size(), root) == 0 ? srcPath.substr(root.length()) : srcPath;
+#else
+    return srcPath;
+#endif
 }
 
 class logger_base

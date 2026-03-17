@@ -20,6 +20,6 @@ message(STATUS "[Millennium] Git commit hash: ${GIT_COMMIT_HASH}")
 
 add_compile_definitions(
     GIT_COMMIT_HASH="${GIT_COMMIT_HASH}"
-    MILLENNIUM_ROOT="${MILLENNIUM_BASE}"
     MILLENNIUM_VERSION="${MILLENNIUM_VERSION}"
+    $<$<CONFIG:Debug>:MILLENNIUM_ROOT="${MILLENNIUM_BASE}">
 )
