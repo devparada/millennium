@@ -38,12 +38,10 @@ if(DEFINED MILLENNIUM_CHILD_HOOK_OUTPUT_NAME)
     add_compile_definitions(__MILLENNIUM_CHILD_HOOK_OUTPUT_NAME__="${MILLENNIUM_CHILD_HOOK_OUTPUT_NAME}")
 endif()
 
-# In release mode, put all build outputs directly in build/ so paths
-# don't break if the source tree is moved.
-if(CMAKE_BUILD_TYPE STREQUAL "Release")
-    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
-    set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
-endif()
+# Put all build outputs directly in build/ so paths don't mirror
+# the source tree layout.
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
 
 include(FetchContent)
 FetchContent_Declare(snare GIT_REPOSITORY https://github.com/shdwmtr/libsnare.h GIT_TAG main)
