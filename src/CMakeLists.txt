@@ -155,9 +155,6 @@ if(UNIX AND NOT APPLE)
     )
     target_include_directories(${MILLENNIUM_RTB_NAME} PRIVATE ${lua_cjson_SOURCE_DIR})
     target_compile_definitions(${MILLENNIUM_RTB_NAME} PRIVATE USE_INTERNAL_FPCONV)
-    # lua_cjson uses strncasecmp (POSIX, declared in <strings.h>) but only
-    # includes <string.h>. With -std=c11, GCC 14+ treats the missing
-    # declaration as a hard error. Force-include the header.
     set_source_files_properties(
         ${lua_cjson_SOURCE_DIR}/lua_cjson.c
         TARGET_DIRECTORY ${MILLENNIUM_RTB_NAME}

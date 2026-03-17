@@ -52,12 +52,15 @@ else()
     set(CURL_WINDOWS_SSPI           OFF CACHE INTERNAL "" FORCE)
 endif()
 
-# On 32-bit Linux builds, point cmake at 32-bit libraries.
-# Both find_library (via LIB_SUFFIX) and pkg-config (via PKG_CONFIG_PATH)
-# need to be redirected so curl/minizip-ng link the right architecture.
 if(UNIX AND NOT APPLE AND CMAKE_C_FLAGS MATCHES "-m32")
     set(CMAKE_FIND_LIBRARY_CUSTOM_LIB_SUFFIX "32" CACHE STRING "Find 32-bit libraries" FORCE)
-    set(ENV{PKG_CONFIG_PATH} "/usr/lib32/pkgconfig")
+
+    set(_pc32 "/usr/lib32/pkgconfig:/usr/lib/i386-linux-gnu/pkgconfig")
+    if(DEFINED ENV{PKG_CONFIG_PATH} AND NOT "$ENV{PKG_CONFIG_PATH}" STREQUAL "")
+        set(ENV{PKG_CONFIG_PATH} "${_pc32}:$ENV{PKG_CONFIG_PATH}")
+    else()
+        set(ENV{PKG_CONFIG_PATH} "${_pc32}")
+    endif()
 endif()
 
 

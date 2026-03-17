@@ -1,8 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
 
-# The parent CMakeLists sets -m32 globally (also cached) for the 32-bit
-# Millennium library. lua_host is an independent native-64-bit process,
-# so strip -m32 from this directory's flags before any targets are created.
 if(UNIX AND NOT APPLE)
     string(REPLACE "-m32" "" CMAKE_C_FLAGS       "${CMAKE_C_FLAGS}")
     string(REPLACE "-m32" "" CMAKE_CXX_FLAGS     "${CMAKE_CXX_FLAGS}")
@@ -37,12 +34,11 @@ target_include_directories(${MILLENNIUM_RTB_NAME} PRIVATE
 )
 
 if(UNIX AND NOT APPLE)
-    # The lua sandbox is an independent process (IPC over unix sockets), so it
-    # does not need to match the 32-bit Millennium library.  Building it as
-    # native 64-bit avoids the need for 32-bit system libraries (openssl, etc.).
-    # HTTP is handled by the parent process over RPC, so no curl needed here.
+    set(_saved_pkg_config_libdir "$ENV{PKG_CONFIG_LIBDIR}")
+    set(ENV{PKG_CONFIG_LIBDIR} "")
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(LUAJIT REQUIRED IMPORTED_TARGET luajit)
+    set(ENV{PKG_CONFIG_LIBDIR} "${_saved_pkg_config_libdir}")
 
     target_link_libraries(${MILLENNIUM_RTB_NAME}
         PkgConfig::LUAJIT
