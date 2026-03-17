@@ -216,18 +216,27 @@ endif()
 
 include(${MILLENNIUM_BASE}/scripts/cmake/find_steam_path.cmake)
 
-# Build TypeScript frontend before C++ compilation in Release mode.
-# Produces src/typescript/.frontend.bin + SDK JS chunks that get embedded via incbin.
+# Build TypeScript frontend during configure so that generate_virtfs.cmake
+# can glob the chunk files and embed them via incbin.
 if(CMAKE_BUILD_TYPE STREQUAL "Release" AND NOT DISTRO_NIX)
     find_program(BUN_EXECUTABLE bun REQUIRED)
-    add_custom_command(
-        OUTPUT "${MILLENNIUM_BASE}/src/typescript/.frontend.bin"
+    message(STATUS "[Millennium] Building TypeScript frontend...")
+    execute_process(
         COMMAND ${BUN_EXECUTABLE} install --frozen-lockfile
+        WORKING_DIRECTORY "${MILLENNIUM_BASE}/src/typescript"
+        RESULT_VARIABLE _bun_result
+    )
+    if(NOT _bun_result EQUAL 0)
+        message(FATAL_ERROR "bun install failed")
+    endif()
+    execute_process(
         COMMAND ${BUN_EXECUTABLE} run build
         WORKING_DIRECTORY "${MILLENNIUM_BASE}/src/typescript"
-        COMMENT "Building TypeScript frontend (bun run build)..."
+        RESULT_VARIABLE _bun_result
     )
-    add_custom_target(build_frontend DEPENDS "${MILLENNIUM_BASE}/src/typescript/.frontend.bin")
+    if(NOT _bun_result EQUAL 0)
+        message(FATAL_ERROR "bun run build failed")
+    endif()
 endif()
 
 include(${MILLENNIUM_BASE}/scripts/cmake/generate_virtfs.cmake)
@@ -248,9 +257,7 @@ elseif(UNIX)
     endif()
 endif()
 
-if(TARGET build_frontend)
-    add_dependencies(Millennium build_frontend)
-endif()
+
 
 find_steam_path(Millennium)
 target_include_directories(Millennium SYSTEM PRIVATE ${websocketpp_SOURCE_DIR})
