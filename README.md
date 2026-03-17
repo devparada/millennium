@@ -23,92 +23,6 @@ If you enjoy this tool, please consider starring the project ⭐
 
 Installing Millennium is only a few steps. See [this page](https://docs.steambrew.app/users/installing) for a more detailed guide.
 
-### macOS (Experimental)
-
-macOS support now defaults to a wrapper-app install path (`Steam Millennium.app`)
-that does not overwrite Steam-tracked runtime files. For active development, use
-`./scripts/launch_macos.sh`.
-
-#### Install
-
-1. Build the macOS runtime and wrapper:
-
-```bash
-cmake --preset osx-debug
-cmake --build osx-debug
-```
-
-2. Install JS dependencies and build bootstrap web assets:
-
-```bash
-cd src/typescript
-bun install
-bun run build
-```
-
-3. Install Millennium wrapper app and runtime payload:
-
-```bash
-./scripts/install_macos.sh
-```
-
-4. Start Steam through the installed app bundle:
-
-```bash
-open "/Applications/Steam Millennium.app"
-```
-
-If `/Applications` is not writable, installer falls back to:
-
-```bash
-open "$HOME/Applications/Steam Millennium.app"
-```
-
-Legacy tier0 mode is still available when direct `Steam.app` patching is needed:
-
-```bash
-./scripts/install_macos.sh --tier0-legacy --steam-cfg-inhibit-all
-```
-
-Once Millennium is installed, you can find its related settings within the Steam user interface.
-
-From the Steam menu in the macOS menu bar (next to the Apple logo), select Millennium.
-
-You can also open Millennium from the steam url:
-
-```bash
-open 'steam://millennium/settings'
-```
-
-You can use `./scripts/install_macos.sh --help` for additional options (`--status`, `--repair`, `--uninstall`, `--tier0-legacy`, `--restore-steam-cfg`).
-
-#### Run (Development/Debug)
-
-For local development/debug iteration, use the wrapper launcher:
-
-```bash
-./scripts/launch_macos.sh
-```
-
-To enable Steam DevTools shortcuts on macOS via wrapper launch:
-
-```bash
-./scripts/launch_macos.sh --dev --devtools-port 8080
-```
-
-Then open DevTools with `F12` or `Ctrl+Shift+I`, or connect Chrome to:
-
-```text
-http://127.0.0.1:8080
-```
-
-If you need startup trace logs, launch with:
-
-```bash
-MILLENNIUM_BOOTSTRAP_TRACE_PATH=/tmp/millennium-bootstrap.trace \
-./scripts/launch_macos.sh
-```
-
 ## Features
 ### Plugins
 
@@ -155,6 +69,65 @@ Supported Platforms:
 -   Windows (x86/x64/ARM) NT (10 and newer)
 -   Linux (x86/x86_64/i686/i386)
 -   macOS (experimental wrapper app install via `./scripts/install_macos.sh`, legacy tier0 via `--tier0-legacy`, development launch via `./scripts/launch_macos.sh`)
+
+## Building from Source
+
+### Linux
+
+#### Prerequisites
+
+**Arch Linux** (other distros need equivalent packages):
+
+```
+cmake ninja bun
+lib32-gcc-libs lib32-openssl lib32-libidn2 lib32-xz lib32-zstd lib32-brotli lib32-libnghttp2 lib32-libpsl
+libx11 libxtst
+```
+
+#### Build
+
+```bash
+cmake --preset linux-debug
+cmake --build build
+```
+
+For a release build, use `linux-release` instead.
+
+#### Dev Environment Setup
+
+After building, run the setup script to symlink the build outputs into Steam's runtime directories:
+
+```bash
+./scripts/linux/setup_devenv.sh
+```
+
+This only needs to be run **once** — the symlinks point into the build tree, so rebuilding automatically picks up changes without re-running the script. Just restart Steam after rebuilding.
+
+To remove the symlinks and restore Steam to its stock state:
+
+```bash
+./scripts/linux/destroy_devenv.sh
+```
+
+### Windows
+
+#### Prerequisites
+
+- [Visual Studio Build Tools](https://aka.ms/vs/17/release/vs_buildtools.exe) (with the "Desktop development with C++" workload — includes CMake and Ninja, add them to PATH)
+- [Bun](https://bun.sh/)
+
+#### Build
+
+Open a **Developer PowerShell for VS**, then:
+
+```powershell
+cmake --preset windows-debug
+cmake --build build
+```
+
+For a release build, use `windows-release` instead.
+
+On Windows, CMake automatically detects your Steam installation from the registry and outputs binaries directly into Steam's directory. No additional setup is needed — just restart Steam after building.
 
 ## Sponsors
 
