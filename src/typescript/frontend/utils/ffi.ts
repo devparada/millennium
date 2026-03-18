@@ -64,3 +64,5 @@ export const PyUpdateMillennium = callable<[{ downloadUrl: string; downloadSize:
 export const Core_HasPendingMillenniumUpdateRestart = callable<[], boolean>('Core_HasPendingMillenniumUpdateRestart');
 export const PyGetPendingCrashes = callable<[], string>('Core_GetPendingCrashes');
 export const PyAcknowledgeCrash = callable<[{ plugin: string }], void>('Core_AcknowledgeCrash');
+export const PyPluginConfigGetAll = callable<[{ pluginName: string }], string>('PluginConfig_GetAll');
+export const PyPluginConfigDeleteAll = callable<[{ pluginName: string }], string>('PluginConfig_DeleteAll');
