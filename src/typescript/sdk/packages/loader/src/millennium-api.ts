@@ -178,9 +178,13 @@ export const Millennium = {
 window.Millennium = Millennium;
 
 // Callable wrapper — creates a reusable RPC function for a given route.
-// pluginName is injected automatically by the transpiler's AST transform.
-export function callable(pluginName: string, route: string) {
-	return (...args: any[]) => Millennium.callServerMethod(pluginName, route, ...args);
+export function callable(pluginNameOrFn: string | ((...args: any[]) => any), route: string) {
+	if (typeof pluginNameOrFn === 'function') {
+		// Old API: callable(__call_server_method__, route)
+		// __call_server_method__(route, ...args) → Millennium.callServerMethod(pluginName, route, ...args)
+		return (...args: any[]) => pluginNameOrFn(route, ...args);
+	}
+	return (...args: any[]) => Millennium.callServerMethod(pluginNameOrFn, route, ...args);
 }
 
 // Only define pluginSelf if on loopback host

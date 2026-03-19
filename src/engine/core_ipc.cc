@@ -162,7 +162,10 @@ json ipc_main::call_server_method(const json& call)
     const auto& data = call["data"];
     if (!data.contains("pluginName")) {
         LOG_ERROR("no plugin backend specified, doing nothing...");
-        return {};
+        return {
+            { "success",    false                           },
+            { "returnJson", "no plugin backend specified"   }
+        };
     }
 
     const std::string pluginName = data["pluginName"];
