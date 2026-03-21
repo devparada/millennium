@@ -30,15 +30,16 @@
 
 #ifdef __linux__
 #include "millennium/environment.h"
-#include "millennium/plugin_loader.h"
-#include "millennium/logger.h"
 #include "millennium/linux_distro_helpers.h"
+#include "millennium/logger.h"
+#include "millennium/plugin_loader.h"
 
-#include <unistd.h>
 #include <dlfcn.h>
-#include <limits.h>
 #include <string.h>
+#include <unistd.h>
+#include <sys/utsname.h>
 
+#include <fstream>
 #include <regex>
 #include <thread>
 
@@ -132,6 +133,56 @@ bool IsChildUpdaterProc(int argc, char** argv)
     return false;
 }
 
+#ifdef __linux__
+static std::string OsParse(std::ifstream& file, const std::string& key) {
+    if (!file.is_open()) return "unknown";
+
+    const std::string searchKey = key + "=";
+    char buffer[4096];
+    std::string line;
+
+    while (file.getline(buffer, sizeof(buffer))) {
+        if (strncmp(buffer, searchKey.c_str(), searchKey.length()) == 0) {
+            const char* value = buffer + searchKey.length();
+            if (*value == '"') value++;
+            std::string result;
+            while (*value && *value != '"' && *value != '\n') {
+                result += *value++;
+            }
+
+            return result.empty() ? "unknown" : result.c_str();
+        }
+    }
+
+    return "unknown";
+}
+
+std::string GetLinuxDistro()
+{
+    std::ifstream os_release("/etc/os-release", std::ios::binary);
+    if (!os_release.fail()) {
+        return std::string(OsParse(os_release, "PRETTY_NAME")) + " " + OsParse(os_release, "VERSION_ID");
+    } else {
+        os_release.close();
+        std::ifstream lsb_release("/etc/lsb-release", std::ios::binary);
+        if (!lsb_release.fail()) {
+            return OsParse(lsb_release, "DISTRIB_DESCRIPTION") + " " += OsParse(lsb_release, "DISTRIB_RELEASE");
+        } else {
+            lsb_release.close();
+            return "unknown";
+        }
+    }
+}
+
+static std::string GetSystemArchitecture() {
+    struct utsname buf;
+    if (uname(&buf) == 0) {
+        return buf.machine; // "x86_64", "aarch64", "armv7l", etc.
+    }
+    return "unknown";
+}
+#endif
+
 /*
  * Trampoline for __libc_start_main() that replaces the real main
  * function with our hooked version.
@@ -142,7 +193,7 @@ extern "C" int __libc_start_main(int (*main)(int, char**, char**), int argc, cha
                                  void* stack_end)
 {
     fnMainOriginal = main;
-    decltype(&__libc_start_main) orig = (decltype(&__libc_start_main))dlsym(RTLD_NEXT, "__libc_start_main");
+    const decltype(&__libc_start_main) orig = reinterpret_cast<decltype(&__libc_start_main)>(dlsym(RTLD_NEXT, "__libc_start_main"));
 
     if (!IsSamePath(argv[0], platform::environment::get("MILLENNIUM__STEAM_EXE_PATH").c_str()) || IsChildUpdaterProc(argc, argv)) {
         return orig(main, argc, argv, init, fini, rtld_fini, stack_end);
