@@ -264,7 +264,7 @@ void CleanupLoggers();
 
 #if defined(__clang__)
 #ifndef LOG_ERROR
-#define LOG_ERROR(...) logger.private_error_do_not_use(fmt, __sanitize_nt(__FILE__).data(), __LINE__, PRETTY_FUNCTION REST(__VA_ARGS__))
+#define LOG_ERROR(fmt, ...) logger.private_error_do_not_use(fmt, __sanitize_nt(__FILE__).data(), __LINE__, PRETTY_FUNCTION REST(__VA_ARGS__))
 #define FIRST(...) FIRST_HELPER(__VA_ARGS__, throwaway)
 #define FIRST_HELPER(first, ...) first
 #define REST(...) REST_HELPER(NUM(__VA_ARGS__), __VA_ARGS__)
@@ -277,4 +277,5 @@ void CleanupLoggers();
 #endif
 #else
 #define LOG_ERROR(fmt, ...) logger.private_error_do_not_use(fmt, __sanitize_nt(__FILE__).data(), __LINE__, PRETTY_FUNCTION, ##__VA_ARGS__)
+#endif
 #define GET_GITHUB_URL_FROM_HERE() fmt::format("{}/blob/{}{}#L{}", MILLENNIUM_REPOSITORY, GIT_COMMIT_HASH, __get_source_loc(__sanitize_nt(__FILE__).data()).data(), __LINE__)
