@@ -57,8 +57,7 @@ static int IsSamePath(const char* path1, const char* path2)
 {
     char realpath1[PATH_MAX], realpath2[PATH_MAX];
 
-    if (!realpath(path1, realpath1) || !realpath(path2, realpath2))
-        return 0;
+    if (!realpath(path1, realpath1) || !realpath(path2, realpath2)) return 0;
 
     return strcmp(realpath1, realpath2) == 0;
 }
@@ -202,7 +201,7 @@ extern "C" int __libc_start_main(int (*main)(int, char**, char**), int argc, cha
     logger.log("Hooked __libc_start_main() {} pid: {}", argv[0], getpid());
 
 #ifdef __linux__
-    logger.log("Loaded Millennium on {}, system architecture {}", GetLinuxDistro(), GetSystemArchitecture());
+    logger.log("Loaded Millennium on {}, system architecture {}", get_linux_distribution_id(), get_linux_architecture());
 #endif
     return orig(Deprecated_HookedMain, argc, argv, init, fini, rtld_fini, stack_end);
 }
