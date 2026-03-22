@@ -132,31 +132,6 @@ bool IsChildUpdaterProc(int argc, char** argv)
     return false;
 }
 
-#ifdef __linux__
-static std::string OsParse(std::ifstream& file, const std::string& key)
-{
-    if (!file.is_open()) return "unknown";
-
-    const std::string searchKey = key + "=";
-    char buffer[4096];
-    std::string line;
-
-    while (file.getline(buffer, sizeof(buffer))) {
-        if (strncmp(buffer, searchKey.c_str(), searchKey.length()) == 0) {
-            const char* value = buffer + searchKey.length();
-            if (*value == '"') value++;
-            std::string result;
-            while (*value && *value != '"' && *value != '\n') {
-                result += *value++;
-            }
-
-            return result.empty() ? "unknown" : result.c_str();
-        }
-    }
-
-    return "unknown";
-}
-
 /*
  * Trampoline for __libc_start_main() that replaces the real main
  * function with our hooked version.
@@ -174,11 +149,7 @@ extern "C" int __libc_start_main(int (*main)(int, char**, char**), int argc, cha
     }
 
     logger.log("Hooked __libc_start_main() {} pid: {}", argv[0], getpid());
-
-#ifdef __linux__
     logger.log("Loaded Millennium on {}, system architecture {}", get_linux_distribution_id(), get_linux_architecture());
-#endif
     return orig(Deprecated_HookedMain, argc, argv, init, fini, rtld_fini, stack_end);
 }
-
 #endif
