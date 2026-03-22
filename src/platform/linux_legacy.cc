@@ -133,7 +133,8 @@ bool IsChildUpdaterProc(int argc, char** argv)
 }
 
 #ifdef __linux__
-static std::string OsParse(std::ifstream& file, const std::string& key) {
+static std::string OsParse(std::ifstream& file, const std::string& key)
+{
     if (!file.is_open()) return "unknown";
 
     const std::string searchKey = key + "=";
@@ -155,32 +156,6 @@ static std::string OsParse(std::ifstream& file, const std::string& key) {
 
     return "unknown";
 }
-
-std::string GetLinuxDistro()
-{
-    std::ifstream os_release("/etc/os-release", std::ios::binary);
-    if (!os_release.fail()) {
-        return std::string(OsParse(os_release, "PRETTY_NAME")) + " " + OsParse(os_release, "VERSION_ID");
-    } else {
-        os_release.close();
-        std::ifstream lsb_release("/etc/lsb-release", std::ios::binary);
-        if (!lsb_release.fail()) {
-            return OsParse(lsb_release, "DISTRIB_DESCRIPTION") + " " += OsParse(lsb_release, "DISTRIB_RELEASE");
-        } else {
-            lsb_release.close();
-            return "unknown";
-        }
-    }
-}
-
-static std::string GetSystemArchitecture() {
-    struct utsname buf;
-    if (uname(&buf) == 0) {
-        return buf.machine; // "x86_64", "aarch64", "armv7l", etc.
-    }
-    return "unknown";
-}
-#endif
 
 /*
  * Trampoline for __libc_start_main() that replaces the real main
