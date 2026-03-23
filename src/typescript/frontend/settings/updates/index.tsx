@@ -76,7 +76,10 @@ const UpdatesViewModal: React.FC = () => {
 	if (hasUpdateError) {
 		return (
 			<Placeholder icon={<IconsModule.ExclamationPoint />} header={locale.updatePanelErrorHeader} body={locale.updatePanelErrorBody + parseUpdateErrorMessage()}>
-				<DialogButton className={joinClassNames(settingsClasses.SettingsDialogButton, "MillenniumUpdates_CheckForUpdates")} onClick={fetchAvailableUpdates.spread(true)}>
+				<DialogButton
+					className={joinClassNames(settingsClasses.SettingsDialogButton, 'MillenniumUpdates_CheckForUpdates')}
+					onClick={fetchAvailableUpdates.spread(true)}
+				>
 					{locale.updatePanelErrorButton}
 				</DialogButton>
 			</Placeholder>
@@ -87,7 +90,11 @@ const UpdatesViewModal: React.FC = () => {
 	if (!hasAnyUpdates()) {
 		return (
 			<Placeholder icon={<IconsModule.Checkmark />} header={locale.updatePanelNoUpdatesFoundHeader} body={locale.updatePanelNoUpdatesFound}>
-				<DialogButton className={joinClassNames(settingsClasses.SettingsDialogButton, "MillenniumUpdates_CheckForUpdates")} onClick={handleRecheck} disabled={isRechecking}>
+				<DialogButton
+					className={joinClassNames(settingsClasses.SettingsDialogButton, 'MillenniumUpdates_CheckForUpdates')}
+					onClick={handleRecheck}
+					disabled={isRechecking}
+				>
 					{isRechecking && <MillenniumIcons.LoadingSpinner />}
 					{locale.updatePanelCheckForUpdates}
 				</DialogButton>

@@ -1,128 +1,126 @@
-import { JsPbMessage, Unregisterable } from "./shared";
+import { JsPbMessage, Unregisterable } from './shared';
 
 /**
  * Everything is taken from here:
  * https://github.com/SteamDatabase/SteamTracking/blob/master/Protobufs/steammessages_clientnotificationtypes.proto
  */
 export interface Notifications {
-    /**
-     * If `data` is deserialized, returns one of the following here: {@link Notifications}
-     * @returns an object that can be used to unregister the callback.
-     */
-    RegisterForNotifications(
-        callback: (notificationIndex: number, type: EClientNotificationType, data: ArrayBuffer) => void,
-    ): Unregisterable;
+	/**
+	 * If `data` is deserialized, returns one of the following here: {@link Notifications}
+	 * @returns an object that can be used to unregister the callback.
+	 */
+	RegisterForNotifications(callback: (notificationIndex: number, type: EClientNotificationType, data: ArrayBuffer) => void): Unregisterable;
 }
 
 export enum EClientNotificationType {
-    Invalid,
-    DownloadComplete,
-    FriendInvite,
-    FriendInGame,
-    FriendOnline,
-    Achievement,
-    LowBattery,
-    SystemUpdate,
-    FriendMessage,
-    GroupChatMessage,
-    FriendInviteRollup,
-    FamilySharingDeviceAuthorizationChanged,
-    FamilySharingStopPlaying,
-    FamilySharingLibraryAvailable,
-    Screenshot,
-    CloudSyncFailure,
-    CloudSyncConflict,
-    IncomingVoiceChat,
-    ClaimSteamDeckRewards,
-    GiftReceived,
-    ItemAnnouncement,
-    HardwareSurvey,
-    LowDiskSpace,
-    BatteryTemperature,
-    DockUnsupportedFirmware,
-    PeerContentUpload,
-    CannotReadControllerGuideButton,
-    Comment,
-    Wishlist,
-    TradeOffer,
-    AsyncGame,
-    General,
-    HelpRequest,
-    OverlaySplashScreen,
-    BroadcastAvailableToWatch,
-    TimedTrialRemaining,
-    LoginRefresh,
-    MajorSale,
-    TimerExpired,
-    ModeratorMsg,
-    SteamInputActionSetChanged,
-    RemoteClientConnection,
-    RemoteClientStartStream,
-    StreamingClientConnection,
-    FamilyInvite,
-    PlaytimeWarning,
-    FamilyPurchaseRequest,
-    FamilyPurchaseRequestResponse,
-    ParentalFeatureRequest,
-    ParentalPlaytimeRequest,
-    GameRecordingError,
-    ParentalFeatureResponse,
-    ParentalPlaytimeResponse,
-    RequestedGameAdded,
-    ClipDownloaded,
-    GameRecordingStart,
-    GameRecordingStop,
-    GameRecordingUserMarkerAdded,
-    GameRecordingInstantClip,
+	Invalid,
+	DownloadComplete,
+	FriendInvite,
+	FriendInGame,
+	FriendOnline,
+	Achievement,
+	LowBattery,
+	SystemUpdate,
+	FriendMessage,
+	GroupChatMessage,
+	FriendInviteRollup,
+	FamilySharingDeviceAuthorizationChanged,
+	FamilySharingStopPlaying,
+	FamilySharingLibraryAvailable,
+	Screenshot,
+	CloudSyncFailure,
+	CloudSyncConflict,
+	IncomingVoiceChat,
+	ClaimSteamDeckRewards,
+	GiftReceived,
+	ItemAnnouncement,
+	HardwareSurvey,
+	LowDiskSpace,
+	BatteryTemperature,
+	DockUnsupportedFirmware,
+	PeerContentUpload,
+	CannotReadControllerGuideButton,
+	Comment,
+	Wishlist,
+	TradeOffer,
+	AsyncGame,
+	General,
+	HelpRequest,
+	OverlaySplashScreen,
+	BroadcastAvailableToWatch,
+	TimedTrialRemaining,
+	LoginRefresh,
+	MajorSale,
+	TimerExpired,
+	ModeratorMsg,
+	SteamInputActionSetChanged,
+	RemoteClientConnection,
+	RemoteClientStartStream,
+	StreamingClientConnection,
+	FamilyInvite,
+	PlaytimeWarning,
+	FamilyPurchaseRequest,
+	FamilyPurchaseRequestResponse,
+	ParentalFeatureRequest,
+	ParentalPlaytimeRequest,
+	GameRecordingError,
+	ParentalFeatureResponse,
+	ParentalPlaytimeResponse,
+	RequestedGameAdded,
+	ClipDownloaded,
+	GameRecordingStart,
+	GameRecordingStop,
+	GameRecordingUserMarkerAdded,
+	GameRecordingInstantClip,
 }
 
 export enum ESystemUpdateNotificationType {
-    Invalid,
-    Available,
-    NeedsRestart,
+	Invalid,
+	Available,
+	NeedsRestart,
 }
 
 export enum EGameRecordingErrorType {
-    General = 1,
-    LowDiskSpace,
+	General = 1,
+	LowDiskSpace,
 }
 
 export interface ClientNotificationGroupChatMessage extends JsPbMessage {
-    tag(): string;
+	tag(): string;
 
-    /** A Steam64 ID. */
-    steamid_sender(): string;
+	/** A Steam64 ID. */
+	steamid_sender(): string;
 
-    chat_group_id(): string;
+	chat_group_id(): string;
 
-    chat_id(): string;
+	chat_id(): string;
 
-    title(): string;
+	title(): string;
 
-    body(): string;
+	body(): string;
 
-    rawbody(): string;
+	rawbody(): string;
 
-    icon(): string;
+	icon(): string;
 
-    notificationid(): number;
+	notificationid(): number;
 }
 
 export interface ClientNotificationFriendMessage extends JsPbMessage {
-    body(): string;
+	body(): string;
 
-    icon(): string;
+	icon(): string;
 
-    notificationid(): number;
+	notificationid(): number;
 
-    response_steamurl(): string;
+	response_steamurl(): string;
 
-    /** A Steam64 ID. */
-    steamid(): string;
+	/** A Steam64 ID. */
+	steamid(): string;
 
-    tag(): string;
+	tag(): string;
 
-    title(): string;
+	title(): string;
 }
 
 export interface ClientNotificationCloudSyncFailure extends JsPbMessage {
@@ -224,8 +222,7 @@ export interface ClientNotificationIncomingVoiceChat extends JsPbMessage {
 	steamid(): number;
 }
 
-export interface ClientNotificationClaimSteamDeckRewards extends JsPbMessage {
-}
+export interface ClientNotificationClaimSteamDeckRewards extends JsPbMessage {}
 
 export interface ClientNotificationGiftReceived extends JsPbMessage {
 	sender_name(): string;
@@ -236,8 +233,7 @@ export interface ClientNotificationItemAnnouncement extends JsPbMessage {
 	new_backpack_items(): boolean;
 }
 
-export interface ClientNotificationHardwareSurveyPending extends JsPbMessage {
-}
+export interface ClientNotificationHardwareSurveyPending extends JsPbMessage {}
 
 export interface ClientNotificationLowDiskSpace extends JsPbMessage {
 	folder_index(): number;
@@ -248,8 +244,7 @@ export interface ClientNotificationBatteryTemperature extends JsPbMessage {
 	notification_type(): string;
 }
 
-export interface ClientNotificationDockUnsupportedFirmware extends JsPbMessage {
-}
+export interface ClientNotificationDockUnsupportedFirmware extends JsPbMessage {}
 
 export interface ClientNotificationPeerContentUpload extends JsPbMessage {
 	appid(): number;
@@ -260,8 +255,7 @@ export interface ClientNotificationCannotReadControllerGuideButton extends JsPbM
 	controller_index(): number;
 }
 
-export interface ClientNotificationOverlaySplashScreen extends JsPbMessage {
-}
+export interface ClientNotificationOverlaySplashScreen extends JsPbMessage {}
 
 export interface ClientNotificationBroadcastAvailableToWatch extends JsPbMessage {
 	broadcast_permission(): number;
@@ -275,11 +269,9 @@ export interface ClientNotificationTimedTrialRemaining extends JsPbMessage {
 	played_seconds(): number;
 }
 
-export interface ClientNotificationLoginRefresh extends JsPbMessage {
-}
+export interface ClientNotificationLoginRefresh extends JsPbMessage {}
 
-export interface ClientNotificationTimerExpired extends JsPbMessage {
-}
+export interface ClientNotificationTimerExpired extends JsPbMessage {}
 
 export interface ClientNotificationSteamInputActionSetChanged extends JsPbMessage {
 	controller_index(): number;
@@ -323,11 +315,11 @@ export interface ClientNotificationGameRecordingStop extends JsPbMessage {
 }
 
 export interface ClientNotificationGameRecordingUserMarkerAdded extends JsPbMessage {
-    game_id(): number;
+	game_id(): number;
 }
 
 export interface CClientNotificationGameRecordingInstantClip extends JsPbMessage {
-    game_id(): number;
-    clip_id(): string;
+	game_id(): number;
+	clip_id(): string;
 	duration_secs(): number;
 }

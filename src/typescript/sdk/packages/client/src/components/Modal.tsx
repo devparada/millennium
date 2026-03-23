@@ -89,7 +89,7 @@ export const ModalRoot =
 	// new
 	findModuleExport((e: Export) => typeof e === 'function' && e.toString().includes('Either closeModal or onCancel should be passed to GenericDialog. Classes: ')) ||
 	// old
-	Object.values(
+	(Object.values(
 		findModule((m: any) => {
 			if (typeof m !== 'object') return false;
 
@@ -101,7 +101,7 @@ export const ModalRoot =
 
 			return false;
 		}) || {},
-	)?.find((x: any) => x?.type?.toString?.()?.includes('((function(){')) as FC<ModalRootProps>;
+	)?.find((x: any) => x?.type?.toString?.()?.includes('((function(){')) as FC<ModalRootProps>);
 
 interface SimpleModalProps {
 	active?: boolean;

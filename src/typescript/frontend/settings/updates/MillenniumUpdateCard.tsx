@@ -88,11 +88,7 @@ export const MillenniumUpdateCard = ({ millenniumUpdates }: { millenniumUpdates:
 
 	const StartManualUpdate = () => {
 		showModal(
-			<ConfirmModal
-				strTitle={locale.strUpdateMillennium}
-				strDescription={<Markdown>{GetManualUpdateDescription()}</Markdown>}
-				bAlertDialog={true}
-			/>,
+			<ConfirmModal strTitle={locale.strUpdateMillennium} strDescription={<Markdown>{GetManualUpdateDescription()}</Markdown>} bAlertDialog={true} />,
 			pluginSelf.mainWindow,
 			{ bNeverPopOut: false },
 		);

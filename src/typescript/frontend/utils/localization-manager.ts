@@ -87,7 +87,7 @@ const localizationFiles: { [key: string]: LocalizationData } = {
 	japanese,
 	hungarian,
 	koreana,
-	latam
+	latam,
 	// Add other languages here
 };
 

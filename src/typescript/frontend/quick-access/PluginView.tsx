@@ -120,9 +120,7 @@ export const RenderPluginView = () => {
 	if (!renderer) {
 		return (
 			<PanelSection>
-				<PanelSectionRow>
-					{formatString(locale.pluginRendererError, focusedItem?.data?.name)}
-				</PanelSectionRow>
+				<PanelSectionRow>{formatString(locale.pluginRendererError, focusedItem?.data?.name)}</PanelSectionRow>
 			</PanelSection>
 		);
 	}

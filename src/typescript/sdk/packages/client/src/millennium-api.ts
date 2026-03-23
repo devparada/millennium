@@ -48,7 +48,10 @@ const callable: <
 	Return extends IPCType = IPCType,
 >(
 	route: string,
-) => (...params: Params) => Promise<Return> = (_route: string) => (..._params: any[]) => Promise.resolve(undefined as any);
+) => (...params: Params) => Promise<Return> =
+	(_route: string) =>
+	(..._params: any[]) =>
+		Promise.resolve(undefined as any);
 
 const m_private_context: any = undefined;
 export const pluginSelf = m_private_context;

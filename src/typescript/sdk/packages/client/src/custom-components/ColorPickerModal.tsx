@@ -4,47 +4,47 @@ import { ConfirmModal, SliderField } from '../components';
 import { gamepadSliderClasses } from '../utils/static-classes';
 
 interface ColorPickerModalProps {
-  closeModal: () => void;
-  onConfirm?(HSLString: string): any;
-  title?: string;
-  defaultH?: number;
-  defaultS?: number;
-  defaultL?: number;
-  defaultA?: number;
+	closeModal: () => void;
+	onConfirm?(HSLString: string): any;
+	title?: string;
+	defaultH?: number;
+	defaultS?: number;
+	defaultL?: number;
+	defaultA?: number;
 }
 
 export const ColorPickerModal: FC<ColorPickerModalProps> = ({
-  closeModal,
-  onConfirm = () => {},
-  title = 'Color Picker',
-  defaultH = 0,
-  defaultS = 100,
-  defaultL = 50,
-  defaultA = 1,
+	closeModal,
+	onConfirm = () => {},
+	title = 'Color Picker',
+	defaultH = 0,
+	defaultS = 100,
+	defaultL = 50,
+	defaultA = 1,
 }) => {
-  const [H, setH] = useState<number>(defaultH);
-  const [S, setS] = useState<number>(defaultS);
-  const [L, setL] = useState<number>(defaultL);
-  const [A, setA] = useState<number>(defaultA);
+	const [H, setH] = useState<number>(defaultH);
+	const [S, setS] = useState<number>(defaultS);
+	const [L, setL] = useState<number>(defaultL);
+	const [A, setA] = useState<number>(defaultA);
 
-  const colorPickerCSSVars = {
-    '--decky-color-picker-hvalue': `${H}`,
-    '--decky-color-picker-svalue': `${S}%`,
-    '--decky-color-picker-lvalue': `${L}%`,
-    '--decky-color-picker-avalue': `${A}`,
-  } as CSSProperties;
+	const colorPickerCSSVars = {
+		'--decky-color-picker-hvalue': `${H}`,
+		'--decky-color-picker-svalue': `${S}%`,
+		'--decky-color-picker-lvalue': `${L}%`,
+		'--decky-color-picker-avalue': `${A}`,
+	} as CSSProperties;
 
-  return (
-    <ConfirmModal
-      bAllowFullSize
-      onCancel={closeModal}
-      onOK={() => {
-        onConfirm(`hsla(${H}, ${S}%, ${L}%, ${A})`);
-        closeModal();
-      }}
-    >
-      <style>
-        {`
+	return (
+		<ConfirmModal
+			bAllowFullSize
+			onCancel={closeModal}
+			onOK={() => {
+				onConfirm(`hsla(${H}, ${S}%, ${L}%, ${A})`);
+				closeModal();
+			}}
+		>
+			<style>
+				{`
         /* This removes the cyan track color that is behind the slider head */
         .ColorPicker_Container .${gamepadSliderClasses.SliderTrack} {
           --left-track-color: #0000;
@@ -88,45 +88,45 @@ export const ColorPickerModal: FC<ColorPickerModalProps> = ({
           );
         }
         `}
-      </style>
-      <div
-        className="ColorPicker_ColorDisplayContainer"
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '1em',
-          // theres a large header by default on the modal, so this just pushes it up into that unused space
-          marginTop: '-2.5em',
-        }}
-      >
-        <div>
-          <span style={{ fontSize: '1.5em' }}>
-            <b>{title}</b>
-          </span>
-        </div>
-        <div
-          style={{
-            backgroundColor: `hsla(${H}, ${S}%, ${L}%, ${A})`,
-            width: '40px',
-            height: '40px',
-          }}
-        ></div>
-      </div>
-      <div className="ColorPicker_Container" style={colorPickerCSSVars}>
-        <div className="ColorPicker_HSlider">
-          <SliderField showValue editableValue label="Hue" value={H} min={0} max={360} onChange={setH} />
-        </div>
-        <div className="ColorPicker_SSlider">
-          <SliderField showValue editableValue label="Saturation" value={S} min={0} max={100} onChange={setS} />
-        </div>
-        <div className="ColorPicker_LSlider">
-          <SliderField showValue editableValue label="Lightness" value={L} min={0} max={100} onChange={setL} />
-        </div>
-        <div className="ColorPicker_ASlider">
-          <SliderField showValue editableValue label="Alpha" value={A} step={0.1} min={0} max={1} onChange={setA} />
-        </div>
-      </div>
-    </ConfirmModal>
-  );
+			</style>
+			<div
+				className="ColorPicker_ColorDisplayContainer"
+				style={{
+					display: 'flex',
+					justifyContent: 'space-between',
+					alignItems: 'center',
+					marginBottom: '1em',
+					// theres a large header by default on the modal, so this just pushes it up into that unused space
+					marginTop: '-2.5em',
+				}}
+			>
+				<div>
+					<span style={{ fontSize: '1.5em' }}>
+						<b>{title}</b>
+					</span>
+				</div>
+				<div
+					style={{
+						backgroundColor: `hsla(${H}, ${S}%, ${L}%, ${A})`,
+						width: '40px',
+						height: '40px',
+					}}
+				></div>
+			</div>
+			<div className="ColorPicker_Container" style={colorPickerCSSVars}>
+				<div className="ColorPicker_HSlider">
+					<SliderField showValue editableValue label="Hue" value={H} min={0} max={360} onChange={setH} />
+				</div>
+				<div className="ColorPicker_SSlider">
+					<SliderField showValue editableValue label="Saturation" value={S} min={0} max={100} onChange={setS} />
+				</div>
+				<div className="ColorPicker_LSlider">
+					<SliderField showValue editableValue label="Lightness" value={L} min={0} max={100} onChange={setL} />
+				</div>
+				<div className="ColorPicker_ASlider">
+					<SliderField showValue editableValue label="Alpha" value={A} step={0.1} min={0} max={1} onChange={setA} />
+				</div>
+			</div>
+		</ConfirmModal>
+	);
 };

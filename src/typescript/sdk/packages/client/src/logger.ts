@@ -20,7 +20,10 @@ export const groupEnd = (...args: any[]) => {
 };
 
 export default class Logger {
-	constructor(private name: string, private moduleName = 'Millennium') {}
+	constructor(
+		private name: string,
+		private moduleName = 'Millennium',
+	) {}
 	log(...args: any[]) {
 		log(this.moduleName, this.name, ...args);
 	}

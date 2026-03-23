@@ -41,7 +41,6 @@ import { formatString, locale } from '../../utils/localization-manager';
 import { MillenniumIcons } from '../../components/Icons';
 import { showPluginCrashModal } from '../../components/PluginCrashModal';
 
-
 interface PluginComponentProps {
 	plugin: PluginComponent;
 	index: number;

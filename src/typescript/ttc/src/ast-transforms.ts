@@ -64,7 +64,7 @@ function pathEquals(a: string[], b: string[]): boolean {
 }
 
 function findTransform<T extends Transform>(transforms: Transform[], path: string[], type: T['type']): T | undefined {
-	return transforms.find(t => t.type === type && pathEquals(path, t.match)) as T | undefined;
+	return transforms.find((t) => t.type === type && pathEquals(path, t.match)) as T | undefined;
 }
 
 export default function astTransforms(transforms: Transform[]): Plugin {
@@ -119,7 +119,7 @@ export default function astTransforms(transforms: Transform[]): Plugin {
 						const parentProp = (nodePath.parentPath.node as any).property;
 						if (parentProp?.type === 'Identifier') {
 							const extendedPath = [...memberPath, parentProp.name];
-							if (transforms.some(t => pathEquals(t.match, extendedPath))) {
+							if (transforms.some((t) => pathEquals(t.match, extendedPath))) {
 								return;
 							}
 						}

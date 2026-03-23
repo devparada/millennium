@@ -35,7 +35,9 @@ import { dirname } from 'path';
 import { Logger } from './logger';
 
 async function fileExists(filePath: string): Promise<boolean> {
-	return access(filePath).then(() => true).catch(() => false);
+	return access(filePath)
+		.then(() => true)
+		.catch(() => false);
 }
 
 async function detectPackageManager(): Promise<string> {
@@ -45,7 +47,7 @@ async function detectPackageManager(): Promise<string> {
 	if (userAgent.startsWith('yarn')) return 'yarn';
 
 	const cwd = process.cwd();
-	if (await fileExists(path.join(cwd, 'bun.lock')) || await fileExists(path.join(cwd, 'bun.lockb'))) return 'bun';
+	if ((await fileExists(path.join(cwd, 'bun.lock'))) || (await fileExists(path.join(cwd, 'bun.lockb')))) return 'bun';
 	if (await fileExists(path.join(cwd, 'pnpm-lock.yaml'))) return 'pnpm';
 	if (await fileExists(path.join(cwd, 'yarn.lock'))) return 'yarn';
 
@@ -54,10 +56,14 @@ async function detectPackageManager(): Promise<string> {
 
 function installCommand(pm: string, pkg: string): string {
 	switch (pm) {
-		case 'bun': return `bun add -d ${pkg}`;
-		case 'pnpm': return `pnpm add -D ${pkg}`;
-		case 'yarn': return `yarn add -D ${pkg}`;
-		default: return `npm i -D ${pkg}`;
+		case 'bun':
+			return `bun add -d ${pkg}`;
+		case 'pnpm':
+			return `pnpm add -D ${pkg}`;
+		case 'yarn':
+			return `yarn add -D ${pkg}`;
+		default:
+			return `npm i -D ${pkg}`;
 	}
 }
 

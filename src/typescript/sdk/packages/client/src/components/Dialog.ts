@@ -3,7 +3,7 @@ import { ButtonHTMLAttributes, FC, HTMLAttributes } from 'react';
 import { CommonUIModule, Module } from '../webpack';
 import { FooterLegendProps } from './FooterLegend';
 
-export type DialogCommonProps = HTMLAttributes<HTMLDivElement>
+export type DialogCommonProps = HTMLAttributes<HTMLDivElement>;
 
 export interface DialogButtonProps extends FooterLegendProps, ButtonHTMLAttributes<HTMLButtonElement> {
 	/**

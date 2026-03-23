@@ -104,33 +104,21 @@ const CrashModal = ({ detail, closeModal, onResolve }: { detail: PluginCrashInfo
 					/>
 
 					<SettingsDialogSubHeader>{locale.crashModalDeveloperInfo}</SettingsDialogSubHeader>
-					<Field
-						label={locale.crashModalExitCode}
-						description={locale.crashModalExitCodeDescription}
-						icon={<IconsModule.ExclamationPoint color="red" />}
-					>
+					<Field label={locale.crashModalExitCode} description={locale.crashModalExitCodeDescription} icon={<IconsModule.ExclamationPoint color="red" />}>
 						<code style={{ fontFamily: 'monospace', fontSize: '13px' }}>{formatExitCode(detail.exitCode)}</code>
 					</Field>
-					<Field
-						label={locale.crashModalCrashDump}
-						description={locale.crashModalCrashDumpDescription}
-					>
+					<Field label={locale.crashModalCrashDump} description={locale.crashModalCrashDumpDescription}>
 						{hasCrashDir && (
 							<DialogButton className={settingsClasses.SettingsDialogButton} onClick={openCrashFolder}>
 								{locale.strOpenFolder}
 							</DialogButton>
 						)}
 					</Field>
-					<Field
-						label={locale.crashModalPluginLogs}
-						description={locale.crashModalPluginLogsDescription}
-						bottomSeparator="none"
-					>
+					<Field label={locale.crashModalPluginLogs} description={locale.crashModalPluginLogsDescription} bottomSeparator="none">
 						<DialogButton className={settingsClasses.SettingsDialogButton} onClick={viewLogs}>
 							{locale.strViewLogs}
 						</DialogButton>
 					</Field>
-
 				</>
 			}
 			bAlertDialog={false}
