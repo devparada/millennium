@@ -40,7 +40,6 @@
 #include "millennium/types.h"
 
 #include <nlohmann/json_fwd.hpp>
-#include <optional>
 #include <thread>
 #include <unordered_set>
 
@@ -82,7 +81,10 @@ bool network_hook_ctl::remove_hook(unsigned long long moduleId)
     if (!m_hook_list_ptr) return false;
 
     size_t originalSize = m_hook_list_ptr->size();
-    auto newEnd = std::remove_if(m_hook_list_ptr->begin(), m_hook_list_ptr->end(), [moduleId](const hook_item& hook) { return hook.id == moduleId; });
+    auto newEnd = std::remove_if(m_hook_list_ptr->begin(), m_hook_list_ptr->end(), [moduleId](const hook_item& hook)
+    {
+        return hook.id == moduleId;
+    });
     m_hook_list_ptr->erase(newEnd, m_hook_list_ptr->end());
     return m_hook_list_ptr->size() < originalSize;
 }
@@ -118,60 +120,6 @@ std::filesystem::path network_hook_ctl::path_from_url(const std::string& request
     return utils::url::get_path_from_url(requestUrl);
 }
 
-#ifdef MILLENNIUM_ROOT
-static std::optional<std::filesystem::path> resolve_internal_ftp_asset_path(const std::string& requestUrl, const char* ftpHookAddress)
-{
-    if (!ftpHookAddress) {
-        return std::nullopt;
-    }
-
-    const std::string base(ftpHookAddress);
-    if (requestUrl.rfind(base, 0) != 0) {
-        return std::nullopt;
-    }
-
-    std::string relative = requestUrl.substr(base.size());
-    const size_t queryPos = relative.find('?');
-    if (queryPos != std::string::npos) {
-        relative = relative.substr(0, queryPos);
-    }
-
-    const std::string tokenPrefix = GetScrambledApiPathToken() + "/";
-    if (relative.rfind(tokenPrefix, 0) != 0) {
-        return std::nullopt;
-    }
-
-    const std::string assetPath = relative.substr(tokenPrefix.size());
-    const std::filesystem::path repoRoot(MILLENNIUM_ROOT);
-
-    if (assetPath == "millennium.js") {
-        return repoRoot / "src" / "typescript" / "sdk" / "packages" / "loader" / "build" / "millennium.js";
-    }
-
-    if (assetPath == "millennium-frontend.js") {
-        return repoRoot / "build" / "frontend.bin";
-    }
-
-    if (assetPath.rfind("chunks/", 0) == 0) {
-        const std::filesystem::path candidate = repoRoot / "src" / "typescript" / "sdk" / "packages" / "loader" / "build" / assetPath;
-        const std::string filename = candidate.filename().string();
-        const std::string extension = candidate.extension().string();
-
-        if (filename.rfind("chunk-", 0) != 0) {
-            return std::nullopt;
-        }
-
-        if (extension != ".js" && extension != ".map") {
-            return std::nullopt;
-        }
-
-        return candidate;
-    }
-
-    return std::nullopt;
-}
-#endif
-
 void network_hook_ctl::vfs_request_handler(const nlohmann::basic_json<>& message)
 {
     std::string fileContent;
@@ -191,11 +139,7 @@ void network_hook_ctl::vfs_request_handler(const nlohmann::basic_json<>& message
     }
     /** Handle normal disk request */
     else {
-#ifdef MILLENNIUM_ROOT
-        std::filesystem::path localFilePath = resolve_internal_ftp_asset_path(strRequestFile, this->m_ftp_url).value_or(this->path_from_url(strRequestFile));
-#else
         std::filesystem::path localFilePath = this->path_from_url(strRequestFile);
-#endif
         std::ifstream localFileStream(localFilePath);
 
         bool bFailedRead = !localFileStream.is_open();
