@@ -82,13 +82,6 @@ jobs:
               Set-Item "env:$k" $v
           }
 
-          cd src/typescript
-          bun install
-          cd ttc && bun run build && cd ..
-          bun install
-          bun run build
-          cd ../..
-
           cmake --preset=windows-release -DGITHUB_ACTION_BUILD=ON
           cmake --build build
 
@@ -182,13 +175,6 @@ jobs:
           export CMAKE_LIBRARY_PATH="/usr/lib/i386-linux-gnu"
           export CMAKE_INCLUDE_PATH="/usr/include/i386-linux-gnu"
           export PKG_CONFIG_LIBDIR="/usr/lib/i386-linux-gnu/pkgconfig"
-
-          cd src/typescript
-          bun install
-          cd ttc && bun run build && cd ..
-          bun install
-          bun run build
-          cd ../..
 
           cmake --preset=linux-release -G "Ninja" -DGITHUB_ACTION_BUILD=ON \
             -DCMAKE_LIBRARY_PATH="/usr/lib/i386-linux-gnu" \
