@@ -2,13 +2,13 @@
 
 pkgbase="millennium"
 pkgname=('millennium' 'millennium-debug')
-pkgver=3.0.0_beta.13
+pkgver=3.0.0_beta.14
 pkgrel=1
 arch=('x86_64')
 url="https://github.com/SteamClientHomebrew/Millennium"
 license=('MIT')
 makedepends=('bun' 'curl' 'zip' 'unzip' 'tar' 'cmake' 'ninja' 'lib32-gcc-libs' 'lib32-openssl' 'lib32-libidn2' 'lib32-xz' 'lib32-zstd' 'lib32-brotli' 'lib32-libnghttp2' 'lib32-libpsl' 'libx11' 'libxtst')
-source=("git+$url.git#commit=c4f721e26186f453f29bb945c99aa68bd71b773b")
+source=("git+$url.git#commit=7b76c57a5bce56e33aa718bf0eb66c15049de379")
 sha256sums=('SKIP')
 options=(debug)
 
