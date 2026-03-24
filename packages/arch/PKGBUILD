@@ -17,7 +17,7 @@ _pkgdir="Millennium"
 build() {
     cd "$srcdir/$_pkgdir"
 
-    cmake -GNinja . -DCMAKE_BUILD_TYPE=Release --preset linux-release
+    cmake -GNinja . -DCMAKE_BUILD_TYPE=RelWithDebInfo --preset linux-release
     cmake --build build
 }
 
