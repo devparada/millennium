@@ -209,6 +209,7 @@ const char* Plat_HookedCreateSimpleProcess(const char* cmd)
 #include "millennium/argp_win32.h"
 #include "millennium/logger.h"
 #include "millennium/backend_mgr.h"
+#include "millennium/plat_msg.h"
 
 #define LDR_DLL_NOTIFICATION_REASON_LOADED 1
 #define LDR_DLL_NOTIFICATION_REASON_UNLOADED 2
@@ -247,7 +248,7 @@ VOID handle_tier0_dll(PVOID module_base_address)
     if (proc != nullptr) {
         g_create_hook = snare_inline_new(reinterpret_cast<void*>(proc), reinterpret_cast<void*>(&hooked_create_simple_process));
         if (!g_create_hook || snare_inline_install(g_create_hook) < 0) {
-            MessageBoxA(NULL, "Failed to create hook for CreateSimpleProcess", "Error", MB_ICONERROR | MB_OK);
+            platform::messagebox::show("Millennium", "Failed to create hook for CreateSimpleProcess", platform::messagebox::error);
             return;
         }
     }
@@ -369,7 +370,7 @@ bool initialize_steam_hooks()
 
     HMODULE ntdll_module = GetModuleHandleA("ntdll.dll");
     if (!ntdll_module) {
-        MessageBoxA(NULL, "Failed to get handle for ntdll.dll", "Error", MB_ICONERROR | MB_OK);
+        platform::messagebox::show("Millennium", "Failed to get handle for ntdll.dll", platform::messagebox::error);
         return false;
     }
 
@@ -382,7 +383,7 @@ bool initialize_steam_hooks()
     LdrUnregisterDllNotification = reinterpret_cast<LdrUnregisterDllNotification_t>((void*)GetProcAddress(ntdll_module, "LdrUnregisterDllNotification"));
 
     if (!LdrRegisterDllNotification || !LdrUnregisterDllNotification) {
-        MessageBoxA(NULL, "Failed to get address for LdrRegisterDllNotification or LdrUnregisterDllNotification", "Error", MB_ICONERROR | MB_OK);
+        platform::messagebox::show("Millennium", "Failed to get address for LdrRegisterDllNotification or LdrUnregisterDllNotification", platform::messagebox::error);
         return false;
     }
 
