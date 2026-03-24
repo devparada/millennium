@@ -159,9 +159,3 @@ export function showPluginCrashModal(detail: PluginCrashInfo, onAfterResolve?: (
 	openCrashModal(detail, onAfterResolve);
 }
 
-/** Called for both real-time (CustomEvent) and buffered (Core_GetPendingCrashes) crashes.
- *  Deduplicates — if a modal for this plugin is already open, skips. */
-export function showPluginCrashToast(detail: PluginCrashInfo) {
-	if (openModals.has(detail.plugin)) return;
-	openCrashModal(detail);
-}

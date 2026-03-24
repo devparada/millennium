@@ -44,7 +44,7 @@ import { Logger } from './utils/Logger';
 import { useQuickCssState } from './utils/quick-css-state';
 import { NotificationService } from './utils/update-notification-service';
 import { OnRunSteamURL } from './utils/url-scheme-handler';
-import { showPluginCrashToast } from './components/PluginCrashModal';
+import { showPluginCrashModal } from './components/PluginCrashModal';
 
 async function initializeMillennium(settings: SettingsProps) {
 	Logger.Log(`Received props`, settings);
@@ -98,7 +98,7 @@ async function initializeMillennium(settings: SettingsProps) {
 
 	const flushCrashQueue = () => {
 		mainWindowReady = true;
-		crashQueue.splice(0).forEach(showPluginCrashToast);
+		crashQueue.splice(0).forEach(showPluginCrashModal);
 	};
 
 	window.addEventListener('millennium-main-window-ready', flushCrashQueue, { once: true });
@@ -106,7 +106,7 @@ async function initializeMillennium(settings: SettingsProps) {
 	window.addEventListener('millennium-plugin-crash', (e: Event) => {
 		const detail = (e as CustomEvent).detail;
 		Logger.Log('Received real-time crash event for plugin:', detail?.plugin);
-		if (mainWindowReady) showPluginCrashToast(detail);
+		if (mainWindowReady) showPluginCrashModal(detail);
 		else crashQueue.push(detail);
 	});
 
