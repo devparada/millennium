@@ -34,6 +34,7 @@
 #include <lua.hpp>
 
 extern rpc_client* g_rpc;
+extern std::string g_backend_dir;
 
 static int RPC_CallFrontendMethod(lua_State* L)
 {
@@ -63,12 +64,25 @@ static int RPC_CallFrontendMethod(lua_State* L)
     }
 
     try {
-        const json params = {
+        std::string caller;
+        lua_Debug ar;
+        if (lua_getstack(L, 1, &ar) && lua_getinfo(L, "Sl", &ar) && ar.currentline > 0) {
+            const char* src = ar.source ? ar.source : "?";
+            if (*src == '@') ++src;
+            std::string path(src);
+            const std::string prefix = g_backend_dir + "/";
+            if (!prefix.empty() && path.substr(0, prefix.size()) == prefix)
+                path = path.substr(prefix.size());
+            caller = path + ":" + std::to_string(ar.currentline);
+        }
+
+        const json rpc_params = {
             { "methodName", methodName },
-            { "params",     params     }
+            { "params",     params     },
+            { "caller",     caller     }
         };
 
-        nlohmann::json result = g_rpc->call(plugin_ipc::child_method::CALL_FRONTEND_METHOD, params);
+        nlohmann::json result = g_rpc->call(plugin_ipc::child_method::CALL_FRONTEND_METHOD, rpc_params);
 
         if (!result.value("success", false)) {
             lua_pushnil(L);

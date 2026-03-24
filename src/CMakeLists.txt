@@ -201,30 +201,16 @@ endif()
 
 include(${MILLENNIUM_BASE}/scripts/cmake/find_steam_path.cmake)
 
-# Build TypeScript frontend during configure so that generate_virtfs.cmake
-# can glob the chunk files and embed them via incbin.
-if(CMAKE_BUILD_TYPE STREQUAL "Release" AND NOT DISTRO_NIX)
-    find_program(BUN_EXECUTABLE bun REQUIRED)
-    message(STATUS "[Millennium] Building TypeScript frontend...")
-    execute_process(
-        COMMAND ${BUN_EXECUTABLE} install
-        WORKING_DIRECTORY "${MILLENNIUM_BASE}/src/typescript"
-        RESULT_VARIABLE _bun_result
-    )
-    if(NOT _bun_result EQUAL 0)
-        message(FATAL_ERROR "bun install failed")
-    endif()
-    execute_process(
-        COMMAND ${BUN_EXECUTABLE} run build
-        WORKING_DIRECTORY "${MILLENNIUM_BASE}/src/typescript"
-        RESULT_VARIABLE _bun_result
-    )
-    if(NOT _bun_result EQUAL 0)
-        message(FATAL_ERROR "bun run build failed")
-    endif()
+# TypeScript build targets (individual per-package, incremental via stamp files).
+# Nix builds TS externally — this is a no-op for DISTRO_NIX.
+if(NOT DISTRO_NIX)
+    include(${MILLENNIUM_BASE}/scripts/cmake/typescript_targets.cmake)
 endif()
 
-include(${MILLENNIUM_BASE}/scripts/cmake/generate_virtfs.cmake)
+# Nix: generate virtfs.h at configure time using pre-built paths.
+if(DISTRO_NIX)
+    include(${MILLENNIUM_BASE}/scripts/cmake/generate_virtfs.cmake)
+endif()
 
 if(WIN32)
     add_library(Millennium SHARED "${SOURCE_FILES}")
@@ -243,6 +229,12 @@ endif()
 
 
 find_steam_path(Millennium)
+
+# Ensure TypeScript is built before C++ compilation (virtfs.h must exist).
+if(NOT DISTRO_NIX)
+    add_dependencies(Millennium virtfs_header)
+endif()
+
 target_include_directories(Millennium SYSTEM PRIVATE ${websocketpp_SOURCE_DIR})
 set_target_properties(Millennium PROPERTIES
     PREFIX ""

@@ -3,7 +3,7 @@ import { ButtonHTMLAttributes, FC, HTMLAttributes } from 'react';
 import { CommonUIModule, Module } from '../webpack';
 import { FooterLegendProps } from './FooterLegend';
 
-export type DialogCommonProps = HTMLAttributes<HTMLDivElement>
+export type DialogCommonProps = HTMLAttributes<HTMLDivElement>;
 
 export interface DialogButtonProps extends FooterLegendProps, ButtonHTMLAttributes<HTMLButtonElement> {
 	/**
@@ -34,9 +34,12 @@ export interface DialogButtonProps extends FooterLegendProps, ButtonHTMLAttribut
 }
 
 const CommonDialogDivs = Object.values(CommonUIModule).filter(
+	/* mar 19 2026 accept both jsx and createElement divs */
 	(m: any) =>
-		(typeof m === 'object' && m?.render?.toString().includes('createElement("div",{...')) || m?.render?.toString().includes('createElement("div",Object.assign({},'),
+		typeof m === 'object' &&
+		/(jsx\)|createElement)\("div",(\{\.\.\.|\bObject\.assign\(\{},)/.test(m?.render?.toString()),
 );
+
 const MappedDialogDivs = new Map(
 	Object.values(CommonDialogDivs).map((m: any) => {
 		try {

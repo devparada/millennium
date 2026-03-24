@@ -157,7 +157,7 @@ function ReorderableItem<T>(props: ReorderableListEntryProps<T>) {
 							transition: isSelected || isSelectedLastFrame ? '' : 'transform 0.3s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.3s cubic-bezier(0.25, 1, 0.5, 1)', // easeOutQuart https://easings.net/#easeOutQuart
 							transform: !props.reorderEnabled || isSelected ? 'scale(1)' : 'scale(0.9)',
 							opacity: !props.reorderEnabled || isSelected ? 1 : 0.7,
-					  }
+						}
 					: {}
 			}
 		>

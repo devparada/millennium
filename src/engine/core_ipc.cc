@@ -163,8 +163,8 @@ json ipc_main::call_server_method(const json& call)
     if (!data.contains("pluginName")) {
         LOG_ERROR("no plugin backend specified, doing nothing...");
         return {
-            { "success",    false                           },
-            { "returnJson", "no plugin backend specified"   }
+            { "success",    false                         },
+            { "returnJson", "no plugin backend specified" }
         };
     }
 
@@ -319,7 +319,8 @@ json ipc_main::call_frontend_method(const json& call)
         const double dur = std::chrono::duration<double, std::milli>(t1 - t0).count();
         json result_json = eval_result.to_json(pluginName);
 
-        mep::ffi_recorder::instance().record({ pluginName, methodName, "be_to_fe", call["data"].dump(), result_json.dump(), dur, std::chrono::system_clock::now(), {} });
+        mep::ffi_recorder::instance().record(
+            { pluginName, methodName, "be_to_fe", call["data"].dump(), result_json.dump(), dur, std::chrono::system_clock::now(), call["data"].value("caller", std::string{}) });
     }
 
     return eval_result.to_json(pluginName);

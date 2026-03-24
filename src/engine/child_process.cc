@@ -481,8 +481,22 @@ void PluginProcess::detect_child_exit()
     int status = 0;
     pid_t result = ::waitpid(m_pid, &status, WNOHANG);
 
-    if (result <= 0) {
-        /* child may still be running (clean disconnect) or already reaped */
+    if (result == 0) {
+        /* WNOHANG: child still alive — shouldn't normally happen since the socket just closed */
+        return;
+    }
+
+    if (result < 0) {
+        if (errno == ECHILD) {
+            /*
+             * child was reaped externally (e.g. Steam's SIGCHLD handler) before we could
+             * collect its exit status. We know it's dead because the socket just closed and
+             * we didn't initiate shutdown, so treat it as a crash.
+             */
+            LOG_ERROR("Plugin '{}' exited unexpectedly (exit status unavailable — reaped by Steam before collection). Crash dump: {}", m_plugin_name,
+                      m_crash_dump_dir.empty() ? "none" : m_crash_dump_dir);
+            mep::crash_event_bus::instance().notify({ m_plugin_name, 0, m_crash_dump_dir, {} });
+        }
         return;
     }
 

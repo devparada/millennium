@@ -59,7 +59,6 @@ interface ResponsePayload {
 	error?: string;
 }
 
-
 class FFI_Binder {
 	private pendingRequests = new Map<
 		number,
@@ -76,8 +75,14 @@ class FFI_Binder {
 			const stack = new Error().stack;
 			if (!stack) return '';
 			// Drop the "Error" prefix line, keep all "at ..." frames.
-			return stack.split('\n').filter(l => l.trim().startsWith('at ')).map(l => l.trim()).join('\n');
-		} catch { /* noop */ }
+			return stack
+				.split('\n')
+				.filter((l) => l.trim().startsWith('at '))
+				.map((l) => l.trim())
+				.join('\n');
+		} catch {
+			/* noop */
+		}
 		return '';
 	}
 
@@ -196,16 +201,12 @@ export const BindPluginSettings = (pluginName: string) => window.MILLENNIUM_PLUG
 type ConfigChangeCallback = (key: string, value: any) => void;
 const _pluginConfigListeners = new Map<string, Set<ConfigChangeCallback>>();
 
-(window as any).__millennium_plugin_config_changed__ = (
-	pluginName: string,
-	key: string,
-	valueJson: string,
-) => {
+(window as any).__millennium_plugin_config_changed__ = (pluginName: string, key: string, valueJson: string) => {
 	try {
 		const listeners = _pluginConfigListeners.get(pluginName);
 		if (!listeners) return;
 		const value = JSON.parse(valueJson);
-		listeners.forEach(cb => cb(key, value));
+		listeners.forEach((cb) => cb(key, value));
 	} catch (e) {
 		console.error('[Millennium] Config change error:', e);
 	}
@@ -230,17 +231,13 @@ async function _configCall(pluginName: string, method: ConfigMethod, args: Recor
 }
 
 export const pluginConfig = {
-	get: <T = any>(pluginName: string, key: string): Promise<T> =>
-		_configCall(pluginName, ConfigMethod.GET, { key }),
+	get: <T = any>(pluginName: string, key: string): Promise<T> => _configCall(pluginName, ConfigMethod.GET, { key }),
 
-	set: (pluginName: string, key: string, value: any): Promise<void> =>
-		_configCall(pluginName, ConfigMethod.SET, { key, value }),
+	set: (pluginName: string, key: string, value: any): Promise<void> => _configCall(pluginName, ConfigMethod.SET, { key, value }),
 
-	delete: (pluginName: string, key: string): Promise<void> =>
-		_configCall(pluginName, ConfigMethod.DELETE, { key }),
+	delete: (pluginName: string, key: string): Promise<void> => _configCall(pluginName, ConfigMethod.DELETE, { key }),
 
-	getAll: <T = Record<string, any>>(pluginName: string): Promise<T> =>
-		_configCall(pluginName, ConfigMethod.GET_ALL, {}),
+	getAll: <T = Record<string, any>>(pluginName: string): Promise<T> => _configCall(pluginName, ConfigMethod.GET_ALL, {}),
 };
 
 const _React = () => (window as any).SP_REACT;
@@ -254,9 +251,7 @@ export function usePluginConfig<T = any>(pluginName: string, key?: string): [T |
 
 		const fetchInitial = async () => {
 			try {
-				const result = key
-					? await pluginConfig.get<T>(pluginName, key)
-					: await pluginConfig.getAll(pluginName);
+				const result = key ? await pluginConfig.get<T>(pluginName, key) : await pluginConfig.getAll(pluginName);
 				if (!cancelled) setState(result as T);
 			} catch {
 				/* initial fetch failed — leave as undefined */

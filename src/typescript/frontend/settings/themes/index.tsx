@@ -61,7 +61,7 @@ export class ThemeViewModal extends Component<{}, ThemeViewModalState> {
 
 	componentDidMount() {
 		const activeTheme: ThemeItem = pluginSelf.activeTheme;
-		const active = pluginSelf.isDefaultTheme ? 'Default' : activeTheme?.data?.name ?? activeTheme?.native;
+		const active = pluginSelf.isDefaultTheme ? 'Default' : (activeTheme?.data?.name ?? activeTheme?.native);
 
 		this.setState({ active });
 		this.FetchAllPlugins();

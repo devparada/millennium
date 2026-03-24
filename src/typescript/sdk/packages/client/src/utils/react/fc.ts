@@ -44,7 +44,12 @@ export function injectFCTrampoline(component: FC, customHooks?: any): FCTrampoli
 	};
 	component.prototype.isReactComponent = true;
 	let stubsApplied = false;
-	let oldCreateElement = window.SP_REACT.createElement;
+	const patchJsx = window.SP_REACTDOM.version.startsWith('19.');
+
+	type JsxFactoryKey = 'jsx' | 'jsxs';
+	const jsxKeys: JsxFactoryKey[] = ['jsx', 'jsxs'];
+	const oldJsxFns = Object.fromEntries(jsxKeys.map((k) => [k, window.SP_JSX_FACTORY?.[k]])) as Record<JsxFactoryKey, Function>;
+	const oldCreateElement = window.SP_REACT.createElement;
 
 	const applyStubsIfNeeded = () => {
 		if (!stubsApplied) {
@@ -52,11 +57,15 @@ export function injectFCTrampoline(component: FC, customHooks?: any): FCTrampoli
 			stubsApplied = true;
 			applyHookStubs(customHooks);
 			// we have to redirect this to return an object with component's prototype as a constructor returning a value overrides its prototype
-			window.SP_REACT.createElement = () => {
-				loggingEnabled && logger.debug('createElement hook called');
-				loggingEnabled && console.trace('createElement trace');
-				return Object.create(component.prototype);
-			};
+			for (const [obj, keys] of [[window.SP_REACT, ['createElement']], ...(patchJsx ? [[window.SP_JSX_FACTORY, jsxKeys]] : [])] as [Record<string, any>, string[]][]) {
+				for (const k of keys) {
+					obj[k] = () => {
+						loggingEnabled && logger.debug(`${k} hook called`);
+						loggingEnabled && console.trace(`${k} trace`);
+						return Object.create(component.prototype);
+					};
+				}
+			}
 		}
 	};
 
@@ -66,6 +75,7 @@ export function injectFCTrampoline(component: FC, customHooks?: any): FCTrampoli
 			stubsApplied = false;
 			removeHookStubs();
 			window.SP_REACT.createElement = oldCreateElement;
+			if (patchJsx) for (const k of jsxKeys) window.SP_JSX_FACTORY[k] = oldJsxFns[k];
 		}
 	};
 

@@ -91,6 +91,10 @@ endif()
 
 add_library(hhx64 SHARED ${SOURCE_FILES})
 
+if(CMAKE_C_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    set_source_files_properties(main.cc PROPERTIES COMPILE_OPTIONS "-Wno-stringop-overflow")
+endif()
+
 if(WIN32)
     target_link_libraries(hhx64 wsock32)
 endif()

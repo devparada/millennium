@@ -72,10 +72,7 @@ export function unregisterInstallerProgressListener(opId: number) {
 	_pendingEvents.delete(opId);
 }
 
-export function waitForInstallerComplete(
-	opId: number,
-	onProgress: (event: IProgressProps) => void,
-): Promise<boolean> {
+export function waitForInstallerComplete(opId: number, onProgress: (event: IProgressProps) => void): Promise<boolean> {
 	return new Promise((resolve) => {
 		registerInstallerProgressListener(opId, (event) => {
 			onProgress(event);

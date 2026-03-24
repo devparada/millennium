@@ -67,7 +67,10 @@ static inline void* dlsym_or_log(void* handle, const char* symbol)
 
 static inline void get_steam_lib_path(char* buf, const char* parent, const char* arch, const char* lib)
 {
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wformat-truncation"
     snprintf(buf, PATH_MAX, "%s/steam-runtime/usr/lib/%s/%s", parent, arch, lib);
+#pragma GCC diagnostic pop
 }
 
 /** Returns $HOME/.steam/steam/ubuntu12_32 — the fixed base of the Steam installation. */

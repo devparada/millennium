@@ -116,13 +116,13 @@ function insertMillennium(target: BuildTarget, props: TranspilerProps): InputPlu
 		generateBundle(_: unknown, bundle: OutputBundle) {
 			for (const fileName in bundle) {
 				const chunk = bundle[fileName];
-                if (chunk.type !== 'chunk') {
-                    continue;
+				if (chunk.type !== 'chunk') {
+					continue;
 				}
 
 				const chunkAst = parse(chunk.code, { sourceType: 'script', plugins: ['jsx'] });
 				const wrapped = buildPluginWrapper({
-					isClient:  t.booleanLiteral(target === BuildTarget.Plugin),
+					isClient: t.booleanLiteral(target === BuildTarget.Plugin),
 					pluginName: t.stringLiteral(props.pluginName),
 					chunkBody: chunkAst.program.body,
 				});
@@ -189,7 +189,7 @@ function tsconfigPathsPlugin(tsconfigPath: string): InputPluginOption {
 
 	function resolveWithExtensions(base: string): string | null {
 		for (const ext of ['', '.ts', '.tsx', '.js', '.jsx', '/index.ts', '/index.tsx']) {
-		    if (fs.existsSync(base + ext) && fs.statSync(base + ext).isFile()) return base + ext;
+			if (fs.existsSync(base + ext) && fs.statSync(base + ext).isFile()) return base + ext;
 		}
 		return null;
 	}
@@ -235,30 +235,30 @@ function tsconfigPathsPlugin(tsconfigPath: string): InputPluginOption {
 }
 
 const PLUGIN_NAME_INJECTIONS: Transform[] = [
-	{ type: 'inject_arg', match: ['client', 'BindPluginSettings'],       arg: 'pluginName' },
-	{ type: 'inject_arg', match: ['client', 'pluginConfig', 'get'],      arg: 'pluginName' },
-	{ type: 'inject_arg', match: ['client', 'pluginConfig', 'set'],      arg: 'pluginName' },
-	{ type: 'inject_arg', match: ['client', 'pluginConfig', 'delete'],   arg: 'pluginName' },
-	{ type: 'inject_arg', match: ['client', 'pluginConfig', 'getAll'],   arg: 'pluginName' },
-	{ type: 'inject_arg', match: ['client', 'usePluginConfig'],          arg: 'pluginName' },
-	{ type: 'inject_arg', match: ['client', 'subscribePluginConfig'],    arg: 'pluginName' },
+	{ type: 'inject_arg', match: ['client', 'BindPluginSettings'], arg: 'pluginName' },
+	{ type: 'inject_arg', match: ['client', 'pluginConfig', 'get'], arg: 'pluginName' },
+	{ type: 'inject_arg', match: ['client', 'pluginConfig', 'set'], arg: 'pluginName' },
+	{ type: 'inject_arg', match: ['client', 'pluginConfig', 'delete'], arg: 'pluginName' },
+	{ type: 'inject_arg', match: ['client', 'pluginConfig', 'getAll'], arg: 'pluginName' },
+	{ type: 'inject_arg', match: ['client', 'usePluginConfig'], arg: 'pluginName' },
+	{ type: 'inject_arg', match: ['client', 'subscribePluginConfig'], arg: 'pluginName' },
 ];
 
 const FRONTEND_TRANSFORMS: Transform[] = [
 	/* override pluginSelf */
-	{ type: 'rename', match: ['client', 'pluginSelf'],                           replacement: 'window.PLUGIN_LIST[pluginName]' },
+	{ type: 'rename', match: ['client', 'pluginSelf'], replacement: 'window.PLUGIN_LIST[pluginName]' },
 	/* inject plugin name */
-	{ type: 'inject_arg', match: ['client', 'callable'],                         arg: 'pluginName' },
-	{ type: 'inject_arg', match: ['client', 'Millennium', 'callServerMethod'],   arg: 'pluginName' },
-	{ type: 'inject_arg', match: ['client', 'Millennium', 'exposeObj'],          arg: 'exports' },
+	{ type: 'inject_arg', match: ['client', 'callable'], arg: 'pluginName' },
+	{ type: 'inject_arg', match: ['client', 'Millennium', 'callServerMethod'], arg: 'pluginName' },
+	{ type: 'inject_arg', match: ['client', 'Millennium', 'exposeObj'], arg: 'exports' },
 	...PLUGIN_NAME_INJECTIONS,
 ];
 
 const WEBKIT_TRANSFORMS: Transform[] = [
 	/* inject plugin name */
-	{ type: 'inject_arg', match: ['webkit', 'callable'],                         arg: 'pluginName' },
-	{ type: 'inject_arg', match: ['webkit', 'Millennium', 'callServerMethod'],   arg: 'pluginName' },
-	{ type: 'inject_arg', match: ['webkit', 'Millennium', 'exposeObj'],          arg: 'exports' },
+	{ type: 'inject_arg', match: ['webkit', 'callable'], arg: 'pluginName' },
+	{ type: 'inject_arg', match: ['webkit', 'Millennium', 'callServerMethod'], arg: 'pluginName' },
+	{ type: 'inject_arg', match: ['webkit', 'Millennium', 'exposeObj'], arg: 'exports' },
 	...PLUGIN_NAME_INJECTIONS,
 ];
 
@@ -367,7 +367,7 @@ class FrontendBuild extends MillenniumBuild {
 			name: 'millennium_main',
 			file: isMillennium ? '../.frontend.bin' : '.millennium/Dist/index.js',
 			globals: {
-				'react': 'window.SP_REACT',
+				react: 'window.SP_REACT',
 				'react-dom': 'window.SP_REACTDOM',
 				'react-dom/client': 'window.SP_REACTDOM',
 				'react/jsx-runtime': 'SP_JSX_FACTORY',
