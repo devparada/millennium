@@ -95,10 +95,18 @@ async function initializeMillennium(settings: SettingsProps) {
 
 	const crashQueue: PluginCrashInfo[] = [];
 	let mainWindowReady = false;
+	let mainWindowReadyAt = 0;
+
+	const showAfterDelay = (detail: PluginCrashInfo) => {
+		const elapsed = Date.now() - mainWindowReadyAt;
+		const remaining = Math.max(0, 5000 - elapsed);
+		setTimeout(() => showPluginCrashModal(detail), remaining);
+	};
 
 	const flushCrashQueue = () => {
 		mainWindowReady = true;
-		crashQueue.splice(0).forEach(showPluginCrashModal);
+		mainWindowReadyAt = Date.now();
+		crashQueue.splice(0).forEach(showAfterDelay);
 	};
 
 	window.addEventListener('millennium-main-window-ready', flushCrashQueue, { once: true });
@@ -106,7 +114,7 @@ async function initializeMillennium(settings: SettingsProps) {
 	window.addEventListener('millennium-plugin-crash', (e: Event) => {
 		const detail = (e as CustomEvent).detail;
 		Logger.Log('Received real-time crash event for plugin:', detail?.plugin);
-		if (mainWindowReady) showPluginCrashModal(detail);
+		if (mainWindowReady) showAfterDelay(detail);
 		else crashQueue.push(detail);
 	});
 
