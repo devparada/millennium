@@ -61,7 +61,9 @@ jobs:
           echo "Using commit: $COMMIT"
 
           # Update version and source to use specific commit
+          OLD_VER=$(grep '^pkgver=' ./packages/arch/PKGBUILD | cut -d= -f2)
           sed -i "s/pkgver=.*/pkgver=$CLEAN_TAG/" ./packages/arch/PKGBUILD
+          [ "$OLD_VER" != "$CLEAN_TAG" ] && sed -i "s/pkgrel=.*/pkgrel=1/" ./packages/arch/PKGBUILD
           sed -i "s|source=(\"git+\$url\.git.*\")|source=(\"git+\$url.git#commit=$COMMIT\")|" ./packages/arch/PKGBUILD
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
