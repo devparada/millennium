@@ -466,9 +466,10 @@ void plugin_loader::setup_child_request_handler()
             /* child sends {methodName, params}, but process_message expects
                {pluginName, methodName, argumentList} under "data" */
             nlohmann::json data = {
-                { "pluginName", plugin_name },
-                { "methodName", params.value("methodName", "") },
-                { "argumentList", params.contains("params") ? params["params"] : nlohmann::json::array() }
+                { "pluginName",  plugin_name },
+                { "methodName",  params.value("methodName", "") },
+                { "argumentList", params.contains("params") ? params["params"] : nlohmann::json::array() },
+                { "caller",      params.value("caller", std::string{}) }
             };
 
             nlohmann::json call = {

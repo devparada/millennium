@@ -73,7 +73,7 @@ rpc_client* g_rpc = nullptr;
 
 static lua_State* g_L = nullptr;
 static std::string g_plugin_name;
-static std::string g_backend_dir;
+std::string g_backend_dir;
 static std::string g_backend_file;
 
 static plugin_ipc::socket_fd connect_to_parent(const char* socket_path)
