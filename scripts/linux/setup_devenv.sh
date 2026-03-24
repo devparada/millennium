@@ -26,13 +26,12 @@ BUILD_DIR="$(cd "${BUILD_DIR}" 2>/dev/null && pwd)" || {
 
 BOOTSTRAP_X86="${BUILD_DIR}/libmillennium_bootstrap_x86.so"
 BOOTSTRAP_HHX64="${BUILD_DIR}/libmillennium_bootstrap_hhx64.so"
-HHX64="${BUILD_DIR}/libmillennium_hhx64.so"
 MAIN_X86="${BUILD_DIR}/libmillennium_x86.so"
 LUAVM="${BUILD_DIR}/libmillennium_luavm_x86"
 
 # Verify all binaries exist
 missing=0
-for bin in "${BOOTSTRAP_X86}" "${BOOTSTRAP_HHX64}" "${HHX64}" "${MAIN_X86}" "${LUAVM}"; do
+for bin in "${BOOTSTRAP_X86}" "${BOOTSTRAP_HHX64}" "${MAIN_X86}" "${LUAVM}"; do
     if [ ! -f "${bin}" ]; then
         echo "error: missing ${bin}"
         missing=1
@@ -65,7 +64,6 @@ echo ""
 
 ln -sfv "${BOOTSTRAP_X86}" "${U32}/libXtst.so.6"
 ln -sfv "${BOOTSTRAP_HHX64}" "${U64}/libXtst.so.6"
-ln -sfv "${HHX64}" "${U64}/libmillennium_hhx64.so"
 
 rm -f "${STEAM_DIR}/.cef-enable-remote-debugging"
 
