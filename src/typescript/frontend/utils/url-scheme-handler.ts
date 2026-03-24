@@ -31,7 +31,7 @@
 import { callable, Millennium, Navigation } from '@steambrew/client';
 import { PluginComponent, ThemeItem } from '../types';
 import { Logger } from './Logger';
-import { PyFindAllPlugins, PyFindAllThemes, PyUpdatePluginStatus } from './ffi';
+import { Core_FindAllPlugins, Core_FindAllThemes, Core_ChangePluginStatus } from './ffi';
 import { ChangeActiveTheme, UIReloadProps } from '../settings/themes/ThemeComponent';
 import { useQuickAccessStore } from '../quick-access/quickAccessStore';
 
@@ -54,7 +54,7 @@ const contexts: Record<SteamURLContext, (action?: string, option?: string, param
 
 		if (action === 'plugins') {
 			// God, why
-			const plugins: PluginComponent[] = JSON.parse(await PyFindAllPlugins()).map((e: PluginComponent) => ({ ...e, plugin_name: e.data.name }));
+			const plugins: PluginComponent[] = JSON.parse(await Core_FindAllPlugins()).map((e: PluginComponent) => ({ ...e, plugin_name: e.data.name }));
 			if (parameter) {
 				if (!plugins.some((e) => e.data.name === parameter)) {
 					return;
@@ -70,12 +70,12 @@ const contexts: Record<SteamURLContext, (action?: string, option?: string, param
 				}
 			}
 
-			PyUpdatePluginStatus({ pluginJson: JSON.stringify(plugins) });
+			Core_ChangePluginStatus({ pluginJson: JSON.stringify(plugins) });
 			SteamClient.Browser.RestartJSContext();
 		}
 
 		if (action === 'themes') {
-			const themes: ThemeItem[] = JSON.parse(await PyFindAllThemes());
+			const themes: ThemeItem[] = JSON.parse(await Core_FindAllThemes());
 			const theme = themes.find((e) => e.native === parameter);
 			const theme_name = !!theme && option === 'enable' ? theme.native : DEFAULT_THEME_NAME;
 

@@ -33,7 +33,7 @@ import { settingsClasses } from '../../utils/classes';
 import Ansi from 'ansi-to-react';
 import React, { Component } from 'react';
 import { formatString, locale } from '../../utils/localization-manager';
-import { PyGetLogData } from '../../utils/ffi';
+import { Core_GetPluginBackendLogs } from '../../utils/ffi';
 import { DesktopTooltip, SettingsDialogSubHeader } from '../../components/SteamComponents';
 import { IconButton } from '../../components/IconButton';
 import { Placeholder } from '../../components/Placeholder';
@@ -88,7 +88,7 @@ export class RenderLogViewer extends Component<{}, RenderLogViewerState> {
 	}
 
 	componentDidMount() {
-		PyGetLogData().then((data: any) => {
+		Core_GetPluginBackendLogs().then((data: any) => {
 			const parsed = JSON.parse(data);
 			this.setState({ logData: parsed });
 

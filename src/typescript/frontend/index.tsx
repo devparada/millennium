@@ -39,7 +39,7 @@ import { DesktopMenuProvider } from './quick-access/DesktopMenuContext';
 import { handleSettingsReturnNavigation, MillenniumSettings } from './settings';
 import { MillenniumQuickCssEditor } from './settings/quickcss';
 import { PluginCrashInfo, SettingsProps, SystemAccentColor, ThemeItem, ThemeItemV1 } from './types';
-import { PyGetRootColors, PyGetStartupConfig } from './utils/ffi';
+import { Core_GetRootColors, Core_GetStartConfig } from './utils/ffi';
 import { Logger } from './utils/Logger';
 import { useQuickCssState } from './utils/quick-css-state';
 import { NotificationService } from './utils/update-notification-service';
@@ -63,7 +63,7 @@ async function initializeMillennium(settings: SettingsProps) {
 
 	if (theme?.data?.hasOwnProperty('RootColors')) {
 		try {
-			const rootColors = JSON.parse(await PyGetRootColors());
+			const rootColors = JSON.parse(await Core_GetRootColors());
 			pluginSelf.RootColors = rootColors;
 		} catch (error) {
 			Logger.Error('Failed to load root colors from backend', error);
@@ -121,7 +121,7 @@ async function initializeMillennium(settings: SettingsProps) {
 // Entry point on the front end of your plugin
 export default async function PluginMain() {
 	try {
-		await initializeMillennium(JSON.parse(await PyGetStartupConfig()));
+		await initializeMillennium(JSON.parse(await Core_GetStartConfig()));
 	} catch (error) {
 		Logger.Error('Millennium frontend initialization failed, continuing with route registration.', error);
 	}

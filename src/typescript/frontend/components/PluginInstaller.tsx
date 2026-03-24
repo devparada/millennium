@@ -33,7 +33,7 @@ import { InstallerProps } from '../types';
 import Styles from '../utils/styles';
 import { RendererProps } from '../settings/general/Installer';
 import { API_URL } from '../utils/globals';
-import { PyIsPluginInstalled, PyUpdatePluginStatus, PyInstallPlugin } from '../utils/ffi';
+import { Core_IsPluginInstalled, Core_ChangePluginStatus, Core_InstallPlugin } from '../utils/ffi';
 import { formatString, locale } from '../utils/localization-manager';
 
 function normalizeInstallResponse(result: unknown): { success: boolean; message?: string } {
@@ -62,7 +62,7 @@ function normalizeInstallResponse(result: unknown): { success: boolean; message?
 
 const OnInstallComplete = (data: any, props: InstallerProps) => {
 	const EnablePlugin = async () => {
-		await PyUpdatePluginStatus({ pluginJson: JSON.stringify([{ plugin_name: data?.pluginJson?.name, enabled: true }]) });
+		await Core_ChangePluginStatus({ pluginJson: JSON.stringify([{ plugin_name: data?.pluginJson?.name, enabled: true }]) });
 	};
 
 	/** Refetch plugin data after installation */
@@ -129,7 +129,7 @@ export const StartPluginInstaller = async (data: any, props: InstallerProps): Pr
 		return false;
 	}
 
-	const isInstalled = JSON.parse(await PyIsPluginInstalled({ plugin_name: pluginName }));
+	const isInstalled = JSON.parse(await Core_IsPluginInstalled({ plugin_name: pluginName }));
 
 	if (isInstalled) {
 		props?.ShowMessageBox(formatString(locale.strAlreadyInPluginLibrary, data?.pluginJson?.common_name ?? locale.strUnknown), locale.strAlreadyInstalled, {
@@ -146,7 +146,7 @@ export const StartPluginInstaller = async (data: any, props: InstallerProps): Pr
 	/** Start installer and extract opId for per-operation progress tracking */
 	let opId = 0;
 	try {
-		const result = await PyInstallPlugin({ download_url: downloadUrl, total_size: data?.fileSize });
+		const result = await Core_InstallPlugin({ download_url: downloadUrl, total_size: data?.fileSize });
 		const response = normalizeInstallResponse(result);
 		if (!response.success) {
 			const message = response.message || locale.errorFailedToStartThemeInstaller;
