@@ -262,36 +262,7 @@ VOID handle_tier0_dll(PVOID module_base_address)
  */
 VOID handle_steam_unload()
 {
-    /**
-     * notify the millennium frontend to disconnect
-     * once the frontend disconnects, it will shutdown the rest of Millennium
-     */
     millennium_lifecycle::get().disconnect_frontend.store(true);
-    // auto& backendManager = BackendManager::GetInstance();
-
-    // /** No need to wait if all backends aren't python */
-    // if (!backendManager.HasAnyPythonBackends() && !backendManager.HasAnyLuaBackends()) {
-    //     Logger.Warn("No backends detected, skipping shutdown wait...");
-    //     return;
-    // }
-
-    // std::unique_lock<std::mutex> lk(mtx_hasSteamUnloaded);
-    // Logger.Warn("Waiting for Millennium to be unloaded...");
-
-    // /** wait for Millennium to be unloaded */
-    // cv_hasSteamUnloaded.wait(lk, [&backendManager]()
-    // {
-    //     /** wait for all backends to stop so we can safely free the loader lock */
-    //     if (backendManager.HasAllPythonBackendsStopped() && backendManager.HasAllLuaBackendsStopped()) {
-    //         Logger.Warn("All backends have stopped, proceeding with termination...");
-
-    //         std::unique_lock<std::mutex> lk2(mtx_hasAllPythonPluginsShutdown);
-    //         cv_hasAllPythonPluginsShutdown.notify_all();
-    //         return true;
-    //     }
-    //     return false;
-    // });
-
     logger.warn("Terminate condition variable signaled, exiting...");
 }
 
