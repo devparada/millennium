@@ -127,22 +127,24 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release" AND WIN32)
     file(WRITE "${MILLENNIUM_BASE}/scripts/resources.rc" "${RC_CONTENT}")
 endif()
 
-if(DISTRO_NIX)
-    add_custom_command(
-    OUTPUT "${MILLENNIUM_BASE}/src/include/millennium/virtfs.h"
-    COMMAND ${CMAKE_COMMAND}
-        -D "DISTRO_NIX=${DISTRO_NIX}"
-        -D "NIX_SHIMS=${NIX_SHIMS}"
-        -D "NIX_FRONTEND=${NIX_FRONTEND}"
-        -P "${CMAKE_CURRENT_LIST_FILE}"
-    DEPENDS ${CHUNK_FILES}
-    COMMENT "Generating asset includes"
-)
-else()
-    add_custom_command(
-    OUTPUT "${MILLENNIUM_BASE}/src/include/millennium/virtfs.h"
-    COMMAND ${CMAKE_COMMAND} -P "${CMAKE_CURRENT_LIST_FILE}"
-    DEPENDS ${CHUNK_FILES}
-    COMMENT "Generating asset includes"
-)
+if(NOT CMAKE_SCRIPT_MODE_FILE)
+    if(DISTRO_NIX)
+        add_custom_command(
+        OUTPUT "${MILLENNIUM_BASE}/src/include/millennium/virtfs.h"
+        COMMAND ${CMAKE_COMMAND}
+            -D "DISTRO_NIX=${DISTRO_NIX}"
+            -D "NIX_SHIMS=${NIX_SHIMS}"
+            -D "NIX_FRONTEND=${NIX_FRONTEND}"
+            -P "${CMAKE_CURRENT_LIST_FILE}"
+        DEPENDS ${CHUNK_FILES}
+        COMMENT "Generating asset includes"
+    )
+    else()
+        add_custom_command(
+        OUTPUT "${MILLENNIUM_BASE}/src/include/millennium/virtfs.h"
+        COMMAND ${CMAKE_COMMAND} -P "${CMAKE_CURRENT_LIST_FILE}"
+        DEPENDS ${CHUNK_FILES}
+        COMMENT "Generating asset includes"
+    )
+    endif()
 endif()
