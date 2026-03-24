@@ -60,7 +60,8 @@ jobs:
           echo ""
           echo "=== Extracting package for verification ==="
           mkdir -p /tmp/pkg-verify
-          tar -xf /home/builder/pkg/*.pkg.tar.zst -C /tmp/pkg-verify
+          MAIN_PKG=$(ls /home/builder/pkg/millennium-*.pkg.tar.zst | grep -v -- '-debug-')
+          tar -xf "$MAIN_PKG" -C /tmp/pkg-verify
 
           echo ""
           echo "=== Verifying required binaries are present ==="
