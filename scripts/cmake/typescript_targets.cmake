@@ -91,8 +91,13 @@ _ts_package(core "${TS_ROOT}/frontend"
 add_dependencies(ts_core ts_client ts_webkit)
 
 set(_virtfs_h "${MILLENNIUM_BASE}/src/include/millennium/virtfs.h")
+if(WIN32 AND CMAKE_BUILD_TYPE STREQUAL "Release")
+    set(_virtfs_outputs "${_virtfs_h}" "${MILLENNIUM_BASE}/scripts/resources.rc")
+else()
+    set(_virtfs_outputs "${_virtfs_h}")
+endif()
 add_custom_command(
-    OUTPUT  "${_virtfs_h}"
+    OUTPUT  ${_virtfs_outputs}
     COMMAND ${CMAKE_COMMAND}
         -D "MILLENNIUM_BASE=${MILLENNIUM_BASE}"
         -D "CMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}"
