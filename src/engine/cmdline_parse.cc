@@ -142,7 +142,7 @@ unsigned short CommandLineArguments::get_remote_debugger_port()
     }
 #endif
 
-    const char* portValue = GetAppropriateDevToolsPort(CommandLineArguments::has_argument("-dev"));
+    const char* portValue = get_devtools_port(CommandLineArguments::has_argument("-dev"));
 
     if (!portValue) {
         return 0;

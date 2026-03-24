@@ -166,7 +166,7 @@ nlohmann::json head::system_accent_color::get_accent_color_win32()
 nlohmann::json head::system_accent_color::get_accent_color_macos()
 {
     float r = 0.0f, g = 0.0f, b = 0.0f;
-    if (!Plat_GetMacOSAccentColor(&r, &g, &b)) {
+    if (!platform::get_macos_accent_color(&r, &g, &b)) {
         return get_accent_color_linux();
     }
 

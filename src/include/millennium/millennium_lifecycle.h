@@ -29,17 +29,48 @@
  */
 
 #pragma once
+#include <atomic>
+#include <condition_variable>
+#include <mutex>
 
-#if defined(__linux__) || defined(__APPLE__)
-namespace platform
+class millennium_lifecycle
 {
-/** @brief Decide whether this process should receive Millennium environment setup. */
-bool should_setup_environment();
+  public:
+    struct gate
+    {
+        std::mutex mtx;
+        std::condition_variable cv;
+        std::atomic<bool> flag{false};
 
-/** @brief Platform-specific setup invoked before steam hooks are initialized. */
-void before_attach_millennium();
+        void wait()
+        {
+            std::unique_lock<std::mutex> lk(mtx);
+            cv.wait(lk, [this] { return flag.load(); });
+        }
 
-/** @brief Platform-specific cleanup invoked after Millennium detaches. */
-void after_detach_millennium();
-} // namespace platform
-#endif
+        void notify()
+        {
+            flag.store(true);
+            cv.notify_all();
+        }
+    };
+
+    static millennium_lifecycle& get()
+    {
+        static millennium_lifecycle instance;
+        return instance;
+    }
+
+    gate steam_ui_loaded;
+    gate backends_loaded;
+    gate steam_unloaded;
+
+    std::atomic<bool> terminate{false};
+    std::atomic<bool> disconnect_frontend{false};  // Windows only
+
+    millennium_lifecycle(const millennium_lifecycle&) = delete;
+    millennium_lifecycle& operator=(const millennium_lifecycle&) = delete;
+
+  private:
+    millennium_lifecycle() = default;
+};

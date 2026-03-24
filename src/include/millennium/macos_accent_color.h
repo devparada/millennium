@@ -36,5 +36,8 @@
  * Outputs sRGB components in [0, 1] range.
  * @return true on success, false if the color could not be resolved.
  */
-bool Plat_GetMacOSAccentColor(float* r, float* g, float* b);
+namespace platform
+{
+bool get_macos_accent_color(float* r, float* g, float* b);
+} // namespace platform
 #endif

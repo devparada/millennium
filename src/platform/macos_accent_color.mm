@@ -32,7 +32,7 @@
 #include "millennium/macos_accent_color.h"
 #import <AppKit/AppKit.h>
 
-bool Plat_GetMacOSAccentColor(float* r, float* g, float* b)
+bool platform::get_macos_accent_color(float* r, float* g, float* b)
 {
     NSColor* accent = [[NSColor controlAccentColor] colorUsingColorSpace:[NSColorSpace sRGBColorSpace]];
     if (!accent) return false;

@@ -62,11 +62,7 @@
 using namespace std::placeholders;
 using namespace std::chrono;
 
-std::shared_ptr<InterpreterMutex> g_shouldTerminateMillennium = std::make_shared<InterpreterMutex>();
-
-extern std::mutex mtx_hasSteamUnloaded, mtx_hasSteamUIStartedLoading;
-extern std::condition_variable cv_hasSteamUnloaded, cv_hasSteamUIStartedLoading;
-extern std::atomic<bool> ab_shouldDisconnectFrontend;
+#include "millennium/millennium_lifecycle.h"
 
 plugin_loader::plugin_loader(std::shared_ptr<plugin_manager> plugin_manager, std::shared_ptr<millennium_updater> millennium_updater)
     : m_thread_pool(std::make_unique<thread_pool>(2)), m_plugin_manager(std::move(plugin_manager)), m_plugin_ptr(nullptr), m_enabledPluginsPtr(nullptr),
@@ -176,7 +172,7 @@ void plugin_loader::init()
     m_plugin_manager->init();
 
     /** setup steam hooks once backends have loaded */
-    m_backend_event_dispatcher->on_all_backends_ready(Plat_WaitForBackendLoad);
+    m_backend_event_dispatcher->on_all_backends_ready(platform::wait_for_backend_load);
 }
 void plugin_loader::init_devtools()
 {
@@ -388,7 +384,7 @@ void plugin_loader::inject_frontend_shims(bool reload_frontend)
 
 void plugin_loader::start_plugin_frontends()
 {
-    if (g_shouldTerminateMillennium->flag.load()) {
+    if (millennium_lifecycle::get().terminate.load()) {
         logger.log("Terminating frontend thread pool...");
         return;
     }
@@ -402,7 +398,7 @@ void plugin_loader::start_plugin_frontends()
         socket_thread->join();
     }
 
-    if (g_shouldTerminateMillennium->flag.load()) {
+    if (millennium_lifecycle::get().terminate.load()) {
         logger.log("Terminating frontend thread pool...");
         return;
     }
@@ -412,9 +408,9 @@ void plugin_loader::start_plugin_frontends()
     auto start = std::chrono::steady_clock::now();
     while (std::chrono::steady_clock::now() - start < std::chrono::seconds(10)) {
 #ifdef _WIN32
-        if (ab_shouldDisconnectFrontend.load())
+        if (millennium_lifecycle::get().disconnect_frontend.load())
 #else
-        if (g_shouldTerminateMillennium->flag.load())
+        if (millennium_lifecycle::get().terminate.load())
 #endif
         {
             logger.log("Steam is shutting down, terminating frontend thread pool...");

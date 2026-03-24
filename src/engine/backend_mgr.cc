@@ -45,8 +45,7 @@
 #include <dlfcn.h>
 #endif
 
-extern std::condition_variable cv_hasSteamUnloaded;
-extern std::mutex mtx_hasSteamUnloaded;
+#include "millennium/millennium_lifecycle.h"
 
 /**
  * path to the lua sandbox executable.
@@ -213,10 +212,7 @@ bool backend_manager::destroy_plugin(const std::string& pluginName, bool isShutt
        (e.g. spawn failed but backend_loaded_event_hdlr recorded BACKEND_LOAD_FAILED). */
     m_backend_event_dispatcher->backend_unloaded_event_hdlr({ pluginName }, isShuttingDown);
 
-    {
-        std::unique_lock<std::mutex> lk(mtx_hasSteamUnloaded);
-        cv_hasSteamUnloaded.notify_all();
-    }
+    millennium_lifecycle::get().steam_unloaded.notify();
 
     return true;
 }

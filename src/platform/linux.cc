@@ -54,7 +54,7 @@ int is_same_path(const char* path1, const char* path2)
 }
 } // namespace
 
-bool Plat_ShouldSetupEnvironment()
+bool platform::should_setup_environment()
 {
     char path[PATH_MAX];
     ssize_t len = readlink("/proc/self/exe", path, sizeof(path) - 1);
@@ -76,11 +76,11 @@ bool Plat_ShouldSetupEnvironment()
     return true;
 }
 
-void Plat_BeforeAttachMillennium()
+void platform::before_attach_millennium()
 {
 }
 
-void Plat_AfterDetachMillennium()
+void platform::after_detach_millennium()
 {
 }
 #endif

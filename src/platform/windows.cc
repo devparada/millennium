@@ -63,8 +63,7 @@ CONSTRUCTOR VOID Win32_InitializeEnvironment(VOID)
     }
 }
 
-extern std::mutex mtx_hasSteamUIStartedLoading;
-extern std::condition_variable cv_hasSteamUIStartedLoading;
+#include "millennium/millennium_lifecycle.h"
 
 BOOL AreFilesIdentical(LPCWSTR path1, LPCWSTR path2)
 {
@@ -264,7 +263,7 @@ VOID Win32_AttachMillennium(VOID)
     Win32_MigrateLegacyLayout();
 
     /** Starts the CEF arg hook, it doesn't wait for the hook to be installed, it waits for the hook to be setup */
-    if (!Plat_InitializeSteamHooks()) {
+    if (!platform::initialize_steam_hooks()) {
         platform::messagebox::show("Millennium Error", "Failed to initialize Steam hooks, Millennium cannot continue startup.", platform::messagebox::error);
     }
 
@@ -278,7 +277,7 @@ VOID Win32_AttachMillennium(VOID)
     g_millennium->entry();
     logger.log("[Win32_AttachMillennium] Millennium main function has returned, proceeding with shutdown...");
 
-    UninitializeSteamHooks();
+    uninitialize_steam_hooks();
     /** Deallocate the developer console */
     if (CommandLineArguments::has_argument("-dev")) {
         FreeConsole();
@@ -294,7 +293,7 @@ VOID Win32_AttachMillennium(VOID)
 VOID Win32_DetachMillennium(VOID)
 {
     logger.print(" MAIN ", "Shutting Millennium down...", COL_MAGENTA);
-    g_shouldTerminateMillennium->flag.store(true);
+    millennium_lifecycle::get().terminate.store(true);
     logger.log("Waiting for Millennium thread to exit...");
 
     if (!g_millenniumThread.joinable()) {

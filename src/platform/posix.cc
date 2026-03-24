@@ -44,12 +44,11 @@
 #include <unistd.h>
 
 std::unique_ptr<std::thread> g_millenniumThread;
-extern std::mutex mtx_hasAllPythonPluginsShutdown, mtx_hasSteamUnloaded, mtx_hasSteamUIStartedLoading;
-extern std::condition_variable cv_hasSteamUnloaded, cv_hasAllPythonPluginsShutdown, cv_hasSteamUIStartedLoading;
+#include "millennium/millennium_lifecycle.h"
 
 CONSTRUCTOR void Posix_InitializeEnvironment()
 {
-    if (!Plat_ShouldSetupEnvironment()) {
+    if (!platform::should_setup_environment()) {
         return;
     }
 
@@ -72,8 +71,8 @@ void Posix_AttachMillennium()
     /** Handle signal interrupts (^C) */
     signal(SIGINT, [](int /** signalCode */) { std::exit(128 + SIGINT); });
 
-    Plat_BeforeAttachMillennium();
-    Plat_InitializeSteamHooks();
+    platform::before_attach_millennium();
+    platform::initialize_steam_hooks();
     g_millennium = std::make_unique<millennium>();
     g_millennium->entry();
 }
@@ -91,14 +90,14 @@ extern "C" __attribute__((visibility("default"))) int StartMillennium()
 extern "C" __attribute__((visibility("default"))) int StopMillennium()
 {
     logger.log("Unloading Millennium...");
-    g_shouldTerminateMillennium->flag.store(true);
+    millennium_lifecycle::get().terminate.store(true);
 
     if (g_millenniumThread && g_millenniumThread->joinable()) {
         g_millenniumThread->join();
     }
 
     g_millennium.reset();
-    Plat_AfterDetachMillennium();
+    platform::after_detach_millennium();
 
     logger.log("Millennium unloaded successfully.");
     return 0;

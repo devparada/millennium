@@ -33,19 +33,10 @@
 #include "millennium/plugin_manager.h"
 #include "millennium/child_process.h"
 
-#include <atomic>
-#include <condition_variable>
 #include <memory>
 #include <mutex>
 #include <unordered_map>
 
-struct InterpreterMutex
-{
-    std::mutex mtx, runMutex;
-    std::condition_variable cv;
-    std::atomic<bool> flag{ false };
-    std::atomic<bool> hasFinished{ false };
-};
 
 class backend_manager
 {
