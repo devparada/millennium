@@ -31,7 +31,6 @@ link_millennium() {
 
     ln -sf /usr/lib/millennium/libmillennium_bootstrap_x86.so   "$steam/ubuntu12_32/libXtst.so.6"
     ln -sf /usr/lib/millennium/libmillennium_bootstrap_hhx64.so "$steam/ubuntu12_64/libXtst.so.6"
-    ln -sf /usr/lib/millennium/libmillennium_hhx64.so           "$steam/ubuntu12_64/libmillennium_hhx64.so"
 }
 
 unlink_millennium() {
@@ -40,7 +39,6 @@ unlink_millennium() {
 
     rm -f "$steam/ubuntu12_32/libXtst.so.6"
     rm -f "$steam/ubuntu12_64/libXtst.so.6"
-    rm -f "$steam/ubuntu12_64/libmillennium_hhx64.so"
     rm -f "$home/.steam/steam/.cef-enable-remote-debugging"
 }
 
