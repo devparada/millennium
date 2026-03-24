@@ -560,7 +560,7 @@ void platform::wait_for_backend_load()
 bool platform::initialize_steam_hooks()
 {
 #if defined(_WIN32) || defined(__linux__) || defined(__APPLE__)
-    return initialize_steam_hooks();
+    return ::initialize_steam_hooks();
 #else
     return false;
 #endif

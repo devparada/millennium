@@ -72,10 +72,7 @@ plugin_loader::plugin_loader(std::shared_ptr<plugin_manager> plugin_manager, std
     this->init();
 }
 
-plugin_loader::~plugin_loader()
-{
-    this->shutdown();
-}
+plugin_loader::~plugin_loader() = default;
 
 void plugin_loader::shutdown()
 {
@@ -399,7 +396,7 @@ void plugin_loader::start_plugin_frontends()
     }
 
     if (millennium_lifecycle::get().terminate.load()) {
-        logger.log("Terminating frontend thread pool...");
+        logger.log("Steam is shutting down, terminating frontend thread pool...");
         return;
     }
 

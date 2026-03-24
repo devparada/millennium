@@ -100,6 +100,7 @@ static void stop_and_unload_millennium(void)
 
     dlclose(h_millennium);
     h_millennium = NULL;
+    b_has_loaded_millennium = 0;
 }
 
 static void setup_hooks(void)

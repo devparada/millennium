@@ -114,7 +114,7 @@ async function initializeMillennium(settings: SettingsProps) {
 	   The data comes from Core_GetStartConfig — no async poll needed. */
 	if (settings?.pendingCrashes?.length) {
 		Logger.Log(`Startup config contains ${settings.pendingCrashes.length} pending crash(es)`);
-		settings.pendingCrashes.forEach(d => crashQueue.push(d));
+		settings.pendingCrashes.forEach((d) => crashQueue.push(d));
 	}
 }
 
