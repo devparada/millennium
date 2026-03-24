@@ -18,7 +18,7 @@ install=millennium.install
 build() {
     cd "$srcdir/$_pkgdir"
 
-    cmake -GNinja . -DCMAKE_BUILD_TYPE=Release --preset linux-release -DDISTRO_ARCH=ON
+    cmake -GNinja . -DCMAKE_BUILD_TYPE=Release --preset linux-release
     cmake --build build
 }
 
