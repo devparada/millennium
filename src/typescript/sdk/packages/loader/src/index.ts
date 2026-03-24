@@ -48,14 +48,23 @@ class Bootstrap {
 					...webpack.findModule((m) => m.createRoot),
 				};
 
-			const jsx = webpack.findModule((m) => m.jsx && Object.keys(m).length == 1)?.jsx;
+			/* < mar 19 2026 */
+            const oldJsx = webpack.findModule((m) => m.jsx && Object.keys(m).length == 1)?.jsx;
+            /* >= mar 19 2026*/
+			const newJsx = webpack.findModule((m) => m?.jsx && m?.Fragment && m?.jsxs);
 
-			if (jsx) {
+			if (oldJsx) {
 				window.SP_JSX_FACTORY = {
 					Fragment: window.SP_REACT.Fragment,
-					jsx,
-					jsxs: jsx,
+					jsx: oldJsx,
+					jsxs: oldJsx,
 				};
+            }
+            else if (newJsx) {
+                window.SP_JSX_FACTORY = newJsx;
+            }
+            else {
+                this.logger.error("Failed to find JSX Factory!");
 			}
 		}
 

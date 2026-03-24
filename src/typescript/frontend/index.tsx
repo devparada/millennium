@@ -38,7 +38,7 @@ import { MillenniumDesktopSidebar } from './quick-access';
 import { DesktopMenuProvider } from './quick-access/DesktopMenuContext';
 import { handleSettingsReturnNavigation, MillenniumSettings } from './settings';
 import { MillenniumQuickCssEditor } from './settings/quickcss';
-import { SettingsProps, SystemAccentColor, ThemeItem, ThemeItemV1 } from './types';
+import { PluginCrashInfo, SettingsProps, SystemAccentColor, ThemeItem, ThemeItemV1 } from './types';
 import { PyGetRootColors, PyGetStartupConfig } from './utils/ffi';
 import { Logger } from './utils/Logger';
 import { useQuickCssState } from './utils/quick-css-state';
@@ -93,19 +93,28 @@ async function initializeMillennium(settings: SettingsProps) {
 	const notificationService = new NotificationService();
 	notificationService.showNotifications();
 
+	const crashQueue: PluginCrashInfo[] = [];
+	let mainWindowReady = false;
+
+	const flushCrashQueue = () => {
+		mainWindowReady = true;
+		crashQueue.splice(0).forEach(showPluginCrashToast);
+	};
+
+	window.addEventListener('millennium-main-window-ready', flushCrashQueue, { once: true });
+
 	window.addEventListener('millennium-plugin-crash', (e: Event) => {
 		const detail = (e as CustomEvent).detail;
 		Logger.Log('Received real-time crash event for plugin:', detail?.plugin);
-		setTimeout(() => showPluginCrashToast(detail), 3000);
+		if (mainWindowReady) showPluginCrashToast(detail);
+		else crashQueue.push(detail);
 	});
 
 	/* Show crash modals for any plugins that crashed before this init.
 	   The data comes from Core_GetStartConfig — no async poll needed. */
 	if (settings?.pendingCrashes?.length) {
 		Logger.Log(`Startup config contains ${settings.pendingCrashes.length} pending crash(es)`);
-		setTimeout(() => {
-			settings.pendingCrashes.forEach(showPluginCrashToast);
-		}, 3000);
+		settings.pendingCrashes.forEach(d => crashQueue.push(d));
 	}
 }
 

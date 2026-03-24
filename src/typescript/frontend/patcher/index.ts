@@ -162,7 +162,12 @@ export function onWindowCreatedCallback(windowContext: any): void {
 		PatchRootMenu();
 	}
 
+	const prevMainWindow = pluginSelf.mainWindow;
 	pluginSelf.mainWindow = g_PopupManager?.GetExistingPopup?.('SP Desktop_uid0')?.m_popup?.window;
+
+	if (!prevMainWindow && pluginSelf.mainWindow) {
+		window.dispatchEvent(new CustomEvent('millennium-main-window-ready'));
+	}
 
 	patchMissedDocuments();
 	patchDocumentContext(windowContext);

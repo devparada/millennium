@@ -16,6 +16,7 @@ export interface SidebarNavigationPage {
 }
 
 export interface SidebarNavigationProps {
+	className?: string;
 	title?: string;
 	pages: (SidebarNavigationPage | 'separator')[];
 	showTitle?: boolean;

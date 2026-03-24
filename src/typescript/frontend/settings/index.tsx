@@ -150,7 +150,7 @@ export function handleSettingsReturnNavigation(): boolean {
 
 export function MillenniumSettings() {
 	const className = `${settingsClasses.SettingsModal} ${settingsClasses.DesktopPopup} MillenniumSettings ModalDialogPopup`;
-	const settingsPages = [tabSpotGeneral, 'separator', tabSpotThemes, tabSpotQuickCSS, tabSpotPlugins, 'separator', tabSpotUpdates, tabSpotLogs];
+	const settingsPages: (SidebarNavigationPage | "separator")[] = [tabSpotGeneral, 'separator', tabSpotThemes, tabSpotQuickCSS, tabSpotPlugins, 'separator', tabSpotUpdates, tabSpotLogs];
 	const [currentPage, setCurrentPage] = useState(() => sessionStorage.getItem(SETTINGS_TAB_KEY) || undefined);
 
 	useEffect(() => {
@@ -184,7 +184,6 @@ export function MillenniumSettings() {
 		<ConfigProvider>
 			<UpdateContextProvider>
 				<Styles />
-				{/* @ts-ignore */}
 				<SidebarNavigation
 					className={className}
 					pages={settingsPages}
