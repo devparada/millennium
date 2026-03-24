@@ -357,9 +357,6 @@ BOOL WINAPI hooked_read_directory_changes_w(void*, void*, void*, void*, void*, L
 bool initialize_steam_hooks()
 {
     const auto start_time = std::chrono::system_clock::now();
-
-#ifdef MILLENNIUM_64BIT
-
     STEAM_DEVELOPER_TOOLS_PORT = std::to_string(bind_random_port());
 
     HMODULE h_tier0 = GetModuleHandleW(L"tier0_s.dll");
@@ -393,9 +390,7 @@ bool initialize_steam_hooks()
 
     /** wait for steamui.dll to load (which signifies Steam is actually starting and not updating/verifying files) */
     millennium_lifecycle::get().steam_ui_loaded.wait();
-#elif MILLENNIUM_32BIT
-    bool dll_reg_status = true;
-#endif
+
     const auto end_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - start_time).count();
     logger.log("[SH_Hook] Steam UI loaded in {} ms, continuing Millennium startup...", end_time);
 

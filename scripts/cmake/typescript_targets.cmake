@@ -44,7 +44,7 @@ macro(_ts_package _name _dir)
         DEPENDS
             "${TS_STAMPS}/install.stamp"
             ${ARGN}
-        COMMENT "Building typescript component ${_reldir}"
+        COMMENT "Building TS library ${_reldir}"
         VERBATIM
     )
     add_custom_target(ts_${_name} DEPENDS "${_stamp}")

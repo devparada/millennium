@@ -197,15 +197,19 @@ static VOID Win32_MigrateLegacyLayout(VOID)
         }
 
         /** move data directories */
-        auto safe_rename = [&](const fs::path& src, const fs::path& dst) {
+        auto safe_rename = [&](const fs::path& src, const fs::path& dst)
+        {
             if (fs::exists(src, ec) && !fs::exists(dst, ec)) {
                 fs::rename(src, dst, ec);
-                if (ec) { logger.warn("Migration: rename {} failed: {}", src.string(), ec.message()); ec.clear(); }
+                if (ec) {
+                    logger.warn("Migration: rename {} failed: {}", src.string(), ec.message());
+                    ec.clear();
+                }
             }
         };
 
         safe_rename(steam / "ext" / "data" / "assets", millennium / "ext" / "data" / "assets");
-        safe_rename(steam / "ext" / "data" / "shims",  millennium / "ext" / "data" / "shims");
+        safe_rename(steam / "ext" / "data" / "shims", millennium / "ext" / "data" / "shims");
 
         /** move plugins and themes (entry-by-entry so symlinks are preserved) */
         move_directory_entries(steam / "plugins", millennium / "plugins");
@@ -317,14 +321,7 @@ DLL_EXPORT INT WINAPI DllMain([[maybe_unused]] HINSTANCE hinstDLL, DWORD fdwReas
     switch (fdwReason) {
         case DLL_PROCESS_ATTACH:
         {
-#if defined(MILLENNIUM_32BIT)
-            const char* plat = "32-bit";
-#elif defined(MILLENNIUM_64BIT)
-            const char* plat = "64-bit";
-#else
-#error "Unsupported Platform"
-#endif
-            logger.log("Millennium-{}@{} attached...", plat, MILLENNIUM_VERSION);
+            logger.log("Millennium-x86_64@{} attached...", MILLENNIUM_VERSION);
 
             g_millenniumThread = std::thread(Win32_AttachMillennium);
             break;
