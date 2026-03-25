@@ -256,9 +256,14 @@ std::vector<plugin_manager::plugin_t> plugin_manager::get_enabled_backends()
     std::vector<plugin_manager::plugin_t> enabledBackends;
 
     for (auto& plugin : allPlugins) {
-        if (this->is_enabled(plugin.plugin_name) && plugin.plugin_json.value("useBackend", true)) {
-            enabledBackends.push_back(plugin);
+        if (!this->is_enabled(plugin.plugin_name)) continue;
+        if (!plugin.plugin_json.value("useBackend", true)) continue;
+        if (plugin.plugin_json.value("backendType", "") != "lua") {
+            logger.warn("skipping backend for '{}': backendType is not 'lua' (got '{}'). Python backends are no longer supported.",
+                plugin.plugin_name, plugin.plugin_json.value("backendType", "<unset>"));
+            continue;
         }
+        enabledBackends.push_back(plugin);
     }
 
     return enabledBackends;

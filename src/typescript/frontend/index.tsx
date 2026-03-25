@@ -38,13 +38,14 @@ import { MillenniumDesktopSidebar } from './quick-access';
 import { DesktopMenuProvider } from './quick-access/DesktopMenuContext';
 import { handleSettingsReturnNavigation, MillenniumSettings } from './settings';
 import { MillenniumQuickCssEditor } from './settings/quickcss';
-import { PluginCrashInfo, SettingsProps, SystemAccentColor, ThemeItem, ThemeItemV1 } from './types';
-import { Core_GetRootColors, Core_GetStartConfig } from './utils/ffi';
+import { PluginComponent, PluginCrashInfo, SettingsProps, SystemAccentColor, ThemeItem, ThemeItemV1 } from './types';
+import { Core_FindAllPlugins, Core_GetRootColors, Core_GetStartConfig } from './utils/ffi';
 import { Logger } from './utils/Logger';
 import { useQuickCssState } from './utils/quick-css-state';
 import { NotificationService } from './utils/update-notification-service';
 import { OnRunSteamURL } from './utils/url-scheme-handler';
 import { showPluginCrashModal } from './components/PluginCrashModal';
+import { showLegacyPluginModal } from './components/LegacyPluginModal';
 
 async function initializeMillennium(settings: SettingsProps) {
 	Logger.Log(`Received props`, settings);
@@ -103,10 +104,23 @@ async function initializeMillennium(settings: SettingsProps) {
 		setTimeout(() => showPluginCrashModal(detail), remaining);
 	};
 
+	const checkLegacyPlugins = async () => {
+		try {
+			const plugins: PluginComponent[] = JSON.parse(await Core_FindAllPlugins());
+			const legacy = plugins.filter((p) => p.enabled && p.data.useBackend !== false && p.data.backendType !== 'lua');
+			if (legacy.length) {
+				showLegacyPluginModal(legacy);
+			}
+		} catch (e) {
+			Logger.Error('Failed to check for legacy plugins', e);
+		}
+	};
+
 	const flushCrashQueue = () => {
 		mainWindowReady = true;
 		mainWindowReadyAt = Date.now();
 		crashQueue.splice(0).forEach(showAfterDelay);
+		setTimeout(checkLegacyPlugins, 5000);
 	};
 
 	window.addEventListener('millennium-main-window-ready', flushCrashQueue, { once: true });
