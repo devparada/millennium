@@ -263,11 +263,11 @@ network_hook_ctl::processed_hooks network_hook_ctl::apply_user_webkit_hooks(cons
 
 std::string network_hook_ctl::inject_into_document_head(const std::string& original, const std::string& content) const
 {
-    const size_t headPos = original.find("<head>");
+    const size_t headPos = original.find("</head>");
     if (headPos == std::string::npos) {
         return original;
     }
-    return original.substr(0, headPos + 6) + content + original.substr(headPos + 6);
+    return original.substr(0, headPos) + content + original.substr(headPos);
 }
 
 void network_hook_ctl::set_dynamic_css_provider(std::function<std::pair<std::string, std::string>()> provider)
