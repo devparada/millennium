@@ -92,6 +92,12 @@ bool webkit_world_mgr::is_valid_target_url(const std::string& url) const
         return false;
     }
 
+    for (const auto& pattern : g_js_hook_blacklist) {
+        if (std::regex_match(url, std::regex(pattern))) {
+            return false;
+        }
+    }
+
     return true;
 }
 

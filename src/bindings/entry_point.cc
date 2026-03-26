@@ -82,6 +82,11 @@ void head::millennium_backend::init()
 
     m_theme_webkit_mgr = std::make_shared<theme_webkit_mgr>(m_plugin_manager, m_network_hook_ctl);
     m_theme_config = std::make_shared<theme_config_store>(m_plugin_manager, m_theme_webkit_mgr);
+
+    auto theme_config = m_theme_config;
+    m_network_hook_ctl->set_dynamic_css_provider([theme_config]() -> std::pair<std::string, std::string> {
+        return { theme_config->get_colors().get<std::string>(), theme_config->get_slider_css() };
+    });
 }
 
 head::millennium_backend::millennium_backend(std::shared_ptr<network_hook_ctl> network_hook_ctl, std::shared_ptr<plugin_manager> plugin_manager,

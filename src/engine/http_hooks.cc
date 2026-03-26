@@ -223,7 +223,7 @@ void network_hook_ctl::mime_doc_request_handler(const nlohmann::basic_json<>& me
         return;
     }
 
-    const std::string patchedContent = this->patch_document(requestUrl, decodedBody);
+    const std::string patchedContent = patch_document(requestUrl, decodedBody);
     const std::string responseMessage = message.value("responseStatusText", std::string{ "OK" });
     nlohmann::json responseHeaders = message.value("responseHeaders", nlohmann::json::array());
 
@@ -244,41 +244,21 @@ network_hook_ctl::processed_hooks network_hook_ctl::apply_user_webkit_hooks(cons
     auto hookList = get_hook_list();
 
     for (const auto& hook : hookList) {
-        const auto& hookItem = hook.hook;
+        if (!std::regex_match(requestUrl, hook.hook.url_pattern)) continue;
 
-        if (!std::regex_match(requestUrl, hookItem.url_pattern)) {
-            continue;
-        }
+        if (hook.hook.type == TagTypes::STYLESHEET)
+            result.add_stylesheet(m_themes_url + utils::url::encode_url(hook.hook.path));
+        else if (hook.hook.type == TagTypes::JAVASCRIPT)
+            result.add_script_module(m_themes_url + utils::url::encode_url(hook.hook.path));
+    }
 
-        if (hookItem.type == TagTypes::STYLESHEET) {
-            result.cssContent.append(fmt::format("<link rel=\"stylesheet\" href=\"https://millennium.host/v1/themes/{}\">\n", utils::url::encode_url(hookItem.path)));
-        } else if (hookItem.type == TagTypes::JAVASCRIPT) {
-            auto jsPath = fmt::format("https://millennium.host/v1/themes/{}", utils::url::encode_url(hookItem.path));
-            result.script_modules.push_back(jsPath);
-            result.linkPreloads.append(fmt::format("<link rel=\"modulepreload\" href=\"{}\" fetchpriority=\"high\">\n", jsPath));
-        }
+    if (m_dynamic_css_provider) {
+        const auto [rootColors, sliderCss] = m_dynamic_css_provider();
+        if (!rootColors.empty()) result.add_inline_style("RootColors", rootColors);
+        if (!sliderCss.empty()) result.add_inline_style("MillenniumSliderConditions", sliderCss);
     }
 
     return result;
-}
-
-std::string network_hook_ctl::compile_preload_script(const processed_hooks& hooks, [[maybe_unused]] const std::string& millenniumPreloadPath) const
-{
-    /**
-     * In current architecture, frontend bootstrap is injected by plugin_loader/webkit_world_mgr.
-     * Keep document patching for stylesheet hooks only to avoid duplicate JS bootstrap execution.
-     */
-    return hooks.cssContent;
-}
-
-bool network_hook_ctl::is_url_blacklisted(const std::string& requestUrl) const
-{
-    for (const auto& blacklistedUrl : g_js_hook_blacklist) {
-        if (std::regex_match(requestUrl, std::regex(blacklistedUrl))) {
-            return true;
-        }
-    }
-    return false;
 }
 
 std::string network_hook_ctl::inject_into_document_head(const std::string& original, const std::string& content) const
@@ -290,19 +270,15 @@ std::string network_hook_ctl::inject_into_document_head(const std::string& origi
     return original.substr(0, headPos + 6) + content + original.substr(headPos + 6);
 }
 
+void network_hook_ctl::set_dynamic_css_provider(std::function<std::pair<std::string, std::string>()> provider)
+{
+    m_dynamic_css_provider = std::move(provider);
+}
+
 std::string network_hook_ctl::patch_document(const std::string& requestUrl, const std::string& original) const
 {
-    std::string millenniumPreloadPath = platform::get_millennium_preload_path();
-
     processed_hooks hooks = apply_user_webkit_hooks(requestUrl);
-    std::string shimContent = compile_preload_script(hooks, millenniumPreloadPath);
-
-    // Apply blacklist filtering - remove JavaScript for blacklisted URLs
-    if (is_url_blacklisted(requestUrl)) {
-        shimContent = hooks.cssContent; // Keep only CSS content
-    }
-
-    return inject_into_document_head(original, shimContent);
+    return inject_into_document_head(original, hooks.preloads() + hooks.css() + hooks.scripts());
 }
 
 void network_hook_ctl::init()

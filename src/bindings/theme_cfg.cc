@@ -424,6 +424,36 @@ std::string head::theme_config_store::get_theme_conditionals()
     return CONFIG.get({"themes", "conditions"}).dump(4);
 }
 
+std::string head::theme_config_store::get_slider_css()
+{
+    if (theme_data.contains("failed") || !theme_data.contains("data")) return ":root {}";
+
+    const auto& conditions = theme_data["data"].value("Conditions", nlohmann::json::object());
+    if (!conditions.is_object() || conditions.empty()) return ":root {}";
+
+    const auto saved = CONFIG.get({"themes", "conditions", active_theme_name}, nlohmann::json::object());
+    if (!saved.is_object()) return ":root {}";
+
+    std::string root = ":root {";
+
+    for (const auto& [name, def] : conditions.items()) {
+        if (!def.contains("slider") || !def["slider"].is_object()) continue;
+        if (!saved.contains(name) || !saved[name].is_string()) continue;
+
+        const auto& slider = def["slider"];
+        if (!slider.contains("cssVariable") || !slider["cssVariable"].is_string()) continue;
+
+        const std::string css_var = slider["cssVariable"].get<std::string>();
+        const std::string unit    = slider.value("unit", "");
+        const std::string value   = saved[name].get<std::string>();
+
+        root += fmt::format(" {}: {}{};", css_var, value, unit);
+    }
+
+    root += " }";
+    return root;
+}
+
 std::set<std::string> head::theme_config_store::get_all_imports(const std::filesystem::path& css_path, std::set<std::string> visited)
 {
     std::string abs_path = std::filesystem::absolute(css_path).string();
