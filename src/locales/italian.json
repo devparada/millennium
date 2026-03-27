@@ -156,7 +156,7 @@
   "pluginIsNotEnabled": "Questo plugin è disabilitato!",
   "themeConfigChangeReloadHeader": "Attenzione!",
   "themeConfigChangeReloadBody": "Le impostazioni del tema sono state aggiornate. Vuoi ricaricare l'interfaccia di Steam per applicare le modifiche?",
-  "strConfirm": "Facciamolo!"
+  "strConfirm": "Facciamolo!",
   "logPanelNoLogsHeader": "Nessun log",
   "logPanelNoLogsBody": "Non c'è niente da vedere! Una volta che avrai dei log, ti verranno mostrati qui.",
   "strReset": "Ripristina",
