@@ -1,5 +1,5 @@
 import { ConfirmModal, DialogButton, Field, IconsModule, Navigation, pluginSelf, showModal } from '@steambrew/client';
-import { PyAcknowledgeCrash, PyUpdatePluginStatus } from '../utils/ffi';
+import { Core_AcknowledgeCrash, Core_ChangePluginStatus } from '../utils/ffi';
 import { settingsClasses } from '../utils/classes';
 import { SettingsDialogSubHeader } from './SteamComponents';
 import { OSType, PluginCrashInfo } from '../types';
@@ -57,14 +57,14 @@ const openModals = new Set<string>();
 const CrashModal = ({ detail, closeModal, onResolve }: { detail: PluginCrashInfo; closeModal: () => void; onResolve: () => void }): React.ReactElement => {
 	const pluginLabel = detail.displayName || detail.plugin;
 	const disablePlugin = async () => {
-		await PyUpdatePluginStatus({ pluginJson: JSON.stringify([{ plugin_name: detail.plugin, enabled: false }]) });
+		await Core_ChangePluginStatus({ pluginJson: JSON.stringify([{ plugin_name: detail.plugin, enabled: false }]) });
 		onResolve();
 		closeModal();
 	};
 
 	const restartPlugin = async () => {
-		await PyUpdatePluginStatus({ pluginJson: JSON.stringify([{ plugin_name: detail.plugin, enabled: false }]) });
-		await PyUpdatePluginStatus({ pluginJson: JSON.stringify([{ plugin_name: detail.plugin, enabled: true }]) });
+		await Core_ChangePluginStatus({ pluginJson: JSON.stringify([{ plugin_name: detail.plugin, enabled: false }]) });
+		await Core_ChangePluginStatus({ pluginJson: JSON.stringify([{ plugin_name: detail.plugin, enabled: true }]) });
 		onResolve();
 		closeModal();
 	};
@@ -139,7 +139,7 @@ function openCrashModal(detail: PluginCrashInfo, onAfterResolve?: () => void) {
 	let modalWindow: ReturnType<typeof showModal>;
 	const onResolve = () => {
 		openModals.delete(detail.plugin);
-		PyAcknowledgeCrash({ plugin: detail.plugin });
+		Core_AcknowledgeCrash({ plugin: detail.plugin });
 		onAfterResolve?.();
 	};
 	const onClose = () => {
@@ -159,9 +159,3 @@ export function showPluginCrashModal(detail: PluginCrashInfo, onAfterResolve?: (
 	openCrashModal(detail, onAfterResolve);
 }
 
-/** Called for both real-time (CustomEvent) and buffered (Core_GetPendingCrashes) crashes.
- *  Deduplicates — if a modal for this plugin is already open, skips. */
-export function showPluginCrashToast(detail: PluginCrashInfo) {
-	if (openModals.has(detail.plugin)) return;
-	openCrashModal(detail);
-}

@@ -44,7 +44,7 @@ macro(_ts_package _name _dir)
         DEPENDS
             "${TS_STAMPS}/install.stamp"
             ${ARGN}
-        COMMENT "Building typescript component ${_reldir}"
+        COMMENT "Building TS library ${_reldir}"
         VERBATIM
     )
     add_custom_target(ts_${_name} DEPENDS "${_stamp}")
@@ -91,7 +91,7 @@ _ts_package(core "${TS_ROOT}/frontend"
 add_dependencies(ts_core ts_client ts_webkit)
 
 set(_virtfs_h "${MILLENNIUM_BASE}/src/include/millennium/virtfs.h")
-if(WIN32 AND CMAKE_BUILD_TYPE STREQUAL "Release")
+if(WIN32 AND (CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo"))
     set(_virtfs_outputs "${_virtfs_h}" "${MILLENNIUM_BASE}/scripts/resources.rc")
 else()
     set(_virtfs_outputs "${_virtfs_h}")

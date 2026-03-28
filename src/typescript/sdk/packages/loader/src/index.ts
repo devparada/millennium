@@ -143,7 +143,6 @@ class Bootstrap {
 		this.appendMillenniumToPublicContext(ftpBasePath);
 
 		const browserUtils = await import('./browser-init');
-		await browserUtils.appendRootColors();
 		await browserUtils.appendAccentColor();
 		await browserUtils.appendQuickCss();
 		await browserUtils.addPluginDOMBreadCrumbs(enabledPlugins);

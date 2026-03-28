@@ -66,6 +66,7 @@ class theme_config_store
 
     bool does_theme_use_accent_color();
     std::string get_theme_conditionals();
+    std::string get_slider_css();
     json set_condition(const std::string& theme, const json& newData, const std::string& condition);
 
   private:

@@ -185,13 +185,9 @@ jobs:
             -DPKG_CONFIG_EXECUTABLE="/usr/bin/pkg-config" \
             -DPKG_CONFIG_USE_CMAKE_PREFIX_PATH=ON
 
-          # Build the project
           cmake --build build --config Release -- -j$(nproc)
 
-          # Create final directory structure
           mkdir -p ~/build/usr/lib/millennium
-
-          # Copy binaries and libraries directly to final locations
           cp build/libmillennium_x86.so ~/build/usr/lib/millennium/
           cp build/libmillennium_bootstrap_x86.so ~/build/usr/lib/millennium/
           cp build/libmillennium_bootstrap_hhx64.so ~/build/usr/lib/millennium/
@@ -205,8 +201,93 @@ jobs:
           name: millennium-linux
           path: ~/build/
 
+  test-pkgbuild:
+    needs: prepare
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:base-devel
+
+    steps:
+      - name: Setup pacman
+        run: |
+          printf '\n[multilib]\nInclude = /etc/pacman.d/mirrorlist\n' >> /etc/pacman.conf
+          pacman -Syu --noconfirm
+          pacman -S --noconfirm git
+
+          useradd -m builder
+          echo "builder ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Build package
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          cp -r packages/arch /home/builder/pkg
+          sed -i "s/'steam'//" /home/builder/pkg/PKGBUILD
+          mkdir -p /home/builder/pkg/src
+          cp -r "$GITHUB_WORKSPACE" /home/builder/pkg/src/Millennium
+          chown -R builder:builder /home/builder/pkg
+          su builder -c "git config --global --add safe.directory /home/builder/pkg/src/Millennium"
+          su builder -c 'cd /home/builder/pkg && makepkg -s --noconfirm --noextract'
+
+      - name: Verify package
+        run: |
+          echo "=== Built packages ==="
+          ls -lh /home/builder/pkg/*.pkg.tar.zst
+
+          echo ""
+          echo "=== Extracting package for verification ==="
+          mkdir -p /tmp/pkg-verify
+          MAIN_PKG=$(ls /home/builder/pkg/millennium-*.pkg.tar.zst | grep -v -- '-debug-')
+          tar -xf "$MAIN_PKG" -C /tmp/pkg-verify
+
+          echo ""
+          echo "=== Verifying required binaries are present ==="
+          REQUIRED=(
+            "usr/lib/millennium/libmillennium_x86.so"
+            "usr/lib/millennium/libmillennium_hhx64.so"
+            "usr/lib/millennium/libmillennium_bootstrap_x86.so"
+            "usr/lib/millennium/libmillennium_luavm_x86"
+            "usr/lib/millennium/libmillennium_bootstrap_hhx64.so"
+          )
+          MISSING=0
+          for f in "${REQUIRED[@]}"; do
+            if [ -f "/tmp/pkg-verify/$f" ]; then
+              echo "  FOUND:   $f"
+            else
+              echo "  MISSING: $f"
+              MISSING=1
+            fi
+          done
+          [ $MISSING -eq 0 ] || { echo "ERROR: one or more required binaries missing from package"; exit 1; }
+
+          echo ""
+          echo "=== Verifying binary architectures ==="
+          check_arch() {
+            local path="$1" bits="$2"
+            local info
+            info=$(file "/tmp/pkg-verify/$path")
+            if echo "$info" | grep -q "ELF ${bits}-bit"; then
+              echo "  OK  (${bits}-bit ELF): $path"
+            else
+              echo "  FAIL (expected ${bits}-bit ELF): $path"
+              echo "       got: $info"
+              return 1
+            fi
+          }
+          ARCH_FAIL=0
+          check_arch "usr/lib/millennium/libmillennium_x86.so"             32 || ARCH_FAIL=1
+          check_arch "usr/lib/millennium/libmillennium_bootstrap_x86.so"   32 || ARCH_FAIL=1
+          check_arch "usr/lib/millennium/libmillennium_luavm_x86"          32 || ARCH_FAIL=1
+          check_arch "usr/lib/millennium/libmillennium_hhx64.so"           64 || ARCH_FAIL=1
+          check_arch "usr/lib/millennium/libmillennium_bootstrap_hhx64.so" 64 || ARCH_FAIL=1
+          [ $ARCH_FAIL -eq 0 ] || { echo "ERROR: binary architecture mismatch"; exit 1; }
+
   release:
-    needs: [prepare, build-windows, build-linux]
+    needs: [prepare, build-windows, build-linux, test-pkgbuild]
     runs-on: ubuntu-latest
     if: ${{ inputs.release_artifacts == 'yes' }}
     steps:
@@ -258,19 +339,16 @@ jobs:
           win32_name="millennium-v${{ needs.prepare.outputs.version }}-windows-x86_64"
           win32_release_name="./artifacts/release/${win32_name}"
 
-          # setup windows release
           cd ./artifacts/windows && zip -r ../release/${win32_name}.zip . && cd ../..
           sha256sum ${win32_release_name}.zip > ${win32_release_name}.sha256
           sed -i 's#\./artifacts/release/##g' ${win32_release_name}.sha256
           du -sb ./artifacts/windows | awk '{print $1}' > ${win32_release_name}.installsize
 
-          # setup linux release
           tar -czvf ${linux_release_name}.tar.gz -C ./artifacts/linux .
           sha256sum ${linux_release_name}.tar.gz > ${linux_release_name}.sha256
           sed -i 's#\./artifacts/release/##g' ${linux_release_name}.sha256
           du -sb ./artifacts/linux | awk '{print $1}' > ${linux_release_name}.installsize
 
-          # setup PDB symbols release
           pdb_name="millennium-v${{ needs.prepare.outputs.version }}-pdb"
           pdb_release_name="./artifacts/release/${pdb_name}"
           cd ./artifacts/pdb && zip -r ../release/${pdb_name}.zip . && cd ../..
@@ -280,3 +358,65 @@ jobs:
           cd scripts && npx semantic-release
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+
+  update-pkgbuild:
+    needs: [prepare, release]
+    runs-on: ubuntu-latest
+    if: ${{ inputs.release_artifacts == 'yes' }}
+    outputs:
+      updated_sha: ${{ steps.push.outputs.updated_sha }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+
+      - name: Update Package Version and Commit
+        run: |
+          TAG="v${{ needs.prepare.outputs.version }}"
+          CLEAN_TAG="${{ needs.prepare.outputs.version }}"
+          CLEAN_TAG="${CLEAN_TAG//-/_}"
+
+          COMMIT=$(gh api repos/${{ github.repository }}/git/refs/tags/$TAG --jq '.object.sha')
+          echo "Using tag: $TAG, commit: $COMMIT"
+
+          OLD_VER=$(grep '^pkgver=' ./packages/arch/PKGBUILD | cut -d= -f2)
+          sed -i "s/pkgver=.*/pkgver=$CLEAN_TAG/" ./packages/arch/PKGBUILD
+          [ "$OLD_VER" != "$CLEAN_TAG" ] && sed -i "s/pkgrel=.*/pkgrel=1/" ./packages/arch/PKGBUILD
+          sed -i "s|source=(\"git+\$url\.git.*\")|source=(\"git+\$url.git#commit=$COMMIT\")|" ./packages/arch/PKGBUILD
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Commit and push PKGBUILD changes
+        id: push
+        run: |
+          git config --local user.email "github-actions@github.com"
+          git config --local user.name "GitHub Actions"
+          git add ./packages/arch/PKGBUILD
+          git commit -m "Update PKGBUILD for release v${{ needs.prepare.outputs.version }}" || true
+          git push origin ${{ github.ref_name }}
+          echo "updated_sha=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+
+  publish-aur:
+    needs: update-pkgbuild
+    runs-on: ubuntu-latest
+    if: ${{ inputs.release_artifacts == 'yes' }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.update-pkgbuild.outputs.updated_sha }}
+
+      - name: Publish AUR package
+        uses: KSXGitHub/github-actions-deploy-aur@master
+        with:
+          pkgname: millennium
+          pkgbuild: ./packages/arch/PKGBUILD
+          assets: ./packages/arch/millennium.install
+          commit_username: GitHub Actions
+          commit_email: github-actions@github.com
+          ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+          commit_message: Update AUR package
+          ssh_keyscan_types: rsa,ecdsa,ed25519

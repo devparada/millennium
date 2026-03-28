@@ -36,7 +36,7 @@ import { Utils } from '../../utils';
 import { formatString, locale } from '../../utils/localization-manager';
 import { SiKofi } from 'react-icons/si';
 import { Component } from 'react';
-import { PyUninstallTheme } from '../../utils/ffi';
+import { Core_UninstallTheme } from '../../utils/ffi';
 import { IconButton } from '../../components/IconButton';
 import { settingsClasses } from '../../utils/classes';
 import { useQuickAccessStore } from '../../quick-access/quickAccessStore';
@@ -134,7 +134,7 @@ export class ThemeItemComponent extends Component<ThemeItemComponentProps, Theme
 		const shouldUninstall = await Utils.ShowMessageBox(formatString(locale.themeUninstallConfirm, theme.data.name), locale.strHeadsUp);
 		if (!shouldUninstall) return;
 
-		PyUninstallTheme({ owner: theme.data.github.owner, repo: theme.data.github.repo_name }).then(() => {
+		Core_UninstallTheme({ owner: theme.data.github.owner, repo: theme.data.github.repo_name }).then(() => {
 			if (this.isActive) {
 				SteamClient.Browser.RestartJSContext();
 			} else {

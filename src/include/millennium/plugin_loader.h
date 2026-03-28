@@ -48,7 +48,6 @@
 #include <websocketpp/client.hpp>
 #include <websocketpp/config/asio_no_tls_client.hpp>
 
-extern std::shared_ptr<InterpreterMutex> g_shouldTerminateMillennium;
 
 class plugin_loader : public std::enable_shared_from_this<plugin_loader>
 {

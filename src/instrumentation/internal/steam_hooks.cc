@@ -29,354 +29,150 @@
  */
 
 #include <atomic>
-#include <condition_variable>
 #include <cstdlib>
-#include <mutex>
+#include <string>
+#include <string_view>
+#include <vector>
 
 #include "millennium/logger.h"
 #include "millennium/steam_hooks.h"
 #include "millennium/cmdline_parse.h"
-
-std::mutex mtx_hasSteamUnloaded, mtx_hasSteamUIStartedLoading, mtx_hasBackendsLoaded;
-std::condition_variable cv_hasSteamUnloaded, cv_hasSteamUIStartedLoading, cv_hasBackendsLoaded;
-std::atomic<bool> atm_hasBackendsAlreadyLoaded{ false };
-std::atomic<bool> atm_hasSteamUILoaded{ false };
+#include "millennium/millennium_lifecycle.h"
 
 std::string STEAM_DEVELOPER_TOOLS_PORT = "8080";
 
-static std::atomic<bool> g_hasWaitedForBackends{ false };
-
-uint_least16_t GetRandomOpenPort()
+uint_least16_t bind_random_port()
 {
     asio::io_context io_context;
     asio::ip::tcp::acceptor acceptor(io_context, asio::ip::tcp::endpoint(asio::ip::tcp::v4(), 0));
     return acceptor.local_endpoint().port();
 }
 
-const char* GetAppropriateDevToolsPort(const bool isDevMode)
+const char* get_devtools_port(const bool is_developer_mode)
 {
-    const char* port = isDevMode ? DEFAULT_DEVTOOLS_PORT : STEAM_DEVELOPER_TOOLS_PORT.c_str();
+    const char* port = is_developer_mode ? DEFAULT_DEVTOOLS_PORT : STEAM_DEVELOPER_TOOLS_PORT.c_str();
     return port;
 }
 
-#define MAX_PARAMS 128
-#define MAX_PARAM_LEN 512
-#define MAX_COMMAND_LEN 4096 /** I don't think any process call from steam would be longer than this */
-
-typedef struct
+struct command
 {
-    char* exec;
-    char* params[MAX_PARAMS];
-    int param_count;
+    std::string exec;
+    std::vector<std::string> params;
 
-    char full_command[MAX_COMMAND_LEN];
-    int dirty;
-} Command;
-
-void Command_mark_dirty(Command* cmd)
-{
-    cmd->dirty = 1;
-}
-
-#ifndef _WIN32
-static int Command_needs_quotes(const char* value)
-{
-    for (const char* cursor = value; *cursor; ++cursor) {
-        if (*cursor == ' ' || *cursor == '\t' || *cursor == '"' || *cursor == '\'') {
-            return 1;
-        }
+    command(const char* full_cmd)
+    {
+        parse(full_cmd);
     }
 
-    return 0;
-}
+    std::string_view executable() const
+    {
+        auto slash = exec.rfind('/');
+        auto backslash = exec.rfind('\\');
+        size_t sep = std::string::npos;
 
-static void Command_append_char(Command* cmd, size_t* pos, char value)
-{
-    if (*pos + 1 >= MAX_COMMAND_LEN) {
-        return;
+        if (slash != std::string::npos && backslash != std::string::npos)
+            sep = std::max(slash, backslash);
+        else if (slash != std::string::npos)
+            sep = slash;
+        else if (backslash != std::string::npos)
+            sep = backslash;
+
+        return sep != std::string::npos ? std::string_view(exec).substr(sep + 1) : std::string_view(exec);
     }
 
-    cmd->full_command[*pos] = value;
-    (*pos)++;
-    cmd->full_command[*pos] = '\0';
-}
+    void ensure_param(std::string_view key, const char* value)
+    {
+        std::string entry = value ? std::string(key) + "=" + value : std::string(key);
 
-static void Command_append_token(Command* cmd, size_t* pos, const char* value)
-{
-    if (*pos >= MAX_COMMAND_LEN) {
-        return;
-    }
-
-    if (!Command_needs_quotes(value)) {
-        int written = snprintf(cmd->full_command + *pos, MAX_COMMAND_LEN - *pos, "%s", value);
-        if (written < 0) {
-            return;
-        }
-
-        *pos += static_cast<size_t>(written);
-        if (*pos >= MAX_COMMAND_LEN) {
-            *pos = MAX_COMMAND_LEN - 1;
-            cmd->full_command[*pos] = '\0';
-        }
-        return;
-    }
-
-    Command_append_char(cmd, pos, '"');
-    for (const char* cursor = value; *cursor; ++cursor) {
-        if (*cursor == '"' || *cursor == '\\') {
-            Command_append_char(cmd, pos, '\\');
-        }
-        Command_append_char(cmd, pos, *cursor);
-    }
-    Command_append_char(cmd, pos, '"');
-}
-#endif
-
-char* Command_get_executable(Command* cmd)
-{
-    char* last_slash = strrchr(cmd->exec, '/');
-    char* last_backslash = strrchr(cmd->exec, '\\');
-    char* last_separator = last_slash > last_backslash ? last_slash : last_backslash;
-    return last_separator ? last_separator + 1 : cmd->exec;
-}
-
-void Command_init(Command* cmd, const char* full_cmd)
-{
-    cmd->param_count = 0;
-    cmd->exec = NULL;
-    cmd->dirty = 1;
-
-#ifdef _WIN32
-    char* copy = strdup(full_cmd);
-    char* p = copy;
-    char token[MAX_PARAM_LEN];
-    int token_idx = 0;
-    int in_quotes = 0;
-    int token_count = 0;
-
-    while (*p) {
-        if (*p == '"') {
-            in_quotes = !in_quotes;
-            p++;
-            continue;
-        }
-        if (*p == ' ' && !in_quotes) {
-            if (token_idx > 0) {
-                token[token_idx] = '\0';
-                if (token_count == 0) {
-                    cmd->exec = strdup(token);
-                } else if (cmd->param_count < MAX_PARAMS) {
-                    cmd->params[cmd->param_count++] = strdup(token);
-                }
-                token_count++;
-                token_idx = 0;
+        for (auto& p : params) {
+            if (p == key || (p.size() > key.size() && p.compare(0, key.size(), key) == 0 && p[key.size()] == '=')) {
+                p = entry;
+                return;
             }
-            p++;
-            continue;
         }
-        if (token_idx < MAX_PARAM_LEN - 1) {
-            token[token_idx++] = *p;
-        }
-        p++;
-    }
-    if (token_idx > 0) {
-        token[token_idx] = '\0';
-        if (token_count == 0) {
-            cmd->exec = strdup(token);
-        } else if (cmd->param_count < MAX_PARAMS) {
-            cmd->params[cmd->param_count++] = strdup(token);
-        }
-    }
-    free(copy);
-#else
-    char* copy = strdup(full_cmd);
-    char* p = copy;
-    char token[MAX_PARAM_LEN];
-    int token_idx = 0;
-    char quote_char = 0;
-    int in_quotes = 0;
-    int token_count = 0;
 
-    while (*p) {
-        if ((*p == '"' || *p == '\'') && (!in_quotes || *p == quote_char)) {
-            quote_char = in_quotes ? 0 : *p;
-            in_quotes = !in_quotes;
-            p++;
-            continue;
+        params.insert(params.begin(), std::move(entry));
+    }
+
+    std::string build() const
+    {
+        std::string result;
+        result += quote_token(exec);
+        for (const auto& p : params) {
+            result += ' ';
+            result += quote_token(p);
         }
-        if (*p == ' ' && !in_quotes) {
-            if (token_idx > 0) {
-                token[token_idx] = '\0';
-                if (token_count == 0) {
-                    cmd->exec = strdup(token);
-                } else if (cmd->param_count < MAX_PARAMS) {
-                    cmd->params[cmd->param_count++] = strdup(token);
-                }
-                token_count++;
-                token_idx = 0;
+        return result;
+    }
+
+  private:
+    static bool is_quote_char(char c)
+    {
+#ifdef _WIN32
+        return c == '"';
+#else
+        return c == '"' || c == '\'';
+#endif
+    }
+
+    static std::string quote_token(const std::string& s)
+    {
+#ifdef _WIN32
+        if (s.find_first_of(" =") != std::string::npos) return '"' + s + '"';
+        return s;
+#else
+        if (s.find_first_of(" \t\"'") == std::string::npos) return s;
+        std::string out = "\"";
+        for (char c : s) {
+            if (c == '"' || c == '\\') out += '\\';
+            out += c;
+        }
+        return out + '"';
+#endif
+    }
+
+    void parse(const char* full_cmd)
+    {
+        std::string token;
+        bool in_quotes = false;
+        char quote_char = 0;
+        bool first = true;
+
+        for (const char* p = full_cmd; *p; ++p) {
+            if (is_quote_char(*p) && (!in_quotes || *p == quote_char)) {
+                quote_char = in_quotes ? 0 : *p;
+                in_quotes = !in_quotes;
+                continue;
             }
-            p++;
-            continue;
+            if (*p == ' ' && !in_quotes) {
+                if (!token.empty()) flush(token, first);
+                continue;
+            }
+            token += *p;
         }
-        if (token_idx < MAX_PARAM_LEN - 1) {
-            token[token_idx++] = *p;
-        }
-        p++;
+        if (!token.empty()) flush(token, first);
     }
-    if (token_idx > 0) {
-        token[token_idx] = '\0';
-        if (token_count == 0) {
-            cmd->exec = strdup(token);
-        } else if (cmd->param_count < MAX_PARAMS) {
-            cmd->params[cmd->param_count++] = strdup(token);
-        }
-    }
-    free(copy);
-#endif
-}
 
-void Command_free(Command* cmd)
-{
-    if (cmd->exec) free(cmd->exec);
-    for (int i = 0; i < cmd->param_count; i++)
-        free(cmd->params[i]);
-}
-
-int Command_has_param(Command* cmd, const char* key)
-{
-    size_t key_len = strlen(key);
-    for (int i = 0; i < cmd->param_count; i++) {
-        if (strcmp(cmd->params[i], key) == 0) return 1;
-        if (strncmp(cmd->params[i], key, key_len) == 0 && cmd->params[i][key_len] == '=') return 1;
-    }
-    return 0;
-}
-
-void Command_add_param(Command* cmd, const char* param)
-{
-    if (cmd->param_count >= MAX_PARAMS) return;
-    if (!Command_has_param(cmd, param)) {
-        for (int i = cmd->param_count; i > 0; i--)
-            cmd->params[i] = cmd->params[i - 1];
-        cmd->params[0] = strdup(param); // Prepend
-        cmd->param_count++;
-        Command_mark_dirty(cmd);
-    }
-}
-
-void Command_remove_param(Command* cmd, const char* key)
-{
-    size_t key_len = strlen(key);
-    for (int i = 0; i < cmd->param_count; i++) {
-        if (strcmp(cmd->params[i], key) == 0 || (strncmp(cmd->params[i], key, key_len) == 0 && cmd->params[i][key_len] == '=')) {
-            free(cmd->params[i]);
-            for (int j = i; j < cmd->param_count - 1; j++)
-                cmd->params[j] = cmd->params[j + 1];
-            cmd->param_count--;
-            i--;
-            Command_mark_dirty(cmd);
-        }
-    }
-}
-
-void Command_update_param(Command* cmd, const char* key, const char* value)
-{
-    size_t key_len = strlen(key);
-    char new_param[MAX_PARAM_LEN];
-    if (value)
-        snprintf(new_param, sizeof(new_param), "%s=%s", key, value);
-    else
-        snprintf(new_param, sizeof(new_param), "%s", key);
-
-    for (int i = 0; i < cmd->param_count; i++) {
-        if (strcmp(cmd->params[i], key) == 0 || (strncmp(cmd->params[i], key, key_len) == 0 && cmd->params[i][key_len] == '=')) {
-            free(cmd->params[i]);
-            for (int j = i; j < cmd->param_count - 1; j++)
-                cmd->params[j] = cmd->params[j + 1];
-            cmd->param_count--;
-            for (int j = cmd->param_count; j > 0; j--)
-                cmd->params[j] = cmd->params[j - 1];
-            cmd->params[0] = strdup(new_param);
-            cmd->param_count++;
-            Command_mark_dirty(cmd);
-            return;
-        }
-    }
-    if (cmd->param_count < MAX_PARAMS) {
-        for (int i = cmd->param_count; i > 0; i--)
-            cmd->params[i] = cmd->params[i - 1];
-        cmd->params[0] = strdup(new_param);
-        cmd->param_count++;
-        Command_mark_dirty(cmd);
-    }
-}
-
-static void Command_ensure_parameter(Command* c, const char* cmd, const char* value)
-{
-    if (Command_has_param(c, cmd)) {
-        Command_update_param(c, cmd, value);
-    } else {
-        if (!value) {
-            Command_add_param(c, cmd);
+    void flush(std::string& token, bool& first)
+    {
+        if (first) {
+            exec = std::move(token);
+            first = false;
         } else {
-            char buffer[256];
-            snprintf(buffer, sizeof(buffer), "%s=%s", cmd, value);
-            Command_add_param(c, buffer);
+            params.push_back(std::move(token));
         }
+        token.clear();
     }
-}
-
-const char* Command_get(Command* cmd)
-{
-    if (!cmd->dirty) return cmd->full_command;
-
-    size_t pos = 0;
-    cmd->full_command[0] = '\0';
-#ifdef _WIN32
-    if (strchr(cmd->exec, ' ')) {
-        pos += snprintf(cmd->full_command + pos, MAX_COMMAND_LEN - pos, "\"%s\"", cmd->exec);
-    } else {
-        pos += snprintf(cmd->full_command + pos, MAX_COMMAND_LEN - pos, "%s", cmd->exec);
-    }
-#else
-    Command_append_token(cmd, &pos, cmd->exec);
-#endif
-
-    for (int i = 0; i < cmd->param_count; i++) {
-#ifdef _WIN32
-        if (strchr(cmd->params[i], '=') || strchr(cmd->params[i], ' ')) {
-            pos += snprintf(cmd->full_command + pos, MAX_COMMAND_LEN - pos, " \"%s\"", cmd->params[i]);
-        } else {
-            pos += snprintf(cmd->full_command + pos, MAX_COMMAND_LEN - pos, " %s", cmd->params[i]);
-        }
-#else
-        Command_append_char(cmd, &pos, ' ');
-        Command_append_token(cmd, &pos, cmd->params[i]);
-#endif
-    }
-
-    cmd->dirty = 0;
-    return cmd->full_command;
-}
+};
 
 const char* Plat_HookedCreateSimpleProcess(const char* cmd)
 {
     /** only wait on the first call. */
-    if (!g_hasWaitedForBackends.load()) {
-        logger.log("[Plat_HookedCreateSimpleProcess] Waiting for backends to finish first load...");
-        std::unique_lock<std::mutex> lock(mtx_hasBackendsLoaded);
-
-        /** if backends have already loaded before this function was called, we don't need to wait. */
-        if (!atm_hasBackendsAlreadyLoaded.load()) {
-            cv_hasBackendsLoaded.wait(lock);
-        }
-
-        logger.log("[Plat_HookedCreateSimpleProcess] All backends have loaded, proceeding with CEF start...");
-        g_hasWaitedForBackends.store(true);
+    if (!millennium_lifecycle::get().backends_loaded.flag.load()) {
+        millennium_lifecycle::get().backends_loaded.wait();
     }
 
-    Command c;
-    Command_init(&c, cmd);
+    command cmd_line(cmd);
 
     const char* target_executable =
 #ifdef _WIN32
@@ -387,27 +183,22 @@ const char* Plat_HookedCreateSimpleProcess(const char* cmd)
         "Steam Helper";
 #endif
 
-    char* hooked_target = Command_get_executable(&c);
-
-    if (strcmp(hooked_target, target_executable) != 0) {
-        Command_free(&c);
+    if (cmd_line.executable() != target_executable) {
         return cmd;
     }
 
-    int is_developer_mode = CommandLineArguments::has_argument("-dev");
+    bool is_developer_mode = CommandLineArguments::has_argument("-dev");
 
     /** block any browser web requests when running in normal mode */
-    Command_ensure_parameter(&c, "--remote-allow-origins", is_developer_mode ? "*" : "");
+    cmd_line.ensure_param("--remote-allow-origins", is_developer_mode ? "*" : "");
     /** always ensure the debugger is only local, and can't be accessed over lan */
-    Command_ensure_parameter(&c, "--remote-debugging-address", "127.0.0.1");
+    cmd_line.ensure_param("--remote-debugging-address", "127.0.0.1");
     /** enable the CEF remote debugger */
-    Command_ensure_parameter(&c, "--remote-debugging-port", GetAppropriateDevToolsPort(is_developer_mode));
+    cmd_line.ensure_param("--remote-debugging-port", get_devtools_port(is_developer_mode));
 
-    const char* result = Command_get(&c);
-    char* owned_cmd = strdup(result);
-    Command_free(&c);
-
-    return owned_cmd;
+    static thread_local std::string result;
+    result = cmd_line.build();
+    return result.c_str();
 }
 
 #ifdef _WIN32
@@ -418,25 +209,25 @@ const char* Plat_HookedCreateSimpleProcess(const char* cmd)
 #include "millennium/argp_win32.h"
 #include "millennium/logger.h"
 #include "millennium/backend_mgr.h"
+#include "millennium/plat_msg.h"
 
 #define LDR_DLL_NOTIFICATION_REASON_LOADED 1
 #define LDR_DLL_NOTIFICATION_REASON_UNLOADED 2
 
 LdrRegisterDllNotification_t LdrRegisterDllNotification = nullptr;
 LdrUnregisterDllNotification_t LdrUnregisterDllNotification = nullptr;
-PVOID g_NotificationCookie = nullptr;
+PVOID g_notification_cookie = nullptr;
 
 static snare_inline_t g_create_hook = nullptr;
-static snare_inline_t g_rdcw_hook   = nullptr;
+static snare_inline_t g_rdcw_hook = nullptr;
 
-HMODULE steamTier0Module;
-std::atomic<bool> ab_shouldDisconnectFrontend{ false };
+HMODULE steam_tier0_module;
 
-INT Hooked_CreateSimpleProcess(const char* a1, char a2, const char* lpMultiByteStr)
+INT hooked_create_simple_process(const char* a1, char a2, const char* lp_multi_byte_str)
 {
     snare_inline_remove(g_create_hook);
     auto orig = reinterpret_cast<INT(__cdecl*)(const char*, char, const char*)>(snare_inline_get_src(g_create_hook));
-    INT result = orig(Plat_HookedCreateSimpleProcess(a1), a2, lpMultiByteStr);
+    INT result = orig(Plat_HookedCreateSimpleProcess(a1), a2, lp_multi_byte_str);
     snare_inline_install(g_create_hook);
     return result;
 }
@@ -448,181 +239,153 @@ INT Hooked_CreateSimpleProcess(const char* a1, char a2, const char* lpMultiByteS
  * It houses various functions, and we are interested in hooking its functions Steam
  * uses to spawn the Steam web helper.
  */
-VOID HandleTier0Dll(PVOID moduleBaseAddress)
+VOID handle_tier0_dll(PVOID module_base_address)
 {
-    steamTier0Module = static_cast<HMODULE>(moduleBaseAddress);
+    steam_tier0_module = static_cast<HMODULE>(module_base_address);
     logger.log("Setting up hooks for tier0_s.dll");
 
-    FARPROC proc = GetProcAddress(steamTier0Module, "CreateSimpleProcess");
+    FARPROC proc = GetProcAddress(steam_tier0_module, "CreateSimpleProcess");
     if (proc != nullptr) {
-        g_create_hook = snare_inline_new(reinterpret_cast<void*>(proc), reinterpret_cast<void*>(&Hooked_CreateSimpleProcess));
+        g_create_hook = snare_inline_new(reinterpret_cast<void*>(proc), reinterpret_cast<void*>(&hooked_create_simple_process));
         if (!g_create_hook || snare_inline_install(g_create_hook) < 0) {
-            MessageBoxA(NULL, "Failed to create hook for CreateSimpleProcess", "Error", MB_ICONERROR | MB_OK);
+            platform::messagebox::show("Millennium", "Failed to create hook for CreateSimpleProcess", platform::messagebox::error);
             return;
         }
     }
 }
 
 /**
- * Millennium uses DllNotificationCallback to hook when steamclient.dll unloaded
+ * Millennium uses dll_notification_callback to hook when steamclient.dll unloaded
  * This signifies the Steam Client is unloading.
  * The reason it is done this way is to prevent windows loader lock from deadlocking or destroying parts of Millennium.
  * When we are running inside the callback, we are inside the loader lock (so windows can't continue loading/unloading dlls)
  */
-VOID HandleSteamUnload()
+VOID handle_steam_unload()
 {
-    /**
-     * notify the millennium frontend to disconnect
-     * once the frontend disconnects, it will shutdown the rest of Millennium
-     */
-    ab_shouldDisconnectFrontend.store(true);
-    // auto& backendManager = BackendManager::GetInstance();
-
-    // /** No need to wait if all backends aren't python */
-    // if (!backendManager.HasAnyPythonBackends() && !backendManager.HasAnyLuaBackends()) {
-    //     Logger.Warn("No backends detected, skipping shutdown wait...");
-    //     return;
-    // }
-
-    // std::unique_lock<std::mutex> lk(mtx_hasSteamUnloaded);
-    // Logger.Warn("Waiting for Millennium to be unloaded...");
-
-    // /** wait for Millennium to be unloaded */
-    // cv_hasSteamUnloaded.wait(lk, [&backendManager]()
-    // {
-    //     /** wait for all backends to stop so we can safely free the loader lock */
-    //     if (backendManager.HasAllPythonBackendsStopped() && backendManager.HasAllLuaBackendsStopped()) {
-    //         Logger.Warn("All backends have stopped, proceeding with termination...");
-
-    //         std::unique_lock<std::mutex> lk2(mtx_hasAllPythonPluginsShutdown);
-    //         cv_hasAllPythonPluginsShutdown.notify_all();
-    //         return true;
-    //     }
-    //     return false;
-    // });
-
+    millennium_lifecycle::get().disconnect_frontend.store(true);
     logger.warn("Terminate condition variable signaled, exiting...");
 }
 
-VOID HandleSteamLoad()
+VOID handle_steam_load()
 {
-    logger.log("[DllNotificationCallback] Notified that Steam UI has loaded, notifying main thread...");
-    atm_hasSteamUILoaded.store(true);
-    cv_hasSteamUIStartedLoading.notify_all();
+    logger.log("[dll_notification_callback] Notified that Steam UI has loaded, notifying main thread...");
+    millennium_lifecycle::get().steam_ui_loaded.notify();
 }
 
-VOID CALLBACK DllNotificationCallback(ULONG NotificationReason, PLDR_DLL_NOTIFICATION_DATA NotificationData, [[maybe_unused]] PVOID Context)
+VOID CALLBACK dll_notification_callback(ULONG notification_reason, PLDR_DLL_NOTIFICATION_DATA notification_data, [[maybe_unused]] PVOID context)
 {
-    std::wstring_view baseDllName(NotificationData->BaseDllName->Buffer, NotificationData->BaseDllName->Length / sizeof(WCHAR));
+    std::wstring_view base_dll_name(notification_data->BaseDllName->Buffer, notification_data->BaseDllName->Length / sizeof(WCHAR));
 
     /** hook Steam load */
-    if (NotificationReason == LDR_DLL_NOTIFICATION_REASON_LOADED && baseDllName == L"steamui.dll") {
-        HandleSteamLoad();
+    if (notification_reason == LDR_DLL_NOTIFICATION_REASON_LOADED && base_dll_name == L"steamui.dll") {
+        handle_steam_load();
         return;
     }
 
     /** hook Steam unload */
-    if (NotificationReason == LDR_DLL_NOTIFICATION_REASON_UNLOADED && baseDllName == L"steamclient64.dll") {
-        logger.log("[DllNotificationCallback] Notified that steamclient64.dll has unloaded, handling Steam unload...");
-        HandleSteamUnload();
+    if (notification_reason == LDR_DLL_NOTIFICATION_REASON_UNLOADED && base_dll_name == L"steamclient64.dll") {
+        logger.log("[dll_notification_callback] Notified that steamclient64.dll has unloaded, handling Steam unload...");
+        handle_steam_unload();
         return;
     }
 
     /** hook steam cross platform api (used to hook create proc) */
-    if (NotificationReason == LDR_DLL_NOTIFICATION_REASON_LOADED && baseDllName == L"tier0_s64.dll") {
-        HandleTier0Dll(NotificationData->DllBase);
+    if (notification_reason == LDR_DLL_NOTIFICATION_REASON_LOADED && base_dll_name == L"tier0_s64.dll") {
+        handle_tier0_dll(notification_data->DllBase);
         return;
     }
 }
 
-void HandleAlreadyLoaded(LPCWSTR dllName)
+void handle_already_loaded(LPCWSTR dll_name)
 {
-    HMODULE module = GetModuleHandleW(dllName);
+    HMODULE module = GetModuleHandleW(dll_name);
 
     if (!module) {
         return;
     }
 
-    LDR_DLL_NOTIFICATION_DATA notifData = {};
-    UNICODE_STRING unicodeDllName = {};
-    unicodeDllName.Buffer = const_cast<PWSTR>(dllName);
-    unicodeDllName.Length = static_cast<USHORT>(wcslen(dllName) * sizeof(WCHAR));
-    notifData.BaseDllName = &unicodeDllName;
-    notifData.DllBase = module;
-    DllNotificationCallback(LDR_DLL_NOTIFICATION_REASON_LOADED, &notifData, nullptr);
+    LDR_DLL_NOTIFICATION_DATA notif_data = {};
+    UNICODE_STRING unicode_dll_name = {};
+    unicode_dll_name.Buffer = const_cast<PWSTR>(dll_name);
+    unicode_dll_name.Length = static_cast<USHORT>(wcslen(dll_name) * sizeof(WCHAR));
+    notif_data.BaseDllName = &unicode_dll_name;
+    notif_data.DllBase = module;
+    dll_notification_callback(LDR_DLL_NOTIFICATION_REASON_LOADED, &notif_data, nullptr);
 }
 
 /**
  * Hook and disable ReadDirectoryChangesW to prevent the Steam client from monitoring changes
  * to the steamui dir, which is incredibly fucking annoying during development.
  */
-BOOL WINAPI Hooked_ReadDirectoryChangesW(void*, void*, void*, void*, void*, LPDWORD bytesRet, void*, void*)
+BOOL WINAPI hooked_read_directory_changes_w(void*, void*, void*, void*, void*, LPDWORD bytes_ret, void*, void*)
 {
     logger.log("[Steam] Blocked attempt to ReadDirectoryChangesW...");
 
-    if (bytesRet) *bytesRet = 0; // no changes
-    return TRUE;                 // indicate success
+    if (bytes_ret) *bytes_ret = 0; // no changes
+    return TRUE;                   // indicate success
 }
 
-bool InitializeSteamHooks()
+bool initialize_steam_hooks()
 {
-    const auto startTime = std::chrono::system_clock::now();
+    const auto start_time = std::chrono::system_clock::now();
+    STEAM_DEVELOPER_TOOLS_PORT = std::to_string(bind_random_port());
 
-#ifdef MILLENNIUM_64BIT
-
-    STEAM_DEVELOPER_TOOLS_PORT = std::to_string(GetRandomOpenPort());
-
-    HMODULE hTier0 = GetModuleHandleW(L"tier0_s.dll");
-    if (hTier0) {
-        HandleTier0Dll(hTier0);
+    HMODULE h_tier0 = GetModuleHandleW(L"tier0_s.dll");
+    if (h_tier0) {
+        handle_tier0_dll(h_tier0);
         return true;
     }
 
-    HMODULE ntdllModule = GetModuleHandleA("ntdll.dll");
-    if (!ntdllModule) {
-        MessageBoxA(NULL, "Failed to get handle for ntdll.dll", "Error", MB_ICONERROR | MB_OK);
+    HMODULE ntdll_module = GetModuleHandleA("ntdll.dll");
+    if (!ntdll_module) {
+        platform::messagebox::show("Millennium", "Failed to get handle for ntdll.dll", platform::messagebox::error);
         return false;
     }
 
     // Check if modules are already loaded and handle them
-    HandleAlreadyLoaded(L"steamui.dll");
-    HandleAlreadyLoaded(L"steamclient64.dll");
-    HandleAlreadyLoaded(L"tier0_s64.dll");
+    handle_already_loaded(L"steamui.dll");
+    handle_already_loaded(L"steamclient64.dll");
+    handle_already_loaded(L"tier0_s64.dll");
 
-    LdrRegisterDllNotification = reinterpret_cast<LdrRegisterDllNotification_t>((void*)GetProcAddress(ntdllModule, "LdrRegisterDllNotification"));
-    LdrUnregisterDllNotification = reinterpret_cast<LdrUnregisterDllNotification_t>((void*)GetProcAddress(ntdllModule, "LdrUnregisterDllNotification"));
+    LdrRegisterDllNotification = reinterpret_cast<LdrRegisterDllNotification_t>((void*)GetProcAddress(ntdll_module, "LdrRegisterDllNotification"));
+    LdrUnregisterDllNotification = reinterpret_cast<LdrUnregisterDllNotification_t>((void*)GetProcAddress(ntdll_module, "LdrUnregisterDllNotification"));
 
     if (!LdrRegisterDllNotification || !LdrUnregisterDllNotification) {
-        MessageBoxA(NULL, "Failed to get address for LdrRegisterDllNotification or LdrUnregisterDllNotification", "Error", MB_ICONERROR | MB_OK);
+        platform::messagebox::show("Millennium", "Failed to get address for LdrRegisterDllNotification or LdrUnregisterDllNotification", platform::messagebox::error);
         return false;
     }
 
-    auto dllRegStatus = NT_SUCCESS(LdrRegisterDllNotification(0, DllNotificationCallback, nullptr, &g_NotificationCookie));
+    auto dll_reg_status = NT_SUCCESS(LdrRegisterDllNotification(0, dll_notification_callback, nullptr, &g_notification_cookie));
 
     logger.log("[SH_Hook] Waiting for Steam UI to load...");
 
     /** wait for steamui.dll to load (which signifies Steam is actually starting and not updating/verifying files) */
-    std::unique_lock<std::mutex> lk(mtx_hasSteamUIStartedLoading);
-    cv_hasSteamUIStartedLoading.wait(lk, [] { return atm_hasSteamUILoaded.load(); });
-#elif MILLENNIUM_32BIT
-    bool dllRegStatus = true;
-#endif
-    const auto endTime = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - startTime).count();
-    logger.log("[SH_Hook] Steam UI loaded in {} ms, continuing Millennium startup...", endTime);
+    millennium_lifecycle::get().steam_ui_loaded.wait();
+
+    const auto end_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - start_time).count();
+    logger.log("[SH_Hook] Steam UI loaded in {} ms, continuing Millennium startup...", end_time);
 
     /** only hook if developer mode is enabled */
     if (CommandLineArguments::has_argument("-dev")) {
-        g_rdcw_hook = snare_inline_new(reinterpret_cast<void*>(&ReadDirectoryChangesW), reinterpret_cast<void*>(&Hooked_ReadDirectoryChangesW));
+        g_rdcw_hook = snare_inline_new(reinterpret_cast<void*>(&ReadDirectoryChangesW), reinterpret_cast<void*>(&hooked_read_directory_changes_w));
         if (g_rdcw_hook) snare_inline_install(g_rdcw_hook);
     }
 
-    return dllRegStatus;
+    return dll_reg_status;
 }
 
-void UninitializeSteamHooks()
+void uninitialize_steam_hooks()
 {
-    if (g_rdcw_hook)   { snare_inline_remove(g_rdcw_hook);   snare_inline_free(g_rdcw_hook);   g_rdcw_hook   = nullptr; }
-    if (g_create_hook) { snare_inline_remove(g_create_hook); snare_inline_free(g_create_hook); g_create_hook = nullptr; }
+    if (g_rdcw_hook) {
+        snare_inline_remove(g_rdcw_hook);
+        snare_inline_free(g_rdcw_hook);
+        g_rdcw_hook = nullptr;
+    }
+    if (g_create_hook) {
+        snare_inline_remove(g_create_hook);
+        snare_inline_free(g_create_hook);
+        g_create_hook = nullptr;
+    }
 }
 #elif __linux__
 #include "millennium/logger.h"
@@ -642,7 +405,7 @@ static snare_inline create_hook;
  * Even if we mistyped them, it doesn't change the actual underlying data being sent in memory.
  * I assume it has something to with working directory &| flags
  */
-extern "C" int Hooked_CreateSimpleProcess(const char* cmd, unsigned int a2, const char* a3)
+extern "C" int hooked_create_simple_process(const char* cmd, unsigned int a2, const char* a3)
 {
     /** temporarily remove the hook to prevent recursive hook calls */
     snare_inline::scoped_remove remove(&create_hook);
@@ -651,7 +414,7 @@ extern "C" int Hooked_CreateSimpleProcess(const char* cmd, unsigned int a2, cons
     return reinterpret_cast<int (*)(const char* cmd, unsigned int flags, const char* cwd)>(create_hook.get_src())(cmd, a2, a3);
 }
 
-static void* GetModuleHandle(const char* libneedle, const char* symbol)
+static void* get_module_handle(const char* libneedle, const char* symbol)
 {
     void* handle = dlopen(libneedle, RTLD_NOW | RTLD_NOLOAD);
     if (handle) {
@@ -666,21 +429,21 @@ static void* GetModuleHandle(const char* libneedle, const char* symbol)
     return nullptr;
 }
 
-bool InitializeSteamHooks()
+bool initialize_steam_hooks()
 {
     const char* libneedle = "libtier0_s.so";
     const char* symbol = "CreateSimpleProcess";
 
-    STEAM_DEVELOPER_TOOLS_PORT = std::to_string(GetRandomOpenPort());
+    STEAM_DEVELOPER_TOOLS_PORT = std::to_string(bind_random_port());
 
-    void* target = GetModuleHandle(libneedle, symbol);
+    void* target = get_module_handle(libneedle, symbol);
     if (!target) {
         LOG_ERROR("Failed to locate symbol '{}'", symbol);
         return false;
     }
 
     logger.log("Located {} at address {}", symbol, target);
-    const bool success = create_hook.install(target, (void*)Hooked_CreateSimpleProcess);
+    const bool success = create_hook.install(target, (void*)hooked_create_simple_process);
     logger.log("Hook install success?: {}", success);
     return true;
 }
@@ -690,63 +453,63 @@ bool InitializeSteamHooks()
 #include <filesystem>
 #include <unistd.h>
 
-bool InitializeSteamHooks()
+bool initialize_steam_hooks()
 {
-    const char* configuredPort = std::getenv("MILLENNIUM_DEBUG_PORT");
-    if (configuredPort && configuredPort[0] != '\0') {
-        STEAM_DEVELOPER_TOOLS_PORT = configuredPort;
+    const char* configured_port = std::getenv("MILLENNIUM_DEBUG_PORT");
+    if (configured_port && configured_port[0] != '\0') {
+        STEAM_DEVELOPER_TOOLS_PORT = configured_port;
     } else {
         STEAM_DEVELOPER_TOOLS_PORT = DEFAULT_DEVTOOLS_PORT;
     }
 
-    std::filesystem::path helperHookPath;
-    std::filesystem::path childHookPath;
+    std::filesystem::path helper_hook_path;
+    std::filesystem::path child_hook_path;
 
-    const char* configuredHookPath = std::getenv("MILLENNIUM_HOOK_HELPER_PATH");
-    if (configuredHookPath && configuredHookPath[0] != '\0') {
-        helperHookPath = configuredHookPath;
+    const char* configured_hook_path = std::getenv("MILLENNIUM_HOOK_HELPER_PATH");
+    if (configured_hook_path && configured_hook_path[0] != '\0') {
+        helper_hook_path = configured_hook_path;
     } else {
-        const char* runtimePath = std::getenv("MILLENNIUM_RUNTIME_PATH");
-        if (runtimePath && runtimePath[0] != '\0') {
-            const std::filesystem::path runtimeDirectory = std::filesystem::path(runtimePath).parent_path();
-            helperHookPath = runtimeDirectory / "libmillennium_hhx64.dylib";
-            childHookPath = runtimeDirectory / "libmillennium_child_hook.dylib";
+        const char* runtime_path = std::getenv("MILLENNIUM_RUNTIME_PATH");
+        if (runtime_path && runtime_path[0] != '\0') {
+            const std::filesystem::path runtime_directory = std::filesystem::path(runtime_path).parent_path();
+            helper_hook_path = runtime_directory / "libmillennium_hhx64.dylib";
+            child_hook_path = runtime_directory / "libmillennium_child_hook.dylib";
         }
     }
 
-    const char* configuredChildHookPath = std::getenv("MILLENNIUM_CHILD_HOOK_PATH");
-    if (configuredChildHookPath && configuredChildHookPath[0] != '\0') {
-        childHookPath = configuredChildHookPath;
+    const char* configured_child_hook_path = std::getenv("MILLENNIUM_CHILD_HOOK_PATH");
+    if (configured_child_hook_path && configured_child_hook_path[0] != '\0') {
+        child_hook_path = configured_child_hook_path;
     }
 
-    if (helperHookPath.empty()) {
-        const char* steamPath = std::getenv("MILLENNIUM__STEAM_PATH");
-        if (steamPath && steamPath[0] != '\0') {
-            const std::filesystem::path steamDirectory = steamPath;
-            helperHookPath = steamDirectory / "libmillennium_hhx64.dylib";
-            if (childHookPath.empty()) {
-                childHookPath = steamDirectory / "libmillennium_child_hook.dylib";
+    if (helper_hook_path.empty()) {
+        const char* steam_path = std::getenv("MILLENNIUM__STEAM_PATH");
+        if (steam_path && steam_path[0] != '\0') {
+            const std::filesystem::path steam_directory = steam_path;
+            helper_hook_path = steam_directory / "libmillennium_hhx64.dylib";
+            if (child_hook_path.empty()) {
+                child_hook_path = steam_directory / "libmillennium_child_hook.dylib";
             }
         }
     }
 
-    if (helperHookPath.empty()) {
+    if (helper_hook_path.empty()) {
         logger.warn("macOS bootstrap-based helper injection could not resolve libmillennium_hhx64.dylib.");
         return false;
     }
 
-    if (access(helperHookPath.c_str(), R_OK) != 0) {
-        logger.warn("macOS bootstrap-based helper injection is not available because '{}' is missing.", helperHookPath.string());
+    if (access(helper_hook_path.c_str(), R_OK) != 0) {
+        logger.warn("macOS bootstrap-based helper injection is not available because '{}' is missing.", helper_hook_path.string());
         return false;
     }
 
-    if (childHookPath.empty()) {
+    if (child_hook_path.empty()) {
         logger.warn("macOS bootstrap-based helper injection could not resolve libmillennium_child_hook.dylib.");
         return false;
     }
 
-    if (access(childHookPath.c_str(), R_OK) != 0) {
-        logger.warn("macOS bootstrap-based helper injection is not available because '{}' is missing.", childHookPath.string());
+    if (access(child_hook_path.c_str(), R_OK) != 0) {
+        logger.warn("macOS bootstrap-based helper injection is not available because '{}' is missing.", child_hook_path.string());
         return false;
     }
 
@@ -755,17 +518,16 @@ bool InitializeSteamHooks()
 }
 #endif
 
-void Plat_WaitForBackendLoad()
+void platform::wait_for_backend_load()
 {
     logger.log("__backend_load was called!");
-    cv_hasBackendsLoaded.notify_all();
-    atm_hasBackendsAlreadyLoaded.store(true);
+    millennium_lifecycle::get().backends_loaded.notify();
 }
 
-bool Plat_InitializeSteamHooks()
+bool platform::initialize_steam_hooks()
 {
 #if defined(_WIN32) || defined(__linux__) || defined(__APPLE__)
-    return InitializeSteamHooks();
+    return ::initialize_steam_hooks();
 #else
     return false;
 #endif

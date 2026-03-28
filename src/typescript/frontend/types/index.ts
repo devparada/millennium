@@ -143,6 +143,8 @@ export interface Plugin {
 	description?: string;
 	venv?: string;
 	version?: string;
+	useBackend?: boolean;
+	backendType?: string;
 	__private_browser_extension?: boolean;
 }
 

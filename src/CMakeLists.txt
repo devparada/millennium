@@ -98,7 +98,7 @@ if(WIN32)
 
     list(APPEND SOURCE_FILES "platform/windows.cc")
     list(APPEND SOURCE_FILES "${CMAKE_BINARY_DIR}/millennium_version.rc")
-    if(CMAKE_BUILD_TYPE STREQUAL "Release")
+    if(CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
         list(APPEND SOURCE_FILES "${MILLENNIUM_BASE}/scripts/resources.rc")
     endif()
 elseif(APPLE)

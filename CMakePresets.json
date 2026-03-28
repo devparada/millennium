@@ -97,6 +97,17 @@
         "CMAKE_C_FLAGS": "-m32",
         "CMAKE_BUILD_TYPE": "Release"
       }
+    },
+    {
+      "name": "linux-arch-pkgbuild",
+      "inherits": "linux-release",
+      "displayName": "linux-arch-pkgbuild",
+      "description": "Arch Linux PKGBUILD build (RelWithDebInfo, remapped debug paths)",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "CMAKE_CXX_FLAGS": "-m32 -fdebug-prefix-map=${sourceDir}/= -fmacro-prefix-map=${sourceDir}/=",
+        "CMAKE_C_FLAGS": "-m32 -fdebug-prefix-map=${sourceDir}/= -fmacro-prefix-map=${sourceDir}/="
+      }
     }
   ]
 }

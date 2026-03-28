@@ -29,7 +29,7 @@
  */
 
 import React, { createContext, useContext } from 'react';
-import { PyResyncUpdates } from '../../utils/ffi';
+import { Core_GetUpdates } from '../../utils/ffi';
 import { pluginSelf } from '@steambrew/client';
 import { UpdateItemType } from './UpdateCard';
 
@@ -129,7 +129,7 @@ const opSetPluginProgress = (key: string, progress: InstallerProgress | null) =>
 const _fetchAvailableUpdates = async (force: boolean = false): Promise<boolean> => {
 	try {
 		if (force || !pluginSelf.hasCheckedForUpdates) {
-			const updates = JSON.parse(await PyResyncUpdates({ force: true }));
+			const updates = JSON.parse(await Core_GetUpdates({ force: true }));
 			pluginSelf.updates.themes = updates.themes;
 			pluginSelf.updates.plugins = updates.plugins;
 			pluginSelf.hasCheckedForUpdates = true;

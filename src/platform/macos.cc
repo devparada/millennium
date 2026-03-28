@@ -39,7 +39,7 @@
 extern "C" void Plat_InstallMacOSMenuItems();
 extern "C" void Plat_InstallMacOSNativeWindowStyling();
 
-bool Plat_ShouldSetupEnvironment()
+bool platform::should_setup_environment()
 {
     char path[PATH_MAX];
     uint32_t path_size = static_cast<uint32_t>(sizeof(path));
@@ -62,13 +62,13 @@ bool Plat_ShouldSetupEnvironment()
     return true;
 }
 
-void Plat_BeforeAttachMillennium()
+void platform::before_attach_millennium()
 {
     Plat_InstallMacOSMenuItems();
     Plat_InstallMacOSNativeWindowStyling();
 }
 
-void Plat_AfterDetachMillennium()
+void platform::after_detach_millennium()
 {
 }
 #endif

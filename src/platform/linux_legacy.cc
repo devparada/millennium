@@ -112,7 +112,7 @@ int Deprecated_HookedMain(int argc, char** argv, char** envp)
     int steam_main = fnMainOriginal(argc, argv, envp);
     logger.log("Hooked Steam entry returned {}", steam_main);
 
-    g_shouldTerminateMillennium->flag.store(true);
+    millennium_lifecycle::get().terminate.store(true);
     g_millenniumThread->join();
 
     logger.log("Shutting down Millennium...");

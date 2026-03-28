@@ -63,8 +63,7 @@ CONSTRUCTOR VOID Win32_InitializeEnvironment(VOID)
     }
 }
 
-extern std::mutex mtx_hasSteamUIStartedLoading;
-extern std::condition_variable cv_hasSteamUIStartedLoading;
+#include "millennium/millennium_lifecycle.h"
 
 BOOL AreFilesIdentical(LPCWSTR path1, LPCWSTR path2)
 {
@@ -198,15 +197,19 @@ static VOID Win32_MigrateLegacyLayout(VOID)
         }
 
         /** move data directories */
-        auto safe_rename = [&](const fs::path& src, const fs::path& dst) {
+        auto safe_rename = [&](const fs::path& src, const fs::path& dst)
+        {
             if (fs::exists(src, ec) && !fs::exists(dst, ec)) {
                 fs::rename(src, dst, ec);
-                if (ec) { logger.warn("Migration: rename {} failed: {}", src.string(), ec.message()); ec.clear(); }
+                if (ec) {
+                    logger.warn("Migration: rename {} failed: {}", src.string(), ec.message());
+                    ec.clear();
+                }
             }
         };
 
         safe_rename(steam / "ext" / "data" / "assets", millennium / "ext" / "data" / "assets");
-        safe_rename(steam / "ext" / "data" / "shims",  millennium / "ext" / "data" / "shims");
+        safe_rename(steam / "ext" / "data" / "shims", millennium / "ext" / "data" / "shims");
 
         /** move plugins and themes (entry-by-entry so symlinks are preserved) */
         move_directory_entries(steam / "plugins", millennium / "plugins");
@@ -264,7 +267,7 @@ VOID Win32_AttachMillennium(VOID)
     Win32_MigrateLegacyLayout();
 
     /** Starts the CEF arg hook, it doesn't wait for the hook to be installed, it waits for the hook to be setup */
-    if (!Plat_InitializeSteamHooks()) {
+    if (!platform::initialize_steam_hooks()) {
         platform::messagebox::show("Millennium Error", "Failed to initialize Steam hooks, Millennium cannot continue startup.", platform::messagebox::error);
     }
 
@@ -278,7 +281,7 @@ VOID Win32_AttachMillennium(VOID)
     g_millennium->entry();
     logger.log("[Win32_AttachMillennium] Millennium main function has returned, proceeding with shutdown...");
 
-    UninitializeSteamHooks();
+    uninitialize_steam_hooks();
     /** Deallocate the developer console */
     if (CommandLineArguments::has_argument("-dev")) {
         FreeConsole();
@@ -294,7 +297,7 @@ VOID Win32_AttachMillennium(VOID)
 VOID Win32_DetachMillennium(VOID)
 {
     logger.print(" MAIN ", "Shutting Millennium down...", COL_MAGENTA);
-    g_shouldTerminateMillennium->flag.store(true);
+    millennium_lifecycle::get().terminate.store(true);
     logger.log("Waiting for Millennium thread to exit...");
 
     if (!g_millenniumThread.joinable()) {
@@ -318,14 +321,7 @@ DLL_EXPORT INT WINAPI DllMain([[maybe_unused]] HINSTANCE hinstDLL, DWORD fdwReas
     switch (fdwReason) {
         case DLL_PROCESS_ATTACH:
         {
-#if defined(MILLENNIUM_32BIT)
-            const char* plat = "32-bit";
-#elif defined(MILLENNIUM_64BIT)
-            const char* plat = "64-bit";
-#else
-#error "Unsupported Platform"
-#endif
-            logger.log("Millennium-{}@{} attached...", plat, MILLENNIUM_VERSION);
+            logger.log("Millennium-x86_64@{} attached...", MILLENNIUM_VERSION);
 
             g_millenniumThread = std::thread(Win32_AttachMillennium);
             break;

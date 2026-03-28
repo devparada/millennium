@@ -32,7 +32,7 @@ import { DialogButton, DialogControlsSection, joinClassNames, pluginSelf } from 
 import { ThemeItem } from '../../types';
 import { locale } from '../../utils/localization-manager';
 import { Placeholder } from '../../components/Placeholder';
-import { PyFindAllThemes } from '../../utils/ffi';
+import { Core_FindAllThemes } from '../../utils/ffi';
 import { Component } from 'react';
 import { ChangeActiveTheme, ThemeItemComponent, UIReloadProps } from './ThemeComponent';
 import { settingsClasses } from '../../utils/classes';
@@ -41,7 +41,7 @@ import { FaFolderOpen, FaPaintRoller, FaStore } from 'react-icons/fa';
 import { Utils } from '../../utils';
 
 const findAllThemes = async (): Promise<ThemeItem[]> => {
-	return JSON.parse(await PyFindAllThemes());
+	return JSON.parse(await Core_FindAllThemes());
 };
 
 interface ThemeViewModalState {

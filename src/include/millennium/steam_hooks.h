@@ -38,7 +38,7 @@
 #include <asio/ip/tcp.hpp>
 #define DEFAULT_DEVTOOLS_PORT "8080"
 extern std::string STEAM_DEVELOPER_TOOLS_PORT;
-const char* GetAppropriateDevToolsPort(const bool isDevMode);
+const char* get_devtools_port(const bool isDevMode);
 
 #ifdef _WIN32
 #include <iostream>
@@ -64,14 +64,16 @@ typedef VOID(CALLBACK* PLDR_DLL_NOTIFICATION_FUNCTION)(ULONG NotificationReason,
 typedef NTSTATUS(NTAPI* LdrRegisterDllNotification_t)(ULONG Flags, PLDR_DLL_NOTIFICATION_FUNCTION NotificationFunction, PVOID Context, PVOID* Cookie);
 typedef NTSTATUS(NTAPI* LdrUnregisterDllNotification_t)(PVOID Cookie);
 
-bool InitializeSteamHooks();
-void UninitializeSteamHooks();
+bool initialize_steam_hooks();
+void uninitialize_steam_hooks();
 
-bool Millennium_Plat_CommandLineIsSetup();
 bool SetupEntryPointHook();
 #elif defined(__linux__) || defined(__APPLE__)
-bool InitializeSteamHooks();
+bool initialize_steam_hooks();
 #endif
 
-void Plat_WaitForBackendLoad();
-bool Plat_InitializeSteamHooks();
+namespace platform
+{
+void wait_for_backend_load();
+bool initialize_steam_hooks();
+} // namespace platform

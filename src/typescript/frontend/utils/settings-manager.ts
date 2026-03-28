@@ -28,7 +28,7 @@
  * SOFTWARE.
  */
 
-import { PyGetBackendConfig, PySetBackendConfig } from './ffi';
+import { Core_GetBackendConfig, Core_SetBackendConfig } from './ffi';
 import { AppConfig } from './AppConfig';
 
 class SettingsManager {
@@ -37,7 +37,7 @@ class SettingsManager {
 	private pendingUpdates: ((draft: AppConfig) => void)[] = [];
 
 	constructor() {
-		PyGetBackendConfig().then((cfg) => {
+		Core_GetBackendConfig().then((cfg) => {
 			this.settings = JSON.parse(cfg) as AppConfig;
 		});
 	}
@@ -81,7 +81,7 @@ class SettingsManager {
 	 * In the case no provider is available, the config will not be saved; so this function is used to force the config to be saved.
 	 */
 	public forceSaveConfig() {
-		PySetBackendConfig({ config: JSON.stringify(this.settings), skip_propagation: true });
+		Core_SetBackendConfig({ config: JSON.stringify(this.settings), skip_propagation: true });
 	}
 }
 

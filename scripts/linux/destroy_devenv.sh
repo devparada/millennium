@@ -25,7 +25,6 @@ remove_if_symlink() {
 
 remove_if_symlink "${U32}/libXtst.so.6"
 remove_if_symlink "${U64}/libXtst.so.6"
-remove_if_symlink "${U64}/libmillennium_hhx64.so"
 
 echo ""
 echo "dev environment removed. restart Steam to apply."

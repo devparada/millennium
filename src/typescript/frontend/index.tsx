@@ -38,13 +38,14 @@ import { MillenniumDesktopSidebar } from './quick-access';
 import { DesktopMenuProvider } from './quick-access/DesktopMenuContext';
 import { handleSettingsReturnNavigation, MillenniumSettings } from './settings';
 import { MillenniumQuickCssEditor } from './settings/quickcss';
-import { PluginCrashInfo, SettingsProps, SystemAccentColor, ThemeItem, ThemeItemV1 } from './types';
-import { PyGetRootColors, PyGetStartupConfig } from './utils/ffi';
+import { PluginComponent, PluginCrashInfo, SettingsProps, SystemAccentColor, ThemeItem, ThemeItemV1 } from './types';
+import { Core_FindAllPlugins, Core_GetRootColors, Core_GetStartConfig } from './utils/ffi';
 import { Logger } from './utils/Logger';
 import { useQuickCssState } from './utils/quick-css-state';
 import { NotificationService } from './utils/update-notification-service';
 import { OnRunSteamURL } from './utils/url-scheme-handler';
-import { showPluginCrashToast } from './components/PluginCrashModal';
+import { showPluginCrashModal } from './components/PluginCrashModal';
+import { showLegacyPluginModal } from './components/LegacyPluginModal';
 
 async function initializeMillennium(settings: SettingsProps) {
 	Logger.Log(`Received props`, settings);
@@ -63,7 +64,7 @@ async function initializeMillennium(settings: SettingsProps) {
 
 	if (theme?.data?.hasOwnProperty('RootColors')) {
 		try {
-			const rootColors = JSON.parse(await PyGetRootColors());
+			const rootColors = JSON.parse(await Core_GetRootColors());
 			pluginSelf.RootColors = rootColors;
 		} catch (error) {
 			Logger.Error('Failed to load root colors from backend', error);
@@ -95,10 +96,31 @@ async function initializeMillennium(settings: SettingsProps) {
 
 	const crashQueue: PluginCrashInfo[] = [];
 	let mainWindowReady = false;
+	let mainWindowReadyAt = 0;
+
+	const showAfterDelay = (detail: PluginCrashInfo) => {
+		const elapsed = Date.now() - mainWindowReadyAt;
+		const remaining = Math.max(0, 5000 - elapsed);
+		setTimeout(() => showPluginCrashModal(detail), remaining);
+	};
+
+	const checkLegacyPlugins = async () => {
+		try {
+			const plugins: PluginComponent[] = JSON.parse(await Core_FindAllPlugins());
+			const legacy = plugins.filter((p) => p.enabled && p.data.useBackend !== false && p.data.backendType !== 'lua');
+			if (legacy.length) {
+				showLegacyPluginModal(legacy);
+			}
+		} catch (e) {
+			Logger.Error('Failed to check for legacy plugins', e);
+		}
+	};
 
 	const flushCrashQueue = () => {
 		mainWindowReady = true;
-		crashQueue.splice(0).forEach(showPluginCrashToast);
+		mainWindowReadyAt = Date.now();
+		crashQueue.splice(0).forEach(showAfterDelay);
+		setTimeout(checkLegacyPlugins, 5000);
 	};
 
 	window.addEventListener('millennium-main-window-ready', flushCrashQueue, { once: true });
@@ -106,7 +128,7 @@ async function initializeMillennium(settings: SettingsProps) {
 	window.addEventListener('millennium-plugin-crash', (e: Event) => {
 		const detail = (e as CustomEvent).detail;
 		Logger.Log('Received real-time crash event for plugin:', detail?.plugin);
-		if (mainWindowReady) showPluginCrashToast(detail);
+		if (mainWindowReady) showAfterDelay(detail);
 		else crashQueue.push(detail);
 	});
 
@@ -114,14 +136,14 @@ async function initializeMillennium(settings: SettingsProps) {
 	   The data comes from Core_GetStartConfig — no async poll needed. */
 	if (settings?.pendingCrashes?.length) {
 		Logger.Log(`Startup config contains ${settings.pendingCrashes.length} pending crash(es)`);
-		settings.pendingCrashes.forEach(d => crashQueue.push(d));
+		settings.pendingCrashes.forEach((d) => crashQueue.push(d));
 	}
 }
 
 // Entry point on the front end of your plugin
 export default async function PluginMain() {
 	try {
-		await initializeMillennium(JSON.parse(await PyGetStartupConfig()));
+		await initializeMillennium(JSON.parse(await Core_GetStartConfig()));
 	} catch (error) {
 		Logger.Error('Millennium frontend initialization failed, continuing with route registration.', error);
 	}

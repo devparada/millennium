@@ -36,6 +36,9 @@
 #include "millennium/logger.h"
 #include "millennium/encoding.h"
 #include "millennium/zip.h"
+#ifdef _WIN32
+#include "millennium/plat_msg.h"
+#endif
 
 #include <filesystem>
 #include <exception>
@@ -85,8 +88,8 @@ void millennium_updater::check_for_updates()
     return;
 #endif
 
-    const bool checkForUpdates = CONFIG.get({"general", "checkForMillenniumUpdates"}, true).get<bool>();
-    std::string channel = CONFIG.get({"general", "millenniumUpdateChannel"}, "stable").get<std::string>();
+    const bool checkForUpdates = CONFIG.get({ "general", "checkForMillenniumUpdates" }, true).get<bool>();
+    std::string channel = CONFIG.get({ "general", "millenniumUpdateChannel" }, "stable").get<std::string>();
 
     if (!checkForUpdates) {
         logger.warn("User has disabled update checking for Millennium.");
@@ -502,7 +505,7 @@ void millennium_updater::win32_update_legacy_shims()
 
     } catch (std::exception& e) {
         LOG_ERROR("Failed to update {}: {}", SHIM_LOADER_PATH, e.what());
-        MessageBoxA(NULL, fmt::format("Failed to update {}, it's recommended that you reinstall Millennium.", SHIM_LOADER_PATH).c_str(), "Oops!", MB_ICONERROR | MB_OK);
+        platform::messagebox::show("Millennium", fmt::format("Failed to update {}, it's recommended that you reinstall Millennium.", SHIM_LOADER_PATH), platform::messagebox::error);
     }
 #endif
 }

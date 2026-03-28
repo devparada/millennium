@@ -36,7 +36,7 @@ import { DesktopSideBarFocusedItemType } from '../../quick-access/DesktopMenuCon
 import { useQuickAccessStore } from '../../quick-access/quickAccessStore';
 import { PluginComponent } from '../../types';
 import { Utils } from '../../utils';
-import { PyUninstallPlugin, PyPluginConfigGetAll, PyPluginConfigDeleteAll } from '../../utils/ffi';
+import { Core_UninstallPlugin, PluginConfig_GetAll, PluginConfig_DeleteAll } from '../../utils/ffi';
 import { formatString, locale } from '../../utils/localization-manager';
 import { MillenniumIcons } from '../../components/Icons';
 import { showPluginCrashModal } from '../../components/PluginCrashModal';
@@ -72,7 +72,7 @@ export class RenderPluginComponent extends Component<PluginComponentProps> {
 		const shouldUninstall = await Utils.ShowMessageBox(formatString(locale.pluginUninstallConfirm, plugin.data.common_name), locale.strHeadsUp);
 		if (!shouldUninstall) return;
 
-		const success = JSON.parse(await PyUninstallPlugin({ pluginName: plugin.data.name }));
+		const success = JSON.parse(await Core_UninstallPlugin({ pluginName: plugin.data.name }));
 
 		if (success == false) {
 			Utils.ShowMessageBox(formatString(locale.pluginUninstallFailed, plugin.data.common_name), locale.errorMessageTitle, {
@@ -80,14 +80,14 @@ export class RenderPluginComponent extends Component<PluginComponentProps> {
 			});
 		} else {
 			try {
-				const configData = JSON.parse(await PyPluginConfigGetAll({ pluginName: plugin.data.name }));
+				const configData = JSON.parse(await PluginConfig_GetAll({ pluginName: plugin.data.name }));
 				if (configData && Object.keys(configData).length > 0) {
 					const shouldDelete = await Utils.ShowMessageBox(
 						formatString(locale.pluginDeleteConfigPrompt ?? 'Do you want to delete saved settings for {0}?', plugin.data.common_name),
 						locale.strHeadsUp,
 					);
 					if (shouldDelete) {
-						await PyPluginConfigDeleteAll({ pluginName: plugin.data.name });
+						await PluginConfig_DeleteAll({ pluginName: plugin.data.name });
 					}
 				}
 			} catch {
