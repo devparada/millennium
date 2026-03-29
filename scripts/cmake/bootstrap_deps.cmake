@@ -86,48 +86,59 @@ if(DISTRO_NIX)
     FetchContent_Declare(zlib           SOURCE_DIR "${MILLENNIUM_BASE}/deps/zlib"                                 )
     FetchContent_Declare(luajit         SOURCE_DIR "${MILLENNIUM_BASE}/deps/luajit"         SOURCE_SUBDIR fakedir )
     FetchContent_Declare(lua_cjson      SOURCE_DIR "${MILLENNIUM_BASE}/deps/luajson"        SOURCE_SUBDIR fakedir )
-    FetchContent_Declare(websocketpp    SOURCE_DIR "${MILLENNIUM_BASE}/deps/websocketpp"    SOURCE_SUBDIR fakedir )
     FetchContent_Declare(fmt            SOURCE_DIR "${MILLENNIUM_BASE}/deps/fmt"            SOURCE_SUBDIR fakedir )
     FetchContent_Declare(nlohmann_json  SOURCE_DIR "${MILLENNIUM_BASE}/deps/json"           SOURCE_SUBDIR fakedir )
     FetchContent_Declare(minizip_ng     SOURCE_DIR "${MILLENNIUM_BASE}/deps/minizip"        SOURCE_SUBDIR fakedir )
     FetchContent_Declare(curl           SOURCE_DIR "${MILLENNIUM_BASE}/deps/curl"           SOURCE_SUBDIR fakedir )
     FetchContent_Declare(incbin         SOURCE_DIR "${MILLENNIUM_BASE}/deps/incbin"         SOURCE_SUBDIR fakedir )
-    FetchContent_Declare(asio           SOURCE_DIR "${MILLENNIUM_BASE}/deps/asio"           SOURCE_SUBDIR fakedir )
 else()
     set(THIRDPARTY_DIR "${MILLENNIUM_BASE}/thirdparty")
     FetchContent_Declare(zlib          URL "file://${THIRDPARTY_DIR}/zlib-2.2.5.tar.gz"           DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
     FetchContent_Declare(luajit        URL "file://${THIRDPARTY_DIR}/luajit-89550023.tar.gz"        DOWNLOAD_EXTRACT_TIMESTAMP TRUE SOURCE_SUBDIR fakedir)
     FetchContent_Declare(lua_cjson     URL "file://${THIRDPARTY_DIR}/lua_cjson-0c1fabf0.tar.gz"    DOWNLOAD_EXTRACT_TIMESTAMP TRUE SOURCE_SUBDIR fakedir)
-    FetchContent_Declare(websocketpp   URL "file://${THIRDPARTY_DIR}/websocketpp-0.8.2.tar.gz"     DOWNLOAD_EXTRACT_TIMESTAMP TRUE SOURCE_SUBDIR fakedir)
     FetchContent_Declare(fmt           URL "file://${THIRDPARTY_DIR}/fmt-12.0.0.tar.gz"            DOWNLOAD_EXTRACT_TIMESTAMP TRUE SOURCE_SUBDIR fakedir)
     FetchContent_Declare(nlohmann_json URL "file://${THIRDPARTY_DIR}/nlohmann_json-v3.12.0.tar.gz" DOWNLOAD_EXTRACT_TIMESTAMP TRUE SOURCE_SUBDIR fakedir)
     FetchContent_Declare(minizip_ng    URL "file://${THIRDPARTY_DIR}/minizip_ng-4.0.10.tar.gz"     DOWNLOAD_EXTRACT_TIMESTAMP TRUE SOURCE_SUBDIR fakedir)
     FetchContent_Declare(curl          URL "file://${THIRDPARTY_DIR}/curl-8_13_0.tar.gz"           DOWNLOAD_EXTRACT_TIMESTAMP TRUE SOURCE_SUBDIR fakedir)
     FetchContent_Declare(incbin        URL "file://${THIRDPARTY_DIR}/incbin-22061f51.tar.gz"        DOWNLOAD_EXTRACT_TIMESTAMP TRUE SOURCE_SUBDIR fakedir)
-    FetchContent_Declare(asio          URL "file://${THIRDPARTY_DIR}/asio-1-30-0.tar.gz"           DOWNLOAD_EXTRACT_TIMESTAMP TRUE SOURCE_SUBDIR fakedir)
 endif()
 
-set(DEPENDENCIES zlib luajit incbin websocketpp fmt nlohmann_json minizip_ng lua_cjson curl asio)
+set(DEPENDENCIES zlib luajit incbin fmt nlohmann_json minizip_ng lua_cjson curl)
 
+set(_saved_msg_level "${CMAKE_MESSAGE_LOG_LEVEL}")
+set(CMAKE_MESSAGE_LOG_LEVEL WARNING)
 
 foreach(dep ${DEPENDENCIES})
     string(TIMESTAMP start_time "%s")
     FetchContent_MakeAvailable(${dep})
     string(TIMESTAMP end_time "%s")
     math(EXPR duration "${end_time} - ${start_time}")
+
+    set(CMAKE_MESSAGE_LOG_LEVEL "${_saved_msg_level}")
     message(STATUS "[Millennium] ${dep} completed in ${duration} seconds")
+    set(CMAKE_MESSAGE_LOG_LEVEL WARNING)
 endforeach()
 
 if(MSVC)
-    foreach(_curl_target libcurl_object libcurl_static libcurl)
-        if(TARGET ${_curl_target})
-            get_target_property(_opts ${_curl_target} COMPILE_OPTIONS)
-            if(_opts)
-                list(REMOVE_ITEM _opts /W4)
-                set_target_properties(${_curl_target} PROPERTIES COMPILE_OPTIONS "${_opts}")
-            endif()
-        endif()
-    endforeach()
+    if(EXISTS "${curl_SOURCE_DIR}/CMake/PickyWarnings.cmake")
+        file(READ "${curl_SOURCE_DIR}/CMake/PickyWarnings.cmake" _pw_content)
+        string(REPLACE
+            "  list(APPEND _picky \"-W4\")"
+            "  if(PICKY_COMPILER)\n    list(APPEND _picky \"-W4\")\n  endif()"
+            _pw_content "${_pw_content}"
+        )
+        file(WRITE "${curl_SOURCE_DIR}/CMake/PickyWarnings.cmake" "${_pw_content}")
+        unset(_pw_content)
+    endif()
+    set(PICKY_COMPILER OFF CACHE BOOL "" FORCE)
+
+    # Patch minizip-ng to not add /W3 in Debug builds; same D9025 root cause.
+    if(EXISTS "${minizip_ng_SOURCE_DIR}/CMakeLists.txt")
+        file(READ "${minizip_ng_SOURCE_DIR}/CMakeLists.txt" _mz_content)
+        string(REPLACE "add_compile_options($<$<CONFIG:Debug>:/W3>)" "" _mz_content "${_mz_content}")
+        file(WRITE "${minizip_ng_SOURCE_DIR}/CMakeLists.txt" "${_mz_content}")
+        unset(_mz_content)
+    endif()
 endif()
 
 set(LUA_INCLUDE_DIR  luajit::header)
@@ -138,7 +149,6 @@ set(LUA_LIBRARIES    luajit::lib   )
 include_directories(SYSTEM
     "${minizip_ng_SOURCE_DIR}"
     "${incbin_SOURCE_DIR}"
-    "${asio_SOURCE_DIR}/asio/include"
     "${luajit_BINARY_DIR}"
     "${luajit_SOURCE_DIR}/src"
     "${CMAKE_SOURCE_DIR}/../hhx64/include"
@@ -146,7 +156,6 @@ include_directories(SYSTEM
 
 millennium_process_package("${luajit_SOURCE_DIR}")
 millennium_process_package("${curl_SOURCE_DIR}")
-millennium_process_package("${websocketpp_SOURCE_DIR}")
 millennium_process_package("${fmt_SOURCE_DIR}")
 millennium_process_package("${nlohmann_json_SOURCE_DIR}")
 millennium_process_package("${minizip_ng_SOURCE_DIR}")
@@ -169,7 +178,7 @@ set(ZLIB_LIBRARIES "${ZLIB_LIBRARY}")
 set(ZLIB_INCLUDE_DIRS "${zlib_SOURCE_DIR};${zlib_BINARY_DIR}")
 set(ZLIB_INCLUDE_DIR "${zlib_SOURCE_DIR};${zlib_BINARY_DIR}")
 
-# Suppress warnings from third-party dependencies
+# Suppress warnings and noisy status messages from third-party dependencies
 set(_saved_c_flags   "${CMAKE_C_FLAGS}")
 set(_saved_cxx_flags "${CMAKE_CXX_FLAGS}")
 string(APPEND CMAKE_C_FLAGS   " -w")
@@ -185,6 +194,7 @@ add_subdirectory("${lua_cjson_SOURCE_DIR}"     "${lua_cjson_BINARY_DIR}"    )
 
 set(CMAKE_C_FLAGS   "${_saved_c_flags}")
 set(CMAKE_CXX_FLAGS "${_saved_cxx_flags}")
+set(CMAKE_MESSAGE_LOG_LEVEL "${_saved_msg_level}")
 
 add_dependencies(cjson luajit::lib luajit::header)
 add_dependencies(luajit zlib)

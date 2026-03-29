@@ -19,11 +19,6 @@ add_compile_definitions(
     "_CRT_SECURE_NO_WARNINGS"
     "USE_INTERNAL_FPCONV"
     "NGHTTP2_STATICLIB"
-    "_WEBSOCKETPP_CPP11_THREAD_"
-    "_WEBSOCKETPP_CPP11_TYPE_TRAITS_"
-    "_WEBSOCKETPP_CPP11_RANDOM_DEVICE_"
-    "ASIO_STANDALONE"
-    "ASIO_HAS_STD_INVOKE_RESULT"
     "FMT_HEADER_ONLY"
     "CURL_STATICLIB"
     $<$<BOOL:${WIN32}>:WIN32_LEAN_AND_MEAN>
@@ -61,8 +56,10 @@ set(SOURCE_FILES
     engine/plugin_webkit_store.cc
     engine/plugin_webkit_world_mgr.cc
     engine/thread_pool.cc
+    util/file_watcher.cc
     util/semver.cc
     util/zip.cc
+    bindings/plugin_config.cc
     bindings/css_parser.cc
     bindings/default_cfg.cc
     bindings/entry_point.cc
@@ -235,7 +232,6 @@ if(NOT DISTRO_NIX)
     add_dependencies(Millennium virtfs_header)
 endif()
 
-target_include_directories(Millennium SYSTEM PRIVATE ${websocketpp_SOURCE_DIR})
 set_target_properties(Millennium PROPERTIES
     PREFIX ""
     OUTPUT_NAME "${MILLENNIUM_OUTPUT_NAME}"
