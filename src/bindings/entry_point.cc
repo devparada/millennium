@@ -46,6 +46,7 @@
 #include "millennium/plugin_loader.h"
 #include "millennium/logger.h"
 #include "millennium/config.h"
+#include "millennium/file_watcher.h"
 #include "millennium/filesystem.h"
 #include <exception>
 #include <fstream>
@@ -72,6 +73,7 @@ int head::millennium_backend::get_operating_system()
 
 head::millennium_backend::~millennium_backend()
 {
+    m_quickcss_watcher.reset();
     logger.log("Successfully shut down millennium_backend...");
 }
 
@@ -84,7 +86,8 @@ void head::millennium_backend::init()
     m_theme_config = std::make_shared<theme_config_store>(m_plugin_manager, m_theme_webkit_mgr);
 
     auto theme_config = m_theme_config;
-    m_network_hook_ctl->set_dynamic_css_provider([theme_config]() -> std::pair<std::string, std::string> {
+    m_network_hook_ctl->set_dynamic_css_provider([theme_config]() -> std::pair<std::string, std::string>
+    {
         return { theme_config->get_colors().get<std::string>(), theme_config->get_slider_css() };
     });
 }
@@ -99,6 +102,8 @@ head::millennium_backend::millennium_backend(std::shared_ptr<network_hook_ctl> n
         register_function(Core_GetStartConfig),
         register_function(Core_LoadQuickCss),
         register_function(Core_SaveQuickCss),
+        register_function(Core_WatchQuickCss),
+        register_function(Core_UnwatchQuickCss),
         register_function(Core_GetSteamPath),
         register_function(Core_FindAllThemes),
         register_function(Core_FindAllPlugins),
@@ -234,21 +239,49 @@ builtin_payload head::millennium_backend::Core_GetStartConfig(const builtin_payl
     };
 }
 
+const std::string get_quick_css_path()
+{
+    return fmt::format("{}/quick.css", platform::environment::get("MILLENNIUM__CONFIG_PATH"));
+}
+
 /** Quick CSS utilities */
 builtin_payload head::millennium_backend::Core_LoadQuickCss(const builtin_payload&)
 {
-    const std::string quickCssPath = fmt::format("{}/quick.css", platform::environment::get("MILLENNIUM__CONFIG_PATH"));
+    const std::string quick_css_path = get_quick_css_path();
 
-    if (!std::filesystem::exists(quickCssPath)) {
-        platform::write_file(quickCssPath, "/* Quick CSS file created by Millennium */\n");
+    if (!std::filesystem::exists(quick_css_path)) {
+        platform::write_file(quick_css_path, "/* Quick CSS file created by Millennium */\n");
     }
 
-    return platform::read_file(quickCssPath);
+    return platform::read_file(quick_css_path);
 }
 builtin_payload head::millennium_backend::Core_SaveQuickCss(const builtin_payload& args)
 {
-    const std::string quickCssPath = fmt::format("{}/quick.css", platform::environment::get("MILLENNIUM__CONFIG_PATH"));
-    platform::write_file(quickCssPath, args["css"].get<std::string>());
+    const std::string quick_css_path = get_quick_css_path();
+    platform::write_file(quick_css_path, args["css"].get<std::string>());
+    return {};
+}
+builtin_payload head::millennium_backend::Core_WatchQuickCss(const builtin_payload&)
+{
+    if (m_quickcss_watcher && m_quickcss_watcher->is_running()) {
+        return {};
+    }
+
+    const std::string quick_css_path = get_quick_css_path();
+
+    m_quickcss_watcher = std::make_unique<platform::file_watcher>(quick_css_path, [this]()
+    {
+        if (m_ipc_main) {
+            const auto expression = m_ipc_main->compile_javascript_expression("core", "OnQuickCssFileChanged", {});
+            m_ipc_main->evaluate_javascript_expression(expression);
+        }
+    });
+    m_quickcss_watcher->start();
+    return {};
+}
+builtin_payload head::millennium_backend::Core_UnwatchQuickCss(const builtin_payload&)
+{
+    m_quickcss_watcher.reset();
     return {};
 }
 
