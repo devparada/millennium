@@ -75,6 +75,7 @@ const localizationFiles: { [key: string]: LocalizationData } = {
 	spanish,
 	indonesian,
 	schinese,
+	tchinese
 	german,
 	russian,
 	italian,
