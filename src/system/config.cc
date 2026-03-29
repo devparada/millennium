@@ -59,24 +59,6 @@ nlohmann::json config_manager::get(std::initializer_list<std::string> segments, 
     return def;
 }
 
-nlohmann::json config_manager::get_path(const std::string& path, const nlohmann::json& def)
-{
-    std::lock_guard<std::recursive_mutex> lock(_mutex);
-    const nlohmann::json* current = &_data;
-    size_t start = 0, end = 0;
-
-    while ((end = path.find('.', start)) != std::string::npos) {
-        std::string key = path.substr(start, end - start);
-        if (!current->contains(key)) return def;
-        current = &(*current)[key];
-        start = end + 1;
-    }
-
-    std::string last_key = path.substr(start);
-    if (!current->contains(last_key)) return def;
-    return (*current)[last_key];
-}
-
 static std::string join_segments(std::initializer_list<std::string> segments)
 {
     std::string result;
@@ -113,39 +95,6 @@ void config_manager::set(std::initializer_list<std::string> segments, const nloh
         (*current)[*last] = value;
         if (!skipPropagation) {
             notify_listeners(join_segments(segments), old_value, value);
-            save_to_disk();
-        }
-    }
-}
-
-void config_manager::set_path(const std::string& path, const nlohmann::json& value, bool skipPropagation)
-{
-    std::lock_guard<std::recursive_mutex> lock(_mutex);
-    nlohmann::json* current = &_data;
-    size_t start = 0, end = 0;
-
-    while ((end = path.find('.', start)) != std::string::npos) {
-        std::string key = path.substr(start, end - start);
-        if (!current->contains(key) || !(*current)[key].is_object()) (*current)[key] = nlohmann::json::object();
-
-        current = &(*current)[key];
-        start = end + 1;
-    }
-
-    std::string last_key = path.substr(start);
-    if (!current->is_object()) {
-        *current = nlohmann::json::object();
-    }
-
-    nlohmann::json old_value = nullptr;
-    if (current->contains(last_key)) {
-        old_value = (*current)[last_key];
-    }
-
-    if (old_value != value) {
-        (*current)[last_key] = value;
-        if (!skipPropagation) {
-            notify_listeners(path, old_value, value);
             save_to_disk();
         }
     }
