@@ -58,7 +58,8 @@ fread_data fread_file(const char* path)
     fread_data result = { 0, 0 };
 
     /** open as read bytes */
-    FILE* f = fopen(path, "rb");
+    FILE* f = nullptr;
+    fopen_s(&f, path, "rb");
     if (!f) return result;
 
     /** get the length of the file by reading to the end */

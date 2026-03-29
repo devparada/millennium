@@ -120,7 +120,14 @@ __attribute__((constructor)) static void init(void)
 #ifdef _WIN32
 #define SNARE_STATIC
 #define SNARE_IMPLEMENTATION
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+#endif
 #include "libsnare.h"
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
 extern snare_inline_t g_win32_cef_hook;
 #endif
 
@@ -196,28 +203,16 @@ extern "C" int tramp_cef_browser_host_create_browser(const void* _1, struct _cef
     }
 
 #ifdef _WIN32
-    snare_inline_remove(g_win32_cef_hook);
-    auto orig = reinterpret_cast<int(__cdecl*)(const void*, struct _cef_client_t*, void*, const void*, void*, void*)>(snare_inline_get_src(g_win32_cef_hook));
-    int result = orig(_1, c, _3, _4, _5, _6);
-    snare_inline_install(g_win32_cef_hook);
-    return result;
+    auto orig = reinterpret_cast<int(__cdecl*)(const void*, struct _cef_client_t*, void*, const void*, void*, void*)>(snare_inline_get_trampoline(g_win32_cef_hook));
+    return orig(_1, c, _3, _4, _5, _6);
 #elif __linux__
     if (!g_cef_hook) {
         fprintf(stderr, "cef_browser_host_create_browser: hook not installed, call dropped\n");
         return 0;
     }
 
-    /* temporarily remove the prologue patch to call the original without recursing */
-    void* src = snare_inline_get_src(g_cef_hook);
-    page_rwx(src);
-    snare_inline_remove(g_cef_hook);
-    page_rx(src);
-    auto orig = reinterpret_cast<decltype(&tramp_cef_browser_host_create_browser)>(src);
-    int result = orig(_1, c, _3, _4, _5, _6);
-    page_rwx(src);
-    snare_inline_install(g_cef_hook);
-    page_rx(src);
-    return result;
+    auto orig = reinterpret_cast<decltype(&tramp_cef_browser_host_create_browser)>(snare_inline_get_trampoline(g_cef_hook));
+    return orig(_1, c, _3, _4, _5, _6);
 #else
     return 0;
 #endif
