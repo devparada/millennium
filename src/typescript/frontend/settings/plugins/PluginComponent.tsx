@@ -52,6 +52,7 @@ interface PluginComponentProps {
 	refetchPlugins: () => Promise<void>;
 	allPlugins: Array<PluginComponent>;
 	isPluginConfigurable: boolean;
+	isLegacy: boolean;
 }
 
 enum TooltipType {
@@ -148,7 +149,18 @@ export class RenderPluginComponent extends Component<PluginComponentProps> {
 	}
 
 	getTooltipContent() {
-		const { plugin, hasErrors, hasWarnings } = this.props;
+		const { plugin, hasErrors, hasWarnings, isLegacy } = this.props;
+
+		if (isLegacy) {
+			return {
+				type: TooltipType.Error,
+				content: (
+					<DesktopTooltip toolTipContent={locale.legacyPluginDisabledTooltip} direction="top">
+						<IconsModule.ExclamationPoint color="red" />
+					</DesktopTooltip>
+				),
+			};
+		}
 
 		if (plugin.data.__private_browser_extension) {
 			return {
@@ -219,7 +231,7 @@ export class RenderPluginComponent extends Component<PluginComponentProps> {
 				data-plugin-common-name={plugin.data.common_name}
 				data-plugin-status={type}
 			>
-				<Toggle key={plugin.data.name} disabled={plugin.data.name === 'core'} value={isEnabled} onChange={onSelectionChange.bind(null, index)} />
+				<Toggle key={plugin.data.name} disabled={plugin.data.name === 'core' || this.props.isLegacy} value={this.props.isLegacy ? false : isEnabled} onChange={onSelectionChange.bind(null, index)} />
 				<IconButton name="KaratDown" onClick={this.showCtxMenu} text={locale.strShowMenu} />
 			</Field>
 		);
