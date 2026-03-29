@@ -48,7 +48,6 @@ class theme_config_store
     void validate_theme();
 
     json get_config();
-    void set_config(const std::string& path, const json& value);
 
     void change_theme(const std::string& theme_name);
     json get_accent_color();
