@@ -29,6 +29,9 @@ file(GLOB_RECURSE _src_core   CONFIGURE_DEPENDS
     "${TS_ROOT}/frontend/*.ts"
     "${TS_ROOT}/frontend/*.tsx"
 )
+file(GLOB _src_locales CONFIGURE_DEPENDS
+    "${MILLENNIUM_BASE}/src/locales/*.json"
+)
 
 macro(_ts_package _name _dir)
     set(_stamp "${TS_STAMPS}/${_name}.stamp")
@@ -87,6 +90,7 @@ _ts_package(core "${TS_ROOT}/frontend"
     "${TS_STAMPS}/webkit.stamp"
     "${TS_ROOT}/frontend/package.json"
     ${_src_core}
+    ${_src_locales}
 )
 add_dependencies(ts_core ts_client ts_webkit)
 

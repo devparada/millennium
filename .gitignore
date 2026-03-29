@@ -13,6 +13,9 @@ src/typescript/.frontend.bin
 # Visual Studio & Visual Studio Code
 .vs*/
 
+# Zed Editor
+.zed/
+
 # Jetbrains IDEs
 .idea/
 
