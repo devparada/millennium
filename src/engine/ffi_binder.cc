@@ -84,8 +84,62 @@ bool ffi_binder::is_valid_request(const json& params)
     return true;
 }
 
+void ffi_binder::cdp_binding_call_hdlr(const json& params)
+{
+    if (!params.contains("payload") || !params.contains("executionContextId") || !params.contains("sessionId")) {
+        LOG_ERROR("ffi_binder: corrupted CDP binding call: {}", params.dump(4));
+        return;
+    }
+
+    int call_id = -1;
+
+    try {
+        json payload = json::parse(params["payload"].get<std::string>());
+        call_id = payload.at("call_id").get<int>();
+        std::string method = payload.at("method").get<std::string>();
+        json cdp_params = payload.value("params", json::object());
+        auto session_id = payload.contains("sessionId") ? std::optional<std::string>(payload["sessionId"].get<std::string>()) : std::nullopt;
+
+        json response;
+        try {
+            auto result = m_client->send_host(method, cdp_params, session_id).get();
+            response = {{"call_id", call_id}, {"result", result}};
+        } catch (const std::exception& e) {
+            response = {{"call_id", call_id}, {"error", {{"message", e.what()}}}};
+        }
+
+        json eval_params = {
+            {"contextId", params["executionContextId"]},
+            {"expression", fmt::format("window.{}.__handleCDPResponse({})", ffi_constants::cdp_frontend_binding_name, response.dump())}
+        };
+        m_client->send_host("Runtime.evaluate", eval_params, params["sessionId"].get<std::string>());
+
+    } catch (const std::exception& e) {
+        LOG_ERROR("ffi_binder: CDP routing error: {}", e.what());
+
+        json error_response = {{"call_id", call_id}, {"error", {{"message", e.what()}}}};
+        try {
+            json eval_params = {
+                {"contextId", params["executionContextId"]},
+                {"expression", fmt::format("window.{}.__handleCDPResponse({})", ffi_constants::cdp_frontend_binding_name, error_response.dump())}
+            };
+            m_client->send_host("Runtime.evaluate", eval_params, params["sessionId"].get<std::string>());
+        } catch (...) {
+        }
+    }
+}
+
 void ffi_binder::binding_call_hdlr(const json& params)
 {
+    if (!params.contains("name")) {
+        return;
+    }
+
+    if (params["name"].get<std::string>() == ffi_constants::cdp_binding_name) {
+        cdp_binding_call_hdlr(params);
+        return;
+    }
+
     if (!this->is_valid_request(params)) {
         LOG_ERROR("ffi_binder: received corrupted binding call, not enough data to respond. called with: {}", params.dump(4));
         return;
@@ -158,6 +212,15 @@ void ffi_binder::execution_ctx_created_hdlr(const json& params)
             { "executionContextId", context_id                  }
         };
         m_client->send_host("Runtime.addBinding", add_binding_params, session_id).get();
+    } catch (...) {
+    }
+
+    try {
+        const json add_cdp_binding_params = {
+            { "name",               ffi_constants::cdp_binding_name },
+            { "executionContextId", context_id                      }
+        };
+        m_client->send_host("Runtime.addBinding", add_cdp_binding_params, session_id).get();
     } catch (...) {
     }
 }

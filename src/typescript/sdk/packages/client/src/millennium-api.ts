@@ -80,57 +80,34 @@ const usePluginConfig: {
 
 const subscribePluginConfig: (cb: (key: string, value: any) => void) => () => void = () => () => {};
 
-interface CDPMessage {
-	id?: number;
-	method: string;
-	params?: Record<string, any>;
-	sessionId?: string; // Optional session ID for targeted commands
-	result?: any;
-	error?: {
-		message: string;
-		code: number;
-	};
-}
-
 class MillenniumChromeDevToolsProtocol {
-	devTools: any;
 	currentId: number;
 	pendingRequests: Map<number, { resolve: (value: any) => void; reject: (reason?: any) => void }>;
 	eventListeners: Map<string, Set<(params: any) => void>>;
 
 	constructor() {
-		this.devTools = window.MILLENNIUM_CHROME_DEV_TOOLS_PROTOCOL_DO_NOT_USE_OR_OVERRIDE_ONMESSAGE;
 		this.currentId = 0;
 		this.pendingRequests = new Map();
 		this.eventListeners = new Map();
 
-		// Override the onmessage callback to handle responses
-		this.devTools.onmessage = (message: any) => {
-			this.handleMessage(message);
+		window.MILLENNIUM_CHROME_DEV_TOOLS_PROTOCOL_DO_NOT_USE_OR_OVERRIDE_ONMESSAGE = {
+			__handleCDPResponse: (response: any) => {
+				this.handleResponse(response);
+			},
 		};
 	}
 
-	handleMessage(message: any) {
-		const data = typeof message === 'string' ? JSON.parse(message) : message;
+	handleResponse(response: any) {
+		const data = typeof response === 'string' ? JSON.parse(response) : response;
 
-		if (data.id !== undefined && this.pendingRequests.has(data.id)) {
-			const pending = this.pendingRequests.get(data.id);
-			this.pendingRequests.delete(data.id);
+		if (data.call_id !== undefined && this.pendingRequests.has(data.call_id)) {
+			const pending = this.pendingRequests.get(data.call_id)!;
+			this.pendingRequests.delete(data.call_id);
 
-			if (pending) {
-				const { resolve, reject } = pending;
-				if (data.error) {
-					reject(new Error(`CDP Error: ${data.error.message} (${data.error.code})`));
-				} else {
-					resolve(data.result);
-				}
-			}
-		} else if (data.method) {
-			const listeners = this.eventListeners.get(data.method);
-			if (listeners) {
-				for (const listener of listeners) {
-					listener(data.params);
-				}
+			if (data.error) {
+				pending.reject(new Error(`CDP Error: ${data.error.message}`));
+			} else {
+				pending.resolve(data.result);
 			}
 		}
 	}
@@ -159,50 +136,32 @@ class MillenniumChromeDevToolsProtocol {
 		sessionId?: string,
 	): Promise<ProtocolMapping.Commands[T]['returnType']> {
 		return new Promise((resolve, reject) => {
-			const id = this.currentId++;
+			const call_id = this.currentId++;
+			this.pendingRequests.set(call_id, { resolve, reject });
 
-			// Store the promise resolvers
-			this.pendingRequests.set(id, { resolve, reject });
-
-			// Prepare the message
-			const message: CDPMessage = {
-				id: id,
-				method: method,
-			};
-
-			// Only add params if they're provided and not empty
+			const payload: any = { call_id, method };
 			if (params && Object.keys(params).length > 0) {
-				message.params = params;
+				payload.params = params;
 			}
-
-			// If a sessionId is provided, include it in the message
 			if (sessionId) {
-				message.sessionId = sessionId;
+				payload.sessionId = sessionId;
 			}
 
-			// Send the message
 			try {
-				this.devTools.send(JSON.stringify(message));
+				(window as any).__millennium_cdp_send__(JSON.stringify(payload));
 			} catch (error) {
-				// Clean up if send fails
-				this.pendingRequests.delete(id);
+				this.pendingRequests.delete(call_id);
 				reject(error);
 			}
 		});
 	}
 
-	// Helper method to send without waiting for response (fire and forget)
 	sendNoResponse<T extends keyof ProtocolMapping.Commands>(method: T, params: ProtocolMapping.Commands[T]['paramsType'][0] = {}) {
-		const message: CDPMessage = {
-			id: this.currentId++,
-			method: method,
-		};
-
+		const payload: any = { call_id: this.currentId++, method };
 		if (params && Object.keys(params).length > 0) {
-			message.params = params;
+			payload.params = params;
 		}
-
-		this.devTools.send(JSON.stringify(message));
+		(window as any).__millennium_cdp_send__(JSON.stringify(payload));
 	}
 }
 

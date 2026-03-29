@@ -197,12 +197,6 @@ void plugin_loader::init_devtools()
                 /** set the session ID of the SharedJSContext */
                 m_cdp->set_shared_js_session_id(result.at("sessionId").get<std::string>());
 
-                const json expose_devtools_params = {
-                    { "targetId",    targetId                                                                },
-                    { "bindingName", "MILLENNIUM_CHROME_DEV_TOOLS_PROTOCOL_DO_NOT_USE_OR_OVERRIDE_ONMESSAGE" }
-                };
-
-                m_cdp->send_host("Target.exposeDevToolsProtocol", expose_devtools_params);
                 break;
             }
         }
@@ -226,7 +220,6 @@ std::shared_ptr<std::thread> plugin_loader::connect_steam_socket(std::shared_ptr
     std::shared_ptr<socket_utils::socket_t> browserProps = std::make_shared<socket_utils::socket_t>();
 
     browserProps->name = "CEFBrowser";
-    browserProps->fetch_socket_url = std::bind(&socket_utils::get_steam_browser_context, socketHelpers);
     browserProps->on_connect = [this](std::shared_ptr<cdp_client> cdp)
     {
         this->devtools_connection_hdlr(std::move(cdp));
@@ -298,6 +291,11 @@ void plugin_loader::inject_frontend_shims(bool reload_frontend)
             { "name", ffi_constants::binding_name }
         };
         self->m_cdp->send("Runtime.addBinding", add_binding_params).get();
+
+        const json add_cdp_binding_params = {
+            { "name", ffi_constants::cdp_binding_name }
+        };
+        self->m_cdp->send("Runtime.addBinding", add_cdp_binding_params).get();
         logger.log("Frontend notifier finished!");
     });
 
@@ -459,10 +457,10 @@ void plugin_loader::setup_child_request_handler()
             /* child sends {methodName, params}, but process_message expects
                {pluginName, methodName, argumentList} under "data" */
             nlohmann::json data = {
-                { "pluginName",  plugin_name },
-                { "methodName",  params.value("methodName", "") },
+                { "pluginName", plugin_name },
+                { "methodName", params.value("methodName", "") },
                 { "argumentList", params.contains("params") ? params["params"] : nlohmann::json::array() },
-                { "caller",      params.value("caller", std::string{}) }
+                { "caller", params.value("caller", std::string{}) }
             };
 
             nlohmann::json call = {

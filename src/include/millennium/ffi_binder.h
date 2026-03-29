@@ -36,6 +36,8 @@ namespace ffi_constants
 {
 static const char* const binding_name = "__private_millennium_ffi_do_not_use__";
 static const char* const frontend_binding_name = "MILLENNIUM_PRIVATE_INTERNAL_FOREIGN_FUNCTION_INTERFACE_DO_NOT_USE";
+static const char* const cdp_binding_name = "__millennium_cdp_send__";
+static const char* const cdp_frontend_binding_name = "MILLENNIUM_CHROME_DEV_TOOLS_PROTOCOL_DO_NOT_USE_OR_OVERRIDE_ONMESSAGE";
 } // namespace ffi_constants
 
 class ffi_binder
@@ -55,6 +57,7 @@ class ffi_binder
      * event handler for Runtime.bindingCalled events
      */
     void binding_call_hdlr(const json& params);
+    void cdp_binding_call_hdlr(const json& params);
     void execution_ctx_created_hdlr(const json& params);
 
     bool is_valid_request(const json& params);
