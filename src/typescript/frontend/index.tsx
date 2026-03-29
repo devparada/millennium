@@ -39,13 +39,14 @@ import { DesktopMenuProvider } from './quick-access/DesktopMenuContext';
 import { handleSettingsReturnNavigation, MillenniumSettings } from './settings';
 import { MillenniumQuickCssEditor } from './settings/quickcss';
 import { PluginComponent, PluginCrashInfo, SettingsProps, SystemAccentColor, ThemeItem, ThemeItemV1 } from './types';
-import { Core_FindAllPlugins, Core_GetRootColors, Core_GetStartConfig } from './utils/ffi';
+import { Core_ChangePluginStatus, Core_FindAllPlugins, Core_GetRootColors, Core_GetStartConfig } from './utils/ffi';
 import { Logger } from './utils/Logger';
 import { useQuickCssState } from './utils/quick-css-state';
 import { NotificationService } from './utils/update-notification-service';
 import { OnRunSteamURL } from './utils/url-scheme-handler';
 import { showPluginCrashModal } from './components/PluginCrashModal';
 import { showLegacyPluginModal } from './components/LegacyPluginModal';
+import { showSupersededPluginModal, SUPERSEDED_PLUGIN_NAMES } from './components/SupersededPluginModal';
 
 async function initializeMillennium(settings: SettingsProps) {
 	Logger.Log(`Received props`, settings);
@@ -107,8 +108,21 @@ async function initializeMillennium(settings: SettingsProps) {
 	const checkLegacyPlugins = async () => {
 		try {
 			const plugins: PluginComponent[] = JSON.parse(await Core_FindAllPlugins());
-			const legacy = plugins.filter((p) => p.enabled && p.data.useBackend !== false && p.data.backendType !== 'lua');
+			const legacy = plugins.filter((p) => p.enabled && p.data.name !== 'core' && p.data.useBackend !== false && p.data.backendType !== 'lua');
+
 			if (legacy.length) {
+				const disablePayload = legacy.map((p) => ({ plugin_name: p.data.name, enabled: false }));
+				await Core_ChangePluginStatus({ pluginJson: JSON.stringify(disablePayload) });
+			}
+
+			const superseded = plugins.filter((p) => SUPERSEDED_PLUGIN_NAMES.includes(p.data.name));
+			const nonSupersededLegacy = legacy.filter((p) => !SUPERSEDED_PLUGIN_NAMES.includes(p.data.name));
+
+			if (superseded.length && nonSupersededLegacy.length) {
+				showSupersededPluginModal(superseded, () => showLegacyPluginModal(nonSupersededLegacy));
+			} else if (superseded.length) {
+				showSupersededPluginModal(superseded);
+			} else if (legacy.length) {
 				showLegacyPluginModal(legacy);
 			}
 		} catch (e) {
