@@ -34,6 +34,5 @@
 namespace CommandLineArguments
 {
 bool has_argument(const std::string& targetArgument);
-unsigned short get_remote_debugger_port();
 
 }; // namespace CommandLineArguments

@@ -34,11 +34,7 @@
 #define _WIN32_WINNT 0x0A00 /** Windows 10 & 11 */
 #endif
 
-#include <asio.hpp>
-#include <asio/ip/tcp.hpp>
 #define DEFAULT_DEVTOOLS_PORT "8080"
-extern std::string STEAM_DEVELOPER_TOOLS_PORT;
-const char* get_devtools_port(const bool isDevMode);
 
 #ifdef _WIN32
 #include <iostream>

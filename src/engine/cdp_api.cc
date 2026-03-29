@@ -36,7 +36,7 @@
 #include <memory>
 #include <unordered_map>
 
-cdp_client::cdp_client(ws_client::connection_ptr conn) : m_conn(std::move(conn)), m_callback_pool(std::make_shared<thread_pool>(4))
+cdp_client::cdp_client(send_fn sender) : m_sender(std::move(sender)), m_callback_pool(std::make_shared<thread_pool>(4))
 {
     /** start the cleanup thread worker */
     m_cleanup_thread = std::thread(&cdp_client::cleanup_loop, this);
@@ -99,8 +99,6 @@ cdp_client::~cdp_client()
 
 /**
  * Shutdown the connection to the CDP endpoint and clean up resources.
- * This does not close the underlying websocket connection, the websocket connection is
- * managed in cef_bridge.h
  */
 void cdp_client::shutdown()
 {
@@ -212,17 +210,16 @@ std::future<json> cdp_client::send_host(const std::string& method, const json& p
 
     std::lock_guard<std::mutex> send_lock(m_send_mutex);
 
-    websocketpp::lib::error_code ec;
-    ec = m_conn->send(payload, websocketpp::frame::opcode::text);
+    bool ok = m_sender(payload);
 
-    if (ec) {
+    if (!ok) {
         /** remove from pending and fail the promise */
         std::lock_guard<std::mutex> lock(m_requests_mutex);
         m_pending_requests.erase(id);
 
         if (!pending->completed.exchange(true, std::memory_order_acq_rel)) {
             try {
-                pending->promise.set_exception(std::make_exception_ptr(std::runtime_error("Send failed: " + ec.message())));
+                pending->promise.set_exception(std::make_exception_ptr(std::runtime_error("Send failed")));
             } catch (...) {
                 LOG_ERROR("Failed to set exception on pending request due to send failure");
             }

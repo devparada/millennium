@@ -31,8 +31,6 @@
 #pragma once
 #include "millennium/thread_pool.h"
 #include "millennium/types.h"
-#include <websocketpp/client.hpp>
-#include <websocketpp/config/asio_no_tls_client.hpp>
 #include <nlohmann/json.hpp>
 #include <functional>
 #include <unordered_map>
@@ -56,11 +54,11 @@
 class cdp_client : public std::enable_shared_from_this<cdp_client>
 {
   public:
-    using ws_client = websocketpp::client<websocketpp::config::asio_client>;
+    using send_fn = std::function<bool(const std::string&)>;
     using event_callback = std::function<void(const json&)>;
     using error_callback = std::function<void(const std::string&, const std::exception&)>;
 
-    explicit cdp_client(ws_client::connection_ptr conn);
+    explicit cdp_client(send_fn sender);
     ~cdp_client();
 
     cdp_client(const cdp_client&) = delete;
@@ -130,7 +128,7 @@ class cdp_client : public std::enable_shared_from_this<cdp_client>
         std::atomic<bool> completed{ false }; // prevents double-completing promises
     };
 
-    ws_client::connection_ptr m_conn;
+    send_fn m_sender;
     std::atomic<int> m_next_id{ 1 }; // cdp message ids increment per request
     std::atomic<bool> m_shutdown{ false };
 
@@ -146,7 +144,7 @@ class cdp_client : public std::enable_shared_from_this<cdp_client>
     std::mutex m_error_mutex;
     error_callback m_error_handler;
 
-    /** prevents concurrent sends on the websocket */
+    /** prevents concurrent sends on the transport */
     std::mutex m_send_mutex;
 
     /** background thread that times out stale requests */

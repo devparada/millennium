@@ -29,7 +29,9 @@
  */
 
 #include <atomic>
+#include <condition_variable>
 #include <cstdlib>
+#include <mutex>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -37,22 +39,17 @@
 #include "millennium/logger.h"
 #include "millennium/steam_hooks.h"
 #include "millennium/cmdline_parse.h"
+#include "millennium/filesystem.h"
 #include "millennium/millennium_lifecycle.h"
 
-std::string STEAM_DEVELOPER_TOOLS_PORT = "8080";
-
-uint_least16_t bind_random_port()
-{
-    asio::io_context io_context;
-    asio::ip::tcp::acceptor acceptor(io_context, asio::ip::tcp::endpoint(asio::ip::tcp::v4(), 0));
-    return acceptor.local_endpoint().port();
-}
-
-const char* get_devtools_port(const bool is_developer_mode)
-{
-    const char* port = is_developer_mode ? DEFAULT_DEVTOOLS_PORT : STEAM_DEVELOPER_TOOLS_PORT.c_str();
-    return port;
-}
+#ifdef _WIN32
+/** Parent-side handles for the CDP debugging pipe (read responses, write commands). */
+HANDLE g_cdp_pipe_read  = INVALID_HANDLE_VALUE;
+HANDLE g_cdp_pipe_write = INVALID_HANDLE_VALUE;
+std::mutex g_cdp_pipe_mutex;
+std::condition_variable g_cdp_pipe_cv;
+bool g_cdp_pipes_ready = false;
+#endif
 
 struct command
 {
@@ -80,7 +77,7 @@ struct command
         return sep != std::string::npos ? std::string_view(exec).substr(sep + 1) : std::string_view(exec);
     }
 
-    void ensure_param(std::string_view key, const char* value)
+    void ensure_param(std::string_view key, const char* value = nullptr)
     {
         std::string entry = value ? std::string(key) + "=" + value : std::string(key);
 
@@ -189,12 +186,49 @@ const char* Plat_HookedCreateSimpleProcess(const char* cmd)
 
     bool is_developer_mode = CommandLineArguments::has_argument("-dev");
 
-    /** block any browser web requests when running in normal mode */
-    cmd_line.ensure_param("--remote-allow-origins", is_developer_mode ? "*" : "");
-    /** always ensure the debugger is only local, and can't be accessed over lan */
-    cmd_line.ensure_param("--remote-debugging-address", "127.0.0.1");
-    /** enable the CEF remote debugger */
-    cmd_line.ensure_param("--remote-debugging-port", get_devtools_port(is_developer_mode));
+    cmd_line.ensure_param("--enable-unsafe-extension-debugging");
+
+    if (is_developer_mode) {
+        cmd_line.ensure_param("--remote-allow-origins", "*");
+        cmd_line.ensure_param("--remote-debugging-address", "127.0.0.1");
+        cmd_line.ensure_param("--remote-debugging-port", DEFAULT_DEVTOOLS_PORT);
+    }
+
+#ifdef _WIN32
+    {
+        SECURITY_ATTRIBUTES sa = { sizeof(sa), nullptr, TRUE };
+
+        HANDLE hChildRead = INVALID_HANDLE_VALUE, hParentWrite = INVALID_HANDLE_VALUE;
+        HANDLE hParentRead = INVALID_HANDLE_VALUE, hChildWrite = INVALID_HANDLE_VALUE;
+
+        bool pipes_ok = CreatePipe(&hChildRead, &hParentWrite, &sa, 0)
+                     && CreatePipe(&hParentRead, &hChildWrite, &sa, 0);
+
+        if (pipes_ok) {
+            /** keep only child-side handles inheritable */
+            SetHandleInformation(hParentWrite, HANDLE_FLAG_INHERIT, 0);
+            SetHandleInformation(hParentRead, HANDLE_FLAG_INHERIT, 0);
+
+            cmd_line.ensure_param("--remote-debugging-pipe");
+            cmd_line.ensure_param("--remote-debugging-io-pipes",
+                fmt::format("{},{}", reinterpret_cast<uintptr_t>(hChildRead),
+                                     reinterpret_cast<uintptr_t>(hChildWrite)).c_str());
+
+            g_cdp_pipe_read  = hParentRead;
+            g_cdp_pipe_write = hParentWrite;
+
+            {
+                std::lock_guard<std::mutex> lock(g_cdp_pipe_mutex);
+                g_cdp_pipes_ready = true;
+            }
+            g_cdp_pipe_cv.notify_all();
+        } else {
+            LOG_ERROR("Failed to create CDP pipes (error {}), falling back to port-only debugging.", GetLastError());
+            if (hChildRead  != INVALID_HANDLE_VALUE) CloseHandle(hChildRead);
+            if (hParentWrite != INVALID_HANDLE_VALUE) CloseHandle(hParentWrite);
+        }
+    }
+#endif
 
     static thread_local std::string result;
     result = cmd_line.build();
@@ -208,7 +242,6 @@ const char* Plat_HookedCreateSimpleProcess(const char* cmd)
 
 #include "millennium/argp_win32.h"
 #include "millennium/logger.h"
-#include "millennium/backend_mgr.h"
 #include "millennium/plat_msg.h"
 
 #define LDR_DLL_NOTIFICATION_REASON_LOADED 1
@@ -220,16 +253,38 @@ PVOID g_notification_cookie = nullptr;
 
 static snare_inline_t g_create_hook = nullptr;
 static snare_inline_t g_rdcw_hook = nullptr;
+static snare_inline_t g_create_process_hook = nullptr;
 
 HMODULE steam_tier0_module;
 
 INT hooked_create_simple_process(const char* a1, char a2, const char* lp_multi_byte_str)
 {
-    snare_inline_remove(g_create_hook);
-    auto orig = reinterpret_cast<INT(__cdecl*)(const char*, char, const char*)>(snare_inline_get_src(g_create_hook));
-    INT result = orig(Plat_HookedCreateSimpleProcess(a1), a2, lp_multi_byte_str);
-    snare_inline_install(g_create_hook);
-    return result;
+    auto orig = reinterpret_cast<INT(__cdecl*)(const char*, char, const char*)>(snare_inline_get_trampoline(g_create_hook));
+    return orig(Plat_HookedCreateSimpleProcess(a1), a2, lp_multi_byte_str);
+}
+
+/**
+ * Hook CreateProcessW to ensure pipe handles are inherited by steamwebhelper.
+ */
+BOOL WINAPI hooked_create_process_w(
+    LPCWSTR lpApplicationName, LPWSTR lpCommandLine,
+    LPSECURITY_ATTRIBUTES lpProcessAttributes, LPSECURITY_ATTRIBUTES lpThreadAttributes,
+    BOOL bInheritHandles, DWORD dwCreationFlags,
+    LPVOID lpEnvironment, LPCWSTR lpCurrentDirectory,
+    LPSTARTUPINFOW lpStartupInfo, LPPROCESS_INFORMATION lpProcessInformation)
+{
+    auto orig = reinterpret_cast<decltype(&CreateProcessW)>(snare_inline_get_trampoline(g_create_process_hook));
+
+    if (g_cdp_pipes_ready && lpCommandLine) {
+        std::wstring cmd(lpCommandLine);
+        if (cmd.find(L"steamwebhelper") != std::wstring::npos) {
+            bInheritHandles = TRUE;
+        }
+    }
+
+    return orig(lpApplicationName, lpCommandLine, lpProcessAttributes, lpThreadAttributes,
+                bInheritHandles, dwCreationFlags, lpEnvironment, lpCurrentDirectory,
+                lpStartupInfo, lpProcessInformation);
 }
 
 /**
@@ -316,24 +371,43 @@ void handle_already_loaded(LPCWSTR dll_name)
 /**
  * Hook and disable ReadDirectoryChangesW to prevent the Steam client from monitoring changes
  * to the steamui dir, which is incredibly fucking annoying during development.
+ *
+ * Calls that originate from Millennium (e.g. file_watcher) are passed through to the real API.
  */
-BOOL WINAPI hooked_read_directory_changes_w(void*, void*, void*, void*, void*, LPDWORD bytes_ret, void*, void*)
+BOOL WINAPI hooked_read_directory_changes_w(HANDLE hDirectory, LPVOID lpBuffer, DWORD nBufferLength, BOOL bWatchSubtree, DWORD dwNotifyFilter, LPDWORD lpBytesReturned,
+                                            LPOVERLAPPED lpOverlapped, LPOVERLAPPED_COMPLETION_ROUTINE lpCompletionRoutine)
 {
-    logger.log("[Steam] Blocked attempt to ReadDirectoryChangesW...");
+    auto orig = reinterpret_cast<decltype(&ReadDirectoryChangesW)>(snare_inline_get_trampoline(g_rdcw_hook));
+    const auto invoke_original = [&]()
+    {
+        return orig(hDirectory, lpBuffer, nBufferLength, bWatchSubtree, dwNotifyFilter, lpBytesReturned, lpOverlapped, lpCompletionRoutine);
+    };
 
-    if (bytes_ret) *bytes_ret = 0; // no changes
-    return TRUE;                   // indicate success
+    wchar_t dir_path[MAX_PATH] = {};
+    if (GetFinalPathNameByHandleW(hDirectory, dir_path, MAX_PATH, FILE_NAME_NORMALIZED)) {
+        std::error_code ec;
+        std::filesystem::path watched = std::filesystem::canonical(std::filesystem::path(dir_path), ec);
+        if (ec) return invoke_original();
+        std::filesystem::path steamui = std::filesystem::canonical(platform::get_steam_path() / "steamui", ec);
+        if (ec) return invoke_original();
+
+        /* block calls to listen to the steamui folder */
+        if (watched == steamui) {
+            if (lpBytesReturned) *lpBytesReturned = 0;
+            return TRUE;
+        }
+    }
+
+    return invoke_original();
 }
 
 bool initialize_steam_hooks()
 {
     const auto start_time = std::chrono::system_clock::now();
-    STEAM_DEVELOPER_TOOLS_PORT = std::to_string(bind_random_port());
 
     HMODULE h_tier0 = GetModuleHandleW(L"tier0_s.dll");
     if (h_tier0) {
         handle_tier0_dll(h_tier0);
-        return true;
     }
 
     HMODULE ntdll_module = GetModuleHandleA("ntdll.dll");
@@ -356,14 +430,17 @@ bool initialize_steam_hooks()
     }
 
     auto dll_reg_status = NT_SUCCESS(LdrRegisterDllNotification(0, dll_notification_callback, nullptr, &g_notification_cookie));
-
-    logger.log("[SH_Hook] Waiting for Steam UI to load...");
+    logger.log("Waiting for Steam UI to load...");
 
     /** wait for steamui.dll to load (which signifies Steam is actually starting and not updating/verifying files) */
     millennium_lifecycle::get().steam_ui_loaded.wait();
 
     const auto end_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - start_time).count();
-    logger.log("[SH_Hook] Steam UI loaded in {} ms, continuing Millennium startup...", end_time);
+    logger.log("Steam UI loaded in {} ms, continuing Millennium startup...", end_time);
+
+    /** hook CreateProcessW to ensure pipe handle inheritance for steamwebhelper */
+    g_create_process_hook = snare_inline_new(reinterpret_cast<void*>(&CreateProcessW), reinterpret_cast<void*>(&hooked_create_process_w));
+    if (g_create_process_hook) snare_inline_install(g_create_process_hook);
 
     /** only hook if developer mode is enabled */
     if (CommandLineArguments::has_argument("-dev")) {
@@ -386,6 +463,11 @@ void uninitialize_steam_hooks()
         snare_inline_free(g_create_hook);
         g_create_hook = nullptr;
     }
+    if (g_create_process_hook) {
+        snare_inline_remove(g_create_process_hook);
+        snare_inline_free(g_create_process_hook);
+        g_create_process_hook = nullptr;
+    }
 }
 #elif __linux__
 #include "millennium/logger.h"
@@ -407,11 +489,9 @@ static snare_inline create_hook;
  */
 extern "C" int hooked_create_simple_process(const char* cmd, unsigned int a2, const char* a3)
 {
-    /** temporarily remove the hook to prevent recursive hook calls */
-    snare_inline::scoped_remove remove(&create_hook);
     cmd = Plat_HookedCreateSimpleProcess(cmd);
-    /** call the original */
-    return reinterpret_cast<int (*)(const char* cmd, unsigned int flags, const char* cwd)>(create_hook.get_src())(cmd, a2, a3);
+    auto orig = reinterpret_cast<int (*)(const char* cmd, unsigned int flags, const char* cwd)>(create_hook.get_trampoline());
+    return orig(cmd, a2, a3);
 }
 
 static void* get_module_handle(const char* libneedle, const char* symbol)
@@ -434,8 +514,6 @@ bool initialize_steam_hooks()
     const char* libneedle = "libtier0_s.so";
     const char* symbol = "CreateSimpleProcess";
 
-    STEAM_DEVELOPER_TOOLS_PORT = std::to_string(bind_random_port());
-
     void* target = get_module_handle(libneedle, symbol);
     if (!target) {
         LOG_ERROR("Failed to locate symbol '{}'", symbol);
@@ -456,11 +534,7 @@ bool initialize_steam_hooks()
 bool initialize_steam_hooks()
 {
     const char* configured_port = std::getenv("MILLENNIUM_DEBUG_PORT");
-    if (configured_port && configured_port[0] != '\0') {
-        STEAM_DEVELOPER_TOOLS_PORT = configured_port;
-    } else {
-        STEAM_DEVELOPER_TOOLS_PORT = DEFAULT_DEVTOOLS_PORT;
-    }
+    std::string debugger_port = (configured_port && configured_port[0] != '\0') ? configured_port : DEFAULT_DEVTOOLS_PORT;
 
     std::filesystem::path helper_hook_path;
     std::filesystem::path child_hook_path;
@@ -513,7 +587,7 @@ bool initialize_steam_hooks()
         return false;
     }
 
-    logger.log("Using bootstrap-based Steam Helper injection on macOS with debugger port {}", STEAM_DEVELOPER_TOOLS_PORT);
+    logger.log("Using bootstrap-based Steam Helper injection on macOS with debugger port {}", debugger_port);
     return true;
 }
 #endif

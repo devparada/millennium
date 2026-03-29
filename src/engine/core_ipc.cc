@@ -28,6 +28,7 @@
  * SOFTWARE.
  */
 
+#include "millennium/encoding.h"
 #include "millennium/auth.h"
 #include "millennium/core_ipc.h"
 #include "millennium/logger.h"
@@ -38,9 +39,6 @@
 #include <cstdint>
 #include <fmt/core.h>
 #include <functional>
-
-#include <websocketpp/config/asio_no_tls.hpp>
-#include <websocketpp/server.hpp>
 
 using namespace std::placeholders;
 
