@@ -89,34 +89,46 @@ BOOL AreFilesIdentical(LPCWSTR path1, LPCWSTR path2)
 }
 
 /**
- * Initialize Millennium webhelper hook by hardlinking it into the cef bin directory.
+ * Initialize Millennium webhelper hook by hardlinking it into the cef bin directories.
  */
 VOID Win32_AttachWebHelperHook(VOID)
 {
     const auto hookPath = platform::get_millennium_path() / "lib" / "millennium.hhx64.dll";
-    const auto targetPath = platform::get_steam_path() / "bin" / "cef" / "cef.win7x64" / "version.dll";
 
     if (!std::filesystem::exists(hookPath)) {
         platform::messagebox::show("Millennium Error", "Millennium webhelper hook is missing. Please reinstall Millennium.", platform::messagebox::error);
         return;
     }
 
-    if (!AreFilesIdentical(hookPath.wstring().c_str(), targetPath.wstring().c_str())) {
-        // Remove existing target if it exists
-        DeleteFileW(targetPath.wstring().c_str());
-    }
+    const fs::path cefDirs[] = {
+        platform::get_steam_path() / "bin" / "cef" / "cef.win7x64",
+        platform::get_steam_path() / "bin" / "cef" / "cef.win64",
+    };
 
-    if (std::filesystem::exists(targetPath)) {
-        /** target file exist, and is identical to the hook, so we don't need to hardlink */
-        return;
-    }
+    for (const auto& cefDir : cefDirs) {
+        if (!std::filesystem::exists(cefDir)) {
+            continue;
+        }
 
-    BOOL result = CreateHardLinkW(targetPath.wstring().c_str(), hookPath.wstring().c_str(), NULL);
-    if (!result) {
-        platform::messagebox::show(
-            "Millennium Error",
-            fmt::format("Failed to create hardlink for Millennium webhelper hook.\nError Code: {}\nMake sure Steam is not running and try again.", GetLastError()).c_str(),
-            platform::messagebox::error);
+        const auto targetPath = cefDir / "version.dll";
+
+        if (!AreFilesIdentical(hookPath.wstring().c_str(), targetPath.wstring().c_str())) {
+            DeleteFileW(targetPath.wstring().c_str());
+        }
+
+        if (std::filesystem::exists(targetPath)) {
+            continue;
+        }
+
+        BOOL result = CreateHardLinkW(targetPath.wstring().c_str(), hookPath.wstring().c_str(), NULL);
+        if (!result) {
+            platform::messagebox::show(
+                "Millennium Error",
+                fmt::format("Failed to create hardlink for Millennium webhelper hook.\nTarget: {}\nError Code: {}\nMake sure Steam is not running and try again.",
+                            targetPath.string(), GetLastError())
+                    .c_str(),
+                platform::messagebox::error);
+        }
     }
 }
 
