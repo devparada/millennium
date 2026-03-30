@@ -28,10 +28,9 @@
  * SOFTWARE.
  */
 
+#include "millennium/millennium_lifecycle.h"
 #include "millennium/core_ipc.h"
 #include "millennium/plugin_config.h"
-#include "mep/crash_event_bus.h"
-#include "head/entry_point.h"
 #include "millennium/life_cycle.h"
 #include "millennium/millennium_updater.h"
 #include "millennium/filesystem.h"
@@ -49,20 +48,19 @@
 #include "millennium/plugin_webkit_store.h"
 #include "millennium/semver.h"
 #include "millennium/auth.h"
-#include <curl/curl.h>
-#include <cstdio>
+
 #include "state/shared_memory.h"
+
 #include "mep/console_capture.h"
-#include <memory>
-#include <mutex>
+#include "mep/crash_event_bus.h"
+
+#include "head/entry_point.h"
+
+#include <curl/curl.h>
 #include <fmt/ranges.h>
-#include <tuple>
-#include <utility>
 
 using namespace std::placeholders;
 using namespace std::chrono;
-
-#include "millennium/millennium_lifecycle.h"
 
 plugin_loader::plugin_loader(std::shared_ptr<plugin_manager> plugin_manager, std::shared_ptr<millennium_updater> millennium_updater)
     : m_thread_pool(std::make_unique<thread_pool>(2)), m_plugin_manager(std::move(plugin_manager)), m_plugin_ptr(nullptr), m_enabledPluginsPtr(nullptr),
