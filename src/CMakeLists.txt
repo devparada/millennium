@@ -13,7 +13,9 @@ set(CMAKE_C_STANDARD   11 CACHE STRING "C standard to use"   FORCE)
 include(ExternalProject)
 include(FetchContent)
 project(Millennium LANGUAGES C CXX)
+
 include(${MILLENNIUM_BASE}/scripts/cmake/millennium_version.cmake)
+include(${MILLENNIUM_BASE}/scripts/cmake/find_steam_path.cmake)
 
 add_compile_definitions(
     "_CRT_SECURE_NO_WARNINGS"
@@ -27,7 +29,6 @@ add_compile_definitions(
     $<$<CONFIG:Debug>:__LUA_HOST_OUTPUT_ABSPATH__="$<TARGET_FILE:${MILLENNIUM_RTB_NAME}>">
     $<$<CONFIG:Debug>:__DBG_MILLENNIUM_OUTPUT_DIR__="$<TARGET_FILE_DIR:Millennium>">
 )
-
 
 include_directories(
     ${MILLENNIUM_BASE}/src
@@ -195,9 +196,6 @@ if(UNIX AND CMAKE_BUILD_TYPE STREQUAL "Release")
     set(CMAKE_CXX_FLAGS_DEBUG "")
 endif()
 
-
-include(${MILLENNIUM_BASE}/scripts/cmake/find_steam_path.cmake)
-
 # TypeScript build targets (individual per-package, incremental via stamp files).
 # Nix builds TS externally — this is a no-op for DISTRO_NIX.
 if(NOT DISTRO_NIX)
@@ -223,14 +221,16 @@ elseif(UNIX)
     endif()
 endif()
 
-
-
-find_steam_path(Millennium)
-
 # Ensure TypeScript is built before C++ compilation (virtfs.h must exist).
 if(NOT DISTRO_NIX)
     add_dependencies(Millennium virtfs_header)
 endif()
+
+find_steam_path(Millennium)
+
+message(STATUS "[Millennium] Build Path:  [${out_steam_path}]")
+message(STATUS "[Millennium] Version:     [${MILLENNIUM_VERSION}]")
+message(STATUS "[Millennium] Revision:    [${GIT_COMMIT_HASH}]")
 
 set_target_properties(Millennium PROPERTIES
     PREFIX ""

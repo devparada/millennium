@@ -15,9 +15,6 @@ configure_file(${MILLENNIUM_BASE}/src/include/millennium/version.h.in ${CMAKE_BI
 # Get the current git commit hash
 execute_process(COMMAND git rev-parse HEAD WORKING_DIRECTORY ${MILLENNIUM_BASE} OUTPUT_VARIABLE GIT_COMMIT_HASH OUTPUT_STRIP_TRAILING_WHITESPACE)
 
-message(STATUS "[Millennium] Version: ${MILLENNIUM_VERSION}")
-message(STATUS "[Millennium] Git commit hash: ${GIT_COMMIT_HASH}")
-
 add_compile_definitions(
     GIT_COMMIT_HASH="${GIT_COMMIT_HASH}"
     MILLENNIUM_VERSION="${MILLENNIUM_VERSION}"
