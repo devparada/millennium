@@ -30,137 +30,161 @@
 
 #include <atomic>
 #include <condition_variable>
-#include <cstdlib>
 #include <mutex>
 #include <string>
 #include <string_view>
 #include <vector>
 
+#ifdef __linux__
+#include <dlfcn.h>
+#include <fcntl.h>
+#include <linux/limits.h>
+#include <pthread.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#endif
+
 #include "millennium/logger.h"
 #include "millennium/steam_hooks.h"
-#include "millennium/cmdline_parse.h"
-#include "millennium/filesystem.h"
+#include "millennium/cmdline_api.h"
+#include "millennium/cmdline_parser.h"
 #include "millennium/millennium_lifecycle.h"
 
-#ifdef _WIN32
-/** Parent-side handles for the CDP debugging pipe (read responses, write commands). */
-HANDLE g_cdp_pipe_read  = INVALID_HANDLE_VALUE;
-HANDLE g_cdp_pipe_write = INVALID_HANDLE_VALUE;
 std::mutex g_cdp_pipe_mutex;
 std::condition_variable g_cdp_pipe_cv;
 bool g_cdp_pipes_ready = false;
+
+#ifdef _WIN32
+HANDLE g_cdp_pipe_read = INVALID_HANDLE_VALUE;
+HANDLE g_cdp_pipe_write = INVALID_HANDLE_VALUE;
+#elif __linux__
+int g_cdp_pipe_read_fd = -1;
+int g_cdp_pipe_write_fd = -1;
 #endif
 
-struct command
+#ifdef __linux__
+static std::string g_pv_shim_dir;
+static std::string g_cdp_cmd_fifo;
+static std::string g_cdp_resp_fifo;
+
+static std::string find_pvs64_binary()
 {
-    std::string exec;
-    std::vector<std::string> params;
-
-    command(const char* full_cmd)
-    {
-        parse(full_cmd);
-    }
-
-    std::string_view executable() const
-    {
-        auto slash = exec.rfind('/');
-        auto backslash = exec.rfind('\\');
-        size_t sep = std::string::npos;
-
-        if (slash != std::string::npos && backslash != std::string::npos)
-            sep = std::max(slash, backslash);
-        else if (slash != std::string::npos)
-            sep = slash;
-        else if (backslash != std::string::npos)
-            sep = backslash;
-
-        return sep != std::string::npos ? std::string_view(exec).substr(sep + 1) : std::string_view(exec);
-    }
-
-    void ensure_param(std::string_view key, const char* value = nullptr)
-    {
-        std::string entry = value ? std::string(key) + "=" + value : std::string(key);
-
-        for (auto& p : params) {
-            if (p == key || (p.size() > key.size() && p.compare(0, key.size(), key) == 0 && p[key.size()] == '=')) {
-                p = entry;
-                return;
-            }
-        }
-
-        params.insert(params.begin(), std::move(entry));
-    }
-
-    std::string build() const
-    {
-        std::string result;
-        result += quote_token(exec);
-        for (const auto& p : params) {
-            result += ' ';
-            result += quote_token(p);
-        }
-        return result;
-    }
-
-  private:
-    static bool is_quote_char(char c)
-    {
-#ifdef _WIN32
-        return c == '"';
+#ifdef __PVS64_OUTPUT_ABSPATH__
+    return __PVS64_OUTPUT_ABSPATH__;
 #else
-        return c == '"' || c == '\'';
+    Dl_info info;
+    if (!dladdr(reinterpret_cast<void*>(&find_pvs64_binary), &info) || !info.dli_fname) {
+        return {};
+    }
+
+    char resolved[PATH_MAX];
+    if (!realpath(info.dli_fname, resolved)) {
+        return {};
+    }
+
+    char* slash = strrchr(resolved, '/');
+    if (!slash) {
+        return {};
+    }
+
+    return std::string(resolved, slash + 1) + "millennium_pvs64";
 #endif
+}
+
+static void cleanup_pv_shim()
+{
+    if (g_pv_shim_dir.empty()) {
+        return;
     }
 
-    static std::string quote_token(const std::string& s)
+    unlink((g_pv_shim_dir + "/bin/pressure-vessel-unruntime").c_str());
+    rmdir((g_pv_shim_dir + "/bin").c_str());
+
+    /* fifo's live inside shim_dir; unlink in case pv-shim didn't. */
+    if (!g_cdp_cmd_fifo.empty()) {
+        unlink(g_cdp_cmd_fifo.c_str());
+        g_cdp_cmd_fifo.clear();
+    }
+
+    if (!g_cdp_resp_fifo.empty()) {
+        unlink(g_cdp_resp_fifo.c_str());
+        g_cdp_resp_fifo.clear();
+    }
+
+    rmdir(g_pv_shim_dir.c_str());
+    g_pv_shim_dir.clear();
+}
+
+static bool create_pv_shim()
+{
+    cleanup_pv_shim();
+
+    int command_fd = -1;
+    int response_fd = -1;
+
+    char tmp[] = "/tmp/.millennium-pv-XXXXXX";
+    const char* mkd_temp_directory = mkdtemp(tmp);
+
+    if (!mkd_temp_directory) {
+        LOG_ERROR("create_pv_shim: mkdtemp failed (errno {})", errno);
+        return false;
+    }
+
+    std::string shim_directory = mkd_temp_directory;
+    std::string binary_directory = shim_directory + "/bin";
+    std::string command_fifo_directory = shim_directory + "/cmd.fifo";
+    std::string response_fifo_directory = shim_directory + "/resp.fifo";
+
+    if (mkdir(binary_directory.c_str(), 0755) < 0) {
+        goto cleanup;
+    }
+
+    if (mkfifo(command_fifo_directory.c_str(), 0600) < 0 || mkfifo(response_fifo_directory.c_str(), 0600) < 0) {
+        LOG_ERROR("create_pv_shim: mkfifo failed (errno {})", errno);
+        goto cleanup;
+    }
+
+    command_fd = open(command_fifo_directory.c_str(), O_RDWR | O_CLOEXEC);
+    response_fd = open(response_fifo_directory.c_str(), O_RDWR | O_CLOEXEC);
+
+    if (command_fd < 0 || response_fd < 0) {
+        LOG_ERROR("create_pv_shim: open FIFO failed (errno {})", errno);
+        goto cleanup;
+    }
+
+    g_cdp_pipe_write_fd = command_fd;
+    g_cdp_pipe_read_fd = response_fd;
+    g_cdp_cmd_fifo = command_fifo_directory;
+    g_cdp_resp_fifo = response_fifo_directory;
     {
-#ifdef _WIN32
-        if (s.find_first_of(" =") != std::string::npos) return '"' + s + '"';
-        return s;
-#else
-        if (s.find_first_of(" \t\"'") == std::string::npos) return s;
-        std::string out = "\"";
-        for (char c : s) {
-            if (c == '"' || c == '\\') out += '\\';
-            out += c;
+        std::string pvs64 = find_pvs64_binary();
+        if (pvs64.empty()) {
+            LOG_ERROR("create_pv_shim: millennium_pvs64 binary not found");
+            goto cleanup;
         }
-        return out + '"';
-#endif
-    }
 
-    void parse(const char* full_cmd)
-    {
-        std::string token;
-        bool in_quotes = false;
-        char quote_char = 0;
-        bool first = true;
+        std::string shim_bin = binary_directory + "/pressure-vessel-unruntime";
 
-        for (const char* p = full_cmd; *p; ++p) {
-            if (is_quote_char(*p) && (!in_quotes || *p == quote_char)) {
-                quote_char = in_quotes ? 0 : *p;
-                in_quotes = !in_quotes;
-                continue;
-            }
-            if (*p == ' ' && !in_quotes) {
-                if (!token.empty()) flush(token, first);
-                continue;
-            }
-            token += *p;
+        if (symlink(pvs64.c_str(), shim_bin.c_str()) < 0) {
+            LOG_ERROR("create_pv_shim: symlink {} → {} failed (errno {})", pvs64, shim_bin, errno);
+            goto cleanup;
         }
-        if (!token.empty()) flush(token, first);
     }
+    g_pv_shim_dir = shim_directory;
+    return true;
 
-    void flush(std::string& token, bool& first)
-    {
-        if (first) {
-            exec = std::move(token);
-            first = false;
-        } else {
-            params.push_back(std::move(token));
-        }
-        token.clear();
-    }
-};
+cleanup:
+    if (command_fd >= 0) close(command_fd);
+    if (response_fd >= 0) close(response_fd);
+
+    unlink(command_fifo_directory.c_str());
+    unlink(response_fifo_directory.c_str());
+    rmdir(binary_directory.c_str());
+    rmdir(mkd_temp_directory);
+
+    return false;
+}
+#endif /* __linux__ */
 
 const char* Plat_HookedCreateSimpleProcess(const char* cmd)
 {
@@ -168,6 +192,8 @@ const char* Plat_HookedCreateSimpleProcess(const char* cmd)
     if (!millennium_lifecycle::get().backends_loaded.flag.load()) {
         millennium_lifecycle::get().backends_loaded.wait();
     }
+
+    logger.log("Plat_HookedCreateSimpleProcess called!");
 
     command cmd_line(cmd);
 
@@ -201,8 +227,7 @@ const char* Plat_HookedCreateSimpleProcess(const char* cmd)
         HANDLE hChildRead = INVALID_HANDLE_VALUE, hParentWrite = INVALID_HANDLE_VALUE;
         HANDLE hParentRead = INVALID_HANDLE_VALUE, hChildWrite = INVALID_HANDLE_VALUE;
 
-        bool pipes_ok = CreatePipe(&hChildRead, &hParentWrite, &sa, 0)
-                     && CreatePipe(&hParentRead, &hChildWrite, &sa, 0);
+        bool pipes_ok = CreatePipe(&hChildRead, &hParentWrite, &sa, 0) && CreatePipe(&hParentRead, &hChildWrite, &sa, 0);
 
         if (pipes_ok) {
             /** keep only child-side handles inheritable */
@@ -210,11 +235,9 @@ const char* Plat_HookedCreateSimpleProcess(const char* cmd)
             SetHandleInformation(hParentRead, HANDLE_FLAG_INHERIT, 0);
 
             cmd_line.ensure_param("--remote-debugging-pipe");
-            cmd_line.ensure_param("--remote-debugging-io-pipes",
-                fmt::format("{},{}", reinterpret_cast<uintptr_t>(hChildRead),
-                                     reinterpret_cast<uintptr_t>(hChildWrite)).c_str());
+            cmd_line.ensure_param("--remote-debugging-io-pipes", fmt::format("{},{}", reinterpret_cast<uintptr_t>(hChildRead), reinterpret_cast<uintptr_t>(hChildWrite)).c_str());
 
-            g_cdp_pipe_read  = hParentRead;
+            g_cdp_pipe_read = hParentRead;
             g_cdp_pipe_write = hParentWrite;
 
             {
@@ -224,14 +247,30 @@ const char* Plat_HookedCreateSimpleProcess(const char* cmd)
             g_cdp_pipe_cv.notify_all();
         } else {
             LOG_ERROR("Failed to create CDP pipes (error {}), falling back to port-only debugging.", GetLastError());
-            if (hChildRead  != INVALID_HANDLE_VALUE) CloseHandle(hChildRead);
+            if (hChildRead != INVALID_HANDLE_VALUE) CloseHandle(hChildRead);
             if (hParentWrite != INVALID_HANDLE_VALUE) CloseHandle(hParentWrite);
         }
+    }
+#elif __linux__
+    {
+        cmd_line.ensure_param("--remote-debugging-pipe");
+
+        if (create_pv_shim()) {
+            cmd_line.params.insert(cmd_line.params.begin(), cmd_line.exec);
+            cmd_line.params.insert(cmd_line.params.begin(), "PRESSURE_VESSEL_PREFIX=" + g_pv_shim_dir);
+            cmd_line.exec = "/usr/bin/env";
+        }
+        {
+            std::lock_guard<std::mutex> lock(g_cdp_pipe_mutex);
+            g_cdp_pipes_ready = true;
+        }
+        g_cdp_pipe_cv.notify_all();
     }
 #endif
 
     static thread_local std::string result;
     result = cmd_line.build();
+    logger.log("[CDPShim] Final command: {}", result);
     return result.c_str();
 }
 
@@ -266,12 +305,9 @@ INT hooked_create_simple_process(const char* a1, char a2, const char* lp_multi_b
 /**
  * Hook CreateProcessW to ensure pipe handles are inherited by steamwebhelper.
  */
-BOOL WINAPI hooked_create_process_w(
-    LPCWSTR lpApplicationName, LPWSTR lpCommandLine,
-    LPSECURITY_ATTRIBUTES lpProcessAttributes, LPSECURITY_ATTRIBUTES lpThreadAttributes,
-    BOOL bInheritHandles, DWORD dwCreationFlags,
-    LPVOID lpEnvironment, LPCWSTR lpCurrentDirectory,
-    LPSTARTUPINFOW lpStartupInfo, LPPROCESS_INFORMATION lpProcessInformation)
+BOOL WINAPI hooked_create_process_w(LPCWSTR lpApplicationName, LPWSTR lpCommandLine, LPSECURITY_ATTRIBUTES lpProcessAttributes, LPSECURITY_ATTRIBUTES lpThreadAttributes,
+                                    BOOL bInheritHandles, DWORD dwCreationFlags, LPVOID lpEnvironment, LPCWSTR lpCurrentDirectory, LPSTARTUPINFOW lpStartupInfo,
+                                    LPPROCESS_INFORMATION lpProcessInformation)
 {
     auto orig = reinterpret_cast<decltype(&CreateProcessW)>(snare_inline_get_trampoline(g_create_process_hook));
 
@@ -282,9 +318,8 @@ BOOL WINAPI hooked_create_process_w(
         }
     }
 
-    return orig(lpApplicationName, lpCommandLine, lpProcessAttributes, lpThreadAttributes,
-                bInheritHandles, dwCreationFlags, lpEnvironment, lpCurrentDirectory,
-                lpStartupInfo, lpProcessInformation);
+    return orig(lpApplicationName, lpCommandLine, lpProcessAttributes, lpThreadAttributes, bInheritHandles, dwCreationFlags, lpEnvironment, lpCurrentDirectory, lpStartupInfo,
+                lpProcessInformation);
 }
 
 /**
@@ -490,8 +525,10 @@ static snare_inline create_hook;
 extern "C" int hooked_create_simple_process(const char* cmd, unsigned int a2, const char* a3)
 {
     cmd = Plat_HookedCreateSimpleProcess(cmd);
-    auto orig = reinterpret_cast<int (*)(const char* cmd, unsigned int flags, const char* cwd)>(create_hook.get_trampoline());
-    return orig(cmd, a2, a3);
+    auto orig = reinterpret_cast<int (*)(const char*, unsigned int, const char*)>(create_hook.get_trampoline());
+    int result = orig(cmd, a2, a3);
+
+    return result;
 }
 
 static void* get_module_handle(const char* libneedle, const char* symbol)

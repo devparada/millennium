@@ -43,23 +43,12 @@ set_target_properties(bootstrap64 PROPERTIES
     SUFFIX ""
 )
 
-if(NOT GITHUB_ACTION_BUILD)
-    set(steam_ubuntu64 "$ENV{HOME}/.steam/steam/ubuntu12_64")
-    if(EXISTS "${steam_ubuntu64}")
-        if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-            add_custom_command(TARGET bootstrap64 POST_BUILD
-                COMMAND ${CMAKE_COMMAND} -E create_symlink
-                    $<TARGET_FILE:bootstrap64>
-                    "${steam_ubuntu64}/libXtst.so.6"
-                COMMENT "Symlinking libXtst.so.6 bootstrap into ubuntu12_64"
-            )
-        else()
-            add_custom_command(TARGET bootstrap64 POST_BUILD
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                    $<TARGET_FILE:bootstrap64>
-                    "${steam_ubuntu64}/libXtst.so.6"
-                COMMENT "Copying libXtst.so.6 bootstrap into ubuntu12_64"
-            )
-        endif()
-    endif()
-endif()
+add_executable(millennium_pvs64 millennium_pvs64.cc)
+
+target_compile_options(millennium_pvs64 PRIVATE -m64 -Wall -Wextra)
+target_link_options(millennium_pvs64 PRIVATE -m64)
+
+set_target_properties(millennium_pvs64 PROPERTIES
+    OUTPUT_NAME "millennium_pvs64"
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
+)

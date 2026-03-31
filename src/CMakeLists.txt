@@ -28,6 +28,7 @@ add_compile_definitions(
     $<$<CONFIG:Debug>:__HOOK_HELPER_OUTPUT_ABSPATH__="$<TARGET_FILE:hhx64>">
     $<$<CONFIG:Debug>:__LUA_HOST_OUTPUT_ABSPATH__="$<TARGET_FILE:${MILLENNIUM_RTB_NAME}>">
     $<$<CONFIG:Debug>:__DBG_MILLENNIUM_OUTPUT_DIR__="$<TARGET_FILE_DIR:Millennium>">
+    $<$<AND:$<CONFIG:Debug>,$<PLATFORM_ID:Linux>>:__PVS64_OUTPUT_ABSPATH__="$<TARGET_FILE:millennium_pvs64>">
 )
 
 include_directories(
@@ -46,7 +47,7 @@ set(SOURCE_FILES
     engine/child_process.cc
     engine/cdp_api.cc
     engine/cdp_connector.cc
-    engine/cmdline_parse.cc
+    engine/cmdline_api.cc
     engine/core_ipc.cc
     engine/ffi_binder.cc
     engine/http_hooks.cc
@@ -57,6 +58,7 @@ set(SOURCE_FILES
     engine/plugin_webkit_store.cc
     engine/plugin_webkit_world_mgr.cc
     engine/thread_pool.cc
+    util/cmdline_parser.cc
     util/file_watcher.cc
     util/semver.cc
     util/zip.cc
@@ -228,9 +230,11 @@ endif()
 
 find_steam_path(Millennium)
 
-message(STATUS "[Millennium] Build Path:  [${out_steam_path}]")
-message(STATUS "[Millennium] Version:     [${MILLENNIUM_VERSION}]")
-message(STATUS "[Millennium] Revision:    [${GIT_COMMIT_HASH}]")
+if (WIN32 AND NOT GITHUB_ACTION_BUILD)
+    message(STATUS "[Millennium] Build Path: ${out_steam_path}")
+endif()
+message(STATUS "[Millennium] Version:    ${MILLENNIUM_VERSION}")
+message(STATUS "[Millennium] Commit OID: ${GIT_COMMIT_HASH}")
 
 set_target_properties(Millennium PROPERTIES
     PREFIX ""
