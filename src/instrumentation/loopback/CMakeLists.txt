@@ -71,6 +71,10 @@ if(APPLE)
     target_link_libraries(hhx64 "-framework AppKit" "-framework QuartzCore")
 endif()
 
+include(FetchContent)
+FetchContent_GetProperties(re2)
+add_subdirectory("${re2_SOURCE_DIR}" "${re2_BINARY_DIR}")
+
 target_link_libraries(hhx64 re2)
 set_target_properties(hhx64 PROPERTIES
     PREFIX ""

@@ -192,7 +192,6 @@ add_subdirectory("${fmt_SOURCE_DIR}"           "${fmt_BINARY_DIR}"          )
 add_subdirectory("${nlohmann_json_SOURCE_DIR}" "${nlohmann_json_BINARY_DIR}")
 add_subdirectory("${minizip_ng_SOURCE_DIR}"    "${minizip_ng_BINARY_DIR}"   )
 add_subdirectory("${lua_cjson_SOURCE_DIR}"     "${lua_cjson_BINARY_DIR}"    )
-add_subdirectory("${re2_SOURCE_DIR}"           "${re2_BINARY_DIR}"          )
 
 set(CMAKE_C_FLAGS   "${_saved_c_flags}")
 set(CMAKE_CXX_FLAGS "${_saved_cxx_flags}")
