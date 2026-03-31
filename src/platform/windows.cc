@@ -31,7 +31,7 @@
 #ifdef _WIN32
 #include "millennium/millennium.h"
 #include "millennium/filesystem.h"
-#include "millennium/cmdline_parse.h"
+#include "millennium/cmdline_api.h"
 #include "millennium/plat_msg.h"
 #include "millennium/environment.h"
 #include "millennium/encoding.h"
@@ -309,7 +309,7 @@ VOID Win32_AttachMillennium(VOID)
 VOID Win32_DetachMillennium(VOID)
 {
     logger.print(" MAIN ", "Shutting Millennium down...", COL_MAGENTA);
-    millennium_lifecycle::get().terminate.store(true);
+    millennium_lifecycle::get().terminate.notify();
     logger.log("Waiting for Millennium thread to exit...");
 
     if (!g_millenniumThread.joinable()) {

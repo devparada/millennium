@@ -377,7 +377,7 @@ void plugin_loader::inject_frontend_shims(bool reload_frontend)
 
 void plugin_loader::start_plugin_frontends()
 {
-    if (millennium_lifecycle::get().terminate.load()) {
+    if (millennium_lifecycle::get().terminate.flag.load()) {
         logger.log("Terminating frontend thread pool...");
         return;
     }
@@ -391,7 +391,7 @@ void plugin_loader::start_plugin_frontends()
         socket_thread->join();
     }
 
-    if (millennium_lifecycle::get().terminate.load()) {
+    if (millennium_lifecycle::get().terminate.flag.load()) {
         logger.log("Steam is shutting down, terminating frontend thread pool...");
         return;
     }
@@ -403,7 +403,7 @@ void plugin_loader::start_plugin_frontends()
 #ifdef _WIN32
         if (millennium_lifecycle::get().disconnect_frontend.load())
 #else
-        if (millennium_lifecycle::get().terminate.load())
+        if (millennium_lifecycle::get().terminate.flag.load())
 #endif
         {
             logger.log("Steam is shutting down, terminating frontend thread pool...");

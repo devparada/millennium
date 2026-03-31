@@ -39,6 +39,7 @@
 #include <dlfcn.h>
 #include <limits.h>
 #include <string.h>
+#include <iostream>
 
 #include <regex>
 #include <thread>
@@ -112,7 +113,7 @@ int Deprecated_HookedMain(int argc, char** argv, char** envp)
     int steam_main = fnMainOriginal(argc, argv, envp);
     logger.log("Hooked Steam entry returned {}", steam_main);
 
-    millennium_lifecycle::get().terminate.store(true);
+    millennium_lifecycle::get().terminate.notify();
     g_millenniumThread->join();
 
     logger.log("Shutting down Millennium...");

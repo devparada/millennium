@@ -90,7 +90,7 @@ extern "C" __attribute__((visibility("default"))) int StartMillennium()
 extern "C" __attribute__((visibility("default"))) int StopMillennium()
 {
     logger.log("Unloading Millennium...");
-    millennium_lifecycle::get().terminate.store(true);
+    millennium_lifecycle::get().terminate.notify();
 
     if (g_millenniumThread && g_millenniumThread->joinable()) {
         g_millenniumThread->join();
