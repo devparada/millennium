@@ -29,9 +29,7 @@
  */
 
 #include "millennium/logger.h"
-#include "millennium/steam_hooks.h"
-#include "millennium/cmdline_parse.h"
-#include <cstring>
+#include "millennium/cmdline_api.h"
 
 #ifdef _WIN32
 #include <Windows.h>
@@ -94,4 +92,3 @@ bool CommandLineArguments::has_argument(const std::string& targetArgument)
     return false;
 #endif
 }
-
