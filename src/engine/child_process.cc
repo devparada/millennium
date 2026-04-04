@@ -42,6 +42,7 @@
 #include <afunix.h>
 #include <windows.h>
 #include <io.h>
+#include "millennium/cmdline_api.h"
 #define unlink _unlink
 #else
 #include <fcntl.h>

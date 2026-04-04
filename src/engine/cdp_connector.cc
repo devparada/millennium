@@ -317,7 +317,7 @@ void socket_utils::connect_socket(std::shared_ptr<socket_utils::socket_t> socket
     {
         millennium_lifecycle::get().terminate.wait();
         const uint64_t val = 1;
-        write(cancel_fd, &val, sizeof(val));
+        (void)write(cancel_fd, &val, sizeof(val));
         cdp->shutdown();
     });
 
