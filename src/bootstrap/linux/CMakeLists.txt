@@ -43,12 +43,12 @@ set_target_properties(bootstrap64 PROPERTIES
     SUFFIX ""
 )
 
-add_executable(millennium_pvs64 millennium_pvs64.cc)
+add_executable(libmillennium_pvs64 millennium_pvs64.cc)
 
-target_compile_options(millennium_pvs64 PRIVATE -m64 -Wall -Wextra)
-target_link_options(millennium_pvs64 PRIVATE -m64)
+target_compile_options(libmillennium_pvs64 PRIVATE -m64 -Wall -Wextra)
+target_link_options(libmillennium_pvs64 PRIVATE -m64)
 
-set_target_properties(millennium_pvs64 PROPERTIES
-    OUTPUT_NAME "millennium_pvs64"
+set_target_properties(libmillennium_pvs64 PROPERTIES
+    OUTPUT_NAME "libmillennium_pvs64"
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
 )

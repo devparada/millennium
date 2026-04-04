@@ -28,6 +28,7 @@
  * SOFTWARE.
  */
 
+#include "millennium/filesystem.h"
 #include <atomic>
 #include <condition_variable>
 #include <mutex>
@@ -72,22 +73,7 @@ static std::string find_pvs64_binary()
 #ifdef __PVS64_OUTPUT_ABSPATH__
     return __PVS64_OUTPUT_ABSPATH__;
 #else
-    Dl_info info;
-    if (!dladdr(reinterpret_cast<void*>(&find_pvs64_binary), &info) || !info.dli_fname) {
-        return {};
-    }
-
-    char resolved[PATH_MAX];
-    if (!realpath(info.dli_fname, resolved)) {
-        return {};
-    }
-
-    char* slash = strrchr(resolved, '/');
-    if (!slash) {
-        return {};
-    }
-
-    return std::string(resolved, slash + 1) + "millennium_pvs64";
+    return (platform::get_millennium_bin_path() / "libmillennium_pvs64").string();
 #endif
 }
 
@@ -159,7 +145,7 @@ static bool create_pv_shim()
     {
         std::string pvs64 = find_pvs64_binary();
         if (pvs64.empty()) {
-            LOG_ERROR("create_pv_shim: millennium_pvs64 binary not found");
+            LOG_ERROR("create_pv_shim: libmillennium_pvs64 binary not found");
             goto cleanup;
         }
 

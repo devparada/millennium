@@ -28,7 +28,7 @@ add_compile_definitions(
     $<$<CONFIG:Debug>:__HOOK_HELPER_OUTPUT_ABSPATH__="$<TARGET_FILE:hhx64>">
     $<$<CONFIG:Debug>:__LUA_HOST_OUTPUT_ABSPATH__="$<TARGET_FILE:${MILLENNIUM_RTB_NAME}>">
     $<$<CONFIG:Debug>:__DBG_MILLENNIUM_OUTPUT_DIR__="$<TARGET_FILE_DIR:Millennium>">
-    $<$<AND:$<CONFIG:Debug>,$<PLATFORM_ID:Linux>>:__PVS64_OUTPUT_ABSPATH__="$<TARGET_FILE:millennium_pvs64>">
+    $<$<AND:$<CONFIG:Debug>,$<PLATFORM_ID:Linux>>:__PVS64_OUTPUT_ABSPATH__="$<TARGET_FILE:libmillennium_pvs64>">
 )
 
 include_directories(

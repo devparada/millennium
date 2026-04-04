@@ -29,7 +29,7 @@
  */
 
 /**
- * millennium_pvs64 (Pressure-Vessel-Shim) — pressure-vessel unruntime shim for CDP pipe forwarding.
+ * libmillennium_pvs64 (Pressure-Vessel-Shim): pressure-vessel unruntime shim for CDP pipe forwarding.
  * Steam's CreateSimpleProcess() fn strips all fd's we pass to it (we need 3 & 4 for the CDP).
  * This shim wraps and executes the real pressure-vessel-unruntime with --pass-fd=3 --pass-fd=4
  * https://gitlab.steamos.cloud/steamrt/steam-runtime-tools/-/blob/main/pressure-vessel/wrap.1.md#:~:text=variable%2Ddir.-,%2D%2Dpass%2Dfd,-FD

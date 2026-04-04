@@ -193,6 +193,7 @@ jobs:
           cp build/libmillennium_bootstrap_hhx64.so ~/build/usr/lib/millennium/
           cp build/libmillennium_hhx64.so ~/build/usr/lib/millennium/
           cp build/libmillennium_luavm_x86 ~/build/usr/lib/millennium/
+          cp build/libmillennium_pvs64 ~/build/usr/lib/millennium/
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
@@ -252,6 +253,7 @@ jobs:
             "usr/lib/millennium/libmillennium_bootstrap_x86.so"
             "usr/lib/millennium/libmillennium_luavm_x86"
             "usr/lib/millennium/libmillennium_bootstrap_hhx64.so"
+            "usr/lib/millennium/libmillennium_pvs64"
           )
           MISSING=0
           for f in "${REQUIRED[@]}"; do
@@ -284,6 +286,7 @@ jobs:
           check_arch "usr/lib/millennium/libmillennium_luavm_x86"          32 || ARCH_FAIL=1
           check_arch "usr/lib/millennium/libmillennium_hhx64.so"           64 || ARCH_FAIL=1
           check_arch "usr/lib/millennium/libmillennium_bootstrap_hhx64.so" 64 || ARCH_FAIL=1
+          check_arch "usr/lib/millennium/libmillennium_pvs64"              64 || ARCH_FAIL=1
           [ $ARCH_FAIL -eq 0 ] || { echo "ERROR: binary architecture mismatch"; exit 1; }
 
   release:
