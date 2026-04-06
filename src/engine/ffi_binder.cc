@@ -40,14 +40,31 @@ ffi_binder::ffi_binder(std::shared_ptr<cdp_client> client, std::shared_ptr<plugi
 {
     m_client->on("Runtime.bindingCalled", std::bind(&ffi_binder::binding_call_hdlr, this, std::placeholders::_1));
     m_client->on("Runtime.executionContextCreated", std::bind(&ffi_binder::execution_ctx_created_hdlr, this, std::placeholders::_1));
+    m_client->on("Runtime.executionContextDestroyed", std::bind(&ffi_binder::execution_ctx_destroyed_hdlr, this, std::placeholders::_1));
 }
 
 ffi_binder::~ffi_binder()
 {
+    std::unique_lock<std::mutex> lock(m_ctx_mutex);
+    for (const auto& [event, _] : m_event_subs) {
+        m_client->off(event);
+    }
+    lock.unlock();
+
     m_client->off("Runtime.bindingCalled");
     m_client->off("Runtime.executionContextCreated");
-
+    m_client->off("Runtime.executionContextDestroyed");
     logger.log("Successfully shut down ffi_binder...");
+}
+
+void ffi_binder::register_isolated_ctx(const std::string& plugin_name, int isolated_ctx_id, const std::string& session_id)
+{
+    std::lock_guard<std::mutex> lock(m_ctx_mutex);
+    auto& ctx = m_plugin_ctxs[plugin_name];
+    ctx.isolated_ctx_id = isolated_ctx_id;
+    ctx.isolated_session_id = session_id;
+    m_ctx_to_plugin[isolated_ctx_id] = plugin_name;
+    logger.log("ffi_binder: registered isolated ctx {} for plugin '{}'", isolated_ctx_id, plugin_name);
 }
 
 void ffi_binder::callback_into_js(const json params, const int request_id, json result)
@@ -84,48 +101,244 @@ bool ffi_binder::is_valid_request(const json& params)
     return true;
 }
 
-void ffi_binder::cdp_binding_call_hdlr(const json& params)
+void ffi_binder::extension_route_hdlr(const json& params)
 {
     if (!params.contains("payload") || !params.contains("executionContextId") || !params.contains("sessionId")) {
-        LOG_ERROR("ffi_binder: corrupted CDP binding call: {}", params.dump(4));
+        LOG_ERROR("ffi_binder: corrupted extension route call: {}", params.dump(4));
         return;
     }
 
+    const int context_id = params["executionContextId"].get<int>();
+    const std::string session_id = params["sessionId"].get<std::string>();
     int call_id = -1;
 
     try {
         json payload = json::parse(params["payload"].get<std::string>());
-        call_id = payload.at("call_id").get<int>();
-        std::string method = payload.at("method").get<std::string>();
+
+        call_id = payload.at("id").get<int>();
+        const std::string method = payload.at("method").get<std::string>();
         json cdp_params = payload.value("params", json::object());
-        auto session_id = payload.contains("sessionId") ? std::optional<std::string>(payload["sessionId"].get<std::string>()) : std::nullopt;
+        auto opt_session = payload.contains("sessionId") ? std::optional<std::string>(payload["sessionId"].get<std::string>()) : std::nullopt;
 
         json response;
         try {
-            auto result = m_client->send_host(method, cdp_params, session_id).get();
-            response = {{"call_id", call_id}, {"result", result}};
+            auto result = m_client->send_host(method, cdp_params, opt_session).get();
+            response = {
+                { "id",     call_id },
+                { "result", result  }
+            };
         } catch (const std::exception& e) {
-            response = {{"call_id", call_id}, {"error", {{"message", e.what()}}}};
+            response = {
+                { "id",    call_id                     },
+                { "error", { { "message", e.what() } } }
+            };
         }
 
         json eval_params = {
-            {"contextId", params["executionContextId"]},
-            {"expression", fmt::format("window.{}.__handleCDPResponse({})", ffi_constants::cdp_frontend_binding_name, response.dump())}
+            { "contextId", context_id },
+            { "expression", fmt::format("window.{}.__handleCDPResponse({})", ffi_constants::extension_frontend_response_name, response.dump()) }
         };
-        m_client->send_host("Runtime.evaluate", eval_params, params["sessionId"].get<std::string>());
+        m_client->send_host("Runtime.evaluate", eval_params, session_id);
 
     } catch (const std::exception& e) {
-        LOG_ERROR("ffi_binder: CDP routing error: {}", e.what());
+        LOG_ERROR("ffi_binder: extension route error: {}", e.what());
 
-        json error_response = {{"call_id", call_id}, {"error", {{"message", e.what()}}}};
+        json error_response = {
+            { "id",    call_id                     },
+            { "error", { { "message", e.what() } } }
+        };
         try {
             json eval_params = {
-                {"contextId", params["executionContextId"]},
-                {"expression", fmt::format("window.{}.__handleCDPResponse({})", ffi_constants::cdp_frontend_binding_name, error_response.dump())}
+                { "contextId", context_id },
+                { "expression", fmt::format("window.{}.__handleCDPResponse({})", ffi_constants::extension_frontend_response_name, error_response.dump()) }
             };
-            m_client->send_host("Runtime.evaluate", eval_params, params["sessionId"].get<std::string>());
+            m_client->send_host("Runtime.evaluate", eval_params, session_id);
         } catch (...) {
         }
+    }
+}
+
+void ffi_binder::cdp_proxy_hdlr(const json& params)
+{
+    if (!params.contains("payload") || !params.contains("executionContextId") || !params.contains("sessionId")) {
+        return;
+    }
+
+    json payload;
+    try {
+        payload = json::parse(params["payload"].get<std::string>());
+    } catch (...) {
+        LOG_ERROR("ffi_binder: cdp_proxy_hdlr failed to parse payload");
+        return;
+    }
+
+    const std::string action = payload.value("action", "");
+    const std::string session_id = params["sessionId"].get<std::string>();
+    const int ctx_id = params["executionContextId"].get<int>();
+
+    if (action == "cdp_call") {
+        const std::string plugin_name = payload.value("pluginName", "");
+        const int callback_id = payload.value("callbackId", -1);
+        const std::string method = payload.value("method", "");
+        const json cdp_params = payload.value("params", json::object());
+
+        if (plugin_name.empty() || callback_id == -1 || method.empty()) {
+            LOG_ERROR("ffi_binder: cdp_proxy: malformed cdp_call payload");
+            return;
+        }
+
+        /** always keep main world context id current, it changes on SharedJSContext reload */
+        {
+            std::lock_guard<std::mutex> lock(m_ctx_mutex);
+            auto& ctx = m_plugin_ctxs[plugin_name];
+            ctx.main_ctx_id = ctx_id;
+            ctx.main_session_id = session_id;
+        }
+
+        cdp_proxy_call(plugin_name, callback_id, method, cdp_params, session_id, ctx_id);
+    } else if (action == "relay" || action == "relay_error") {
+        const int callback_id = payload.value("callbackId", -1);
+        if (callback_id == -1) return;
+
+        std::string main_session;
+        int main_ctx = -1;
+        std::string plugin_name_dbg;
+        {
+            std::lock_guard<std::mutex> lock(m_ctx_mutex);
+            auto name_it = m_ctx_to_plugin.find(ctx_id);
+            if (name_it == m_ctx_to_plugin.end()) {
+                logger.log("[CDP PROXY] relay: unknown isolated ctx_id={}, dropping", ctx_id);
+                return;
+            }
+            plugin_name_dbg = name_it->second;
+            auto ctx_it = m_plugin_ctxs.find(plugin_name_dbg);
+            if (ctx_it == m_plugin_ctxs.end()) return;
+            main_session = ctx_it->second.main_session_id;
+            main_ctx = ctx_it->second.main_ctx_id;
+        }
+
+        if (main_ctx == -1) {
+            logger.log("[CDP PROXY] relay: main_ctx_id not set yet for '{}', dropping", plugin_name_dbg);
+            return;
+        }
+
+        if (action == "relay_error") {
+            const std::string error = payload.value("error", "unknown error");
+            json eval_params = {
+                { "contextId", main_ctx },
+                { "expression", fmt::format("{}({}, {})", ffi_constants::millennium_cdp_reject, callback_id, json(error).dump()) }
+            };
+            m_client->send_host("Runtime.evaluate", eval_params, main_session);
+        } else {
+            const json result = payload.value("result", json::object());
+            json eval_params = {
+                { "contextId", main_ctx },
+                { "expression", fmt::format("{}({}, {})", ffi_constants::millennium_cdp_resolve, callback_id, result.dump()) }
+            };
+            m_client->send_host("Runtime.evaluate", eval_params, main_session);
+        }
+    } else if (action == "subscribe" || action == "unsubscribe") {
+        const std::string plugin_name = payload.value("pluginName", "");
+        const std::string event = payload.value("event", "");
+
+        if (plugin_name.empty() || event.empty()) return;
+
+        std::lock_guard<std::mutex> lock(m_ctx_mutex);
+
+        if (action == "subscribe") {
+            bool first = m_event_subs[event].empty();
+            m_event_subs[event].insert(plugin_name);
+
+            auto& plugin_ctx_ref = m_plugin_ctxs[plugin_name];
+            plugin_ctx_ref.main_ctx_id = ctx_id;
+            plugin_ctx_ref.main_session_id = session_id;
+
+            if (first) {
+                m_client->on(event, [this, event](const json& event_params)
+                {
+                    cdp_event_dispatch(event, event_params);
+                });
+            }
+        } else {
+            auto it = m_event_subs.find(event);
+            if (it != m_event_subs.end()) {
+                it->second.erase(plugin_name);
+                if (it->second.empty()) {
+                    m_event_subs.erase(it);
+                    m_client->off(event);
+                }
+            }
+        }
+    }
+}
+
+void ffi_binder::cdp_proxy_call(const std::string& plugin_name, int callback_id, const std::string& method, const json& params, const std::string& session_id, int main_ctx_id)
+{
+    if (BLOCKED_CDP_METHODS_SET.count(method)) {
+        const std::string msg = fmt::format("Millennium prohibits calls to '{}' for user safety", method);
+        json eval_params = {
+            { "contextId", main_ctx_id },
+            { "expression", fmt::format("{}({}, {})", ffi_constants::millennium_cdp_reject, callback_id, json(msg).dump()) }
+        };
+        m_client->send_host("Runtime.evaluate", eval_params, session_id);
+        return;
+    }
+
+    auto deliver = [&](const json& value, bool is_error)
+    {
+        int main_ctx = main_ctx_id;
+        std::string main_sess = session_id;
+        {
+            std::lock_guard<std::mutex> lock(m_ctx_mutex);
+            auto it = m_plugin_ctxs.find(plugin_name);
+            if (it != m_plugin_ctxs.end() && it->second.main_ctx_id != -1) {
+                main_ctx = it->second.main_ctx_id;
+                main_sess = it->second.main_session_id;
+            }
+        }
+        const char* js_fn = is_error ? ffi_constants::millennium_cdp_reject : ffi_constants::millennium_cdp_resolve;
+        json eval_params = {
+            { "contextId", main_ctx },
+            { "expression", fmt::format("{}({}, {})", js_fn, callback_id, value.dump()) }
+        };
+        m_client->send_host("Runtime.evaluate", eval_params, main_sess);
+    };
+
+    try {
+        auto result = m_client->send_host(method, params).get();
+        deliver(result, false);
+    } catch (const std::exception& e) {
+        deliver(json(std::string(e.what())), true);
+    }
+}
+
+void ffi_binder::cdp_event_dispatch(const std::string& method, const json& params)
+{
+    std::vector<std::pair<int, std::string>> targets; // { main_ctx_id, session_id }
+    {
+        std::lock_guard<std::mutex> lock(m_ctx_mutex);
+        auto it = m_event_subs.find(method);
+        if (it == m_event_subs.end()) return;
+
+        for (const auto& plugin_name : it->second) {
+            auto ctx_it = m_plugin_ctxs.find(plugin_name);
+            if (ctx_it != m_plugin_ctxs.end() && ctx_it->second.main_ctx_id != -1) {
+                targets.emplace_back(ctx_it->second.main_ctx_id, ctx_it->second.main_session_id);
+            }
+        }
+    }
+
+    const json event_data = {
+        { "method", method },
+        { "params", params }
+    };
+
+    for (const auto& [ctx_id, session_id] : targets) {
+        json eval_params = {
+            { "contextId", ctx_id },
+            { "expression", fmt::format("window.__millennium_cdp_event__({})", event_data.dump()) }
+        };
+        m_client->send_host("Runtime.evaluate", eval_params, session_id);
     }
 }
 
@@ -135,8 +348,15 @@ void ffi_binder::binding_call_hdlr(const json& params)
         return;
     }
 
-    if (params["name"].get<std::string>() == ffi_constants::cdp_binding_name) {
-        cdp_binding_call_hdlr(params);
+    const std::string& binding_name = params["name"].get_ref<const std::string&>();
+
+    if (binding_name == ffi_constants::extension_binding_name) {
+        extension_route_hdlr(params);
+        return;
+    }
+
+    if (binding_name == ffi_constants::cdp_proxy_binding_name) {
+        cdp_proxy_hdlr(params);
         return;
     }
 
@@ -216,11 +436,40 @@ void ffi_binder::execution_ctx_created_hdlr(const json& params)
     }
 
     try {
-        const json add_cdp_binding_params = {
-            { "name",               ffi_constants::cdp_binding_name },
-            { "executionContextId", context_id                      }
+        const json add_extension_binding_params = {
+            { "name",               ffi_constants::extension_binding_name },
+            { "executionContextId", context_id                            }
         };
-        m_client->send_host("Runtime.addBinding", add_cdp_binding_params, session_id).get();
+        m_client->send_host("Runtime.addBinding", add_extension_binding_params, session_id).get();
     } catch (...) {
+    }
+
+    try {
+        const json add_cdp_proxy_params = {
+            { "name",               ffi_constants::cdp_proxy_binding_name },
+            { "executionContextId", context_id                            }
+        };
+        m_client->send_host("Runtime.addBinding", add_cdp_proxy_params, session_id).get();
+    } catch (...) {
+    }
+}
+
+void ffi_binder::execution_ctx_destroyed_hdlr(const json& params)
+{
+    if (!params.contains("executionContextId")) {
+        return;
+    }
+
+    const int dead_ctx_id = params["executionContextId"].get<int>();
+
+    std::lock_guard<std::mutex> lock(m_ctx_mutex);
+
+    /* rem from reverse lookup so the ID can't be dirty matched later */
+    m_ctx_to_plugin.erase(dead_ctx_id);
+
+    for (auto& [name, ctx] : m_plugin_ctxs) {
+        if (ctx.main_ctx_id == dead_ctx_id) {
+            ctx.main_ctx_id = -1;
+        }
     }
 }

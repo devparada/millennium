@@ -88,6 +88,7 @@ class cdp_client : public std::enable_shared_from_this<cdp_client>
     /** unsubscribe from a cdp event */
     void off(const std::string& event);
 
+
     /**
      * set a handler for internal errors (parsing failures, callback exceptions, etc).
      * useful for logging/debugging without crashing.
@@ -107,6 +108,12 @@ class cdp_client : public std::enable_shared_from_this<cdp_client>
     void set_shared_js_session_id(const std::string& sessionId)
     {
         m_shared_js_session_id = sessionId;
+    }
+
+    /** get the session id for the shared js context */
+    const std::string& get_shared_js_session_id() const
+    {
+        return m_shared_js_session_id;
     }
 
     /** check if the client is still running */

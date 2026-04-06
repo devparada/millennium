@@ -46,14 +46,8 @@ extern std::mutex g_cdp_pipe_mutex;
 extern std::condition_variable g_cdp_pipe_cv;
 extern bool g_cdp_pipes_ready;
 
-/**
- * CDP pipe transport uses the Chrome DevTools Protocol over pipes.
- * Messages are null-terminated JSON strings, one per write/read.
- */
-
 static bool pipe_send(HANDLE hWrite, const std::string& payload)
 {
-    /** CDP pipe protocol: message followed by null terminator */
     std::string msg = payload;
     msg.push_back('\0');
 
@@ -187,6 +181,7 @@ void socket_utils::connect_socket(std::shared_ptr<socket_utils::socket_t> socket
 
 extern int g_cdp_pipe_read_fd;
 extern int g_cdp_pipe_write_fd;
+extern int g_cdp_pipe_change_efd;
 extern std::mutex g_cdp_pipe_mutex;
 extern std::condition_variable g_cdp_pipe_cv;
 extern bool g_cdp_pipes_ready;
@@ -211,18 +206,20 @@ static bool pipe_send(int fd, const std::string& payload)
     return true;
 }
 
-static void pipe_read_loop(int data_fd, int cancel_fd, std::shared_ptr<cdp_client> cdp)
+static void pipe_read_loop(int data_fd, int cancel_fd, int pipe_change_fd, std::shared_ptr<cdp_client> cdp)
 {
     std::string buffer;
     char chunk[4096];
 
-    struct pollfd pfds[2] = {
-        { data_fd,   POLLIN, 0 },
-        { cancel_fd, POLLIN, 0 },
+    struct pollfd pfds[3] = {
+        { data_fd,        POLLIN, 0 },
+        { cancel_fd,      POLLIN, 0 },
+        { pipe_change_fd, POLLIN, 0 },
     };
+    const int nfds = (pipe_change_fd >= 0) ? 3 : 2;
 
     while (cdp->is_active()) {
-        int r = poll(pfds, 2, -1);
+        int r = poll(pfds, nfds, -1);
         if (r < 0) {
             if (errno == EINTR) continue;
             LOG_ERROR("CDP pipe poll failed (errno {})", errno);
@@ -231,6 +228,14 @@ static void pipe_read_loop(int data_fd, int cancel_fd, std::shared_ptr<cdp_clien
 
         if (pfds[1].revents & POLLIN) {
             logger.log("CDP pipe read cancelled.");
+            break;
+        }
+
+        if (pipe_change_fd >= 0 && (pfds[2].revents & POLLIN)) {
+            uint64_t val;
+            [[maybe_unused]] ssize_t _ = read(pipe_change_fd, &val, sizeof(val));
+            logger.log("CDP pipe replaced (steamwebhelper restarted), reconnecting...");
+            cdp->shutdown();
             break;
         }
 
@@ -293,7 +298,14 @@ void socket_utils::connect_socket(std::shared_ptr<socket_utils::socket_t> socket
         return;
     }
 
+    int read_fd = g_cdp_pipe_read_fd;
     int write_fd = g_cdp_pipe_write_fd;
+
+    if (g_cdp_pipe_change_efd >= 0) {
+        uint64_t val;
+        [[maybe_unused]] ssize_t _ = read(g_cdp_pipe_change_efd, &val, sizeof(val));
+    }
+
     auto cdp = std::make_shared<cdp_client>([write_fd](const std::string& payload) -> bool
     {
         return pipe_send(write_fd, payload);
@@ -301,9 +313,9 @@ void socket_utils::connect_socket(std::shared_ptr<socket_utils::socket_t> socket
 
     logger.log("[{}] CDP pipe transport connected.", name);
 
-    std::thread read_thread([read_fd = g_cdp_pipe_read_fd, cancel_fd, cdp, name]()
+    std::thread read_thread([read_fd, cancel_fd, cdp, name]()
     {
-        pipe_read_loop(read_fd, cancel_fd, cdp);
+        pipe_read_loop(read_fd, cancel_fd, g_cdp_pipe_change_efd, cdp);
         logger.log("[{}] CDP pipe read loop exited.", name);
     });
 
@@ -313,12 +325,21 @@ void socket_utils::connect_socket(std::shared_ptr<socket_utils::socket_t> socket
         LOG_ERROR("[{}] Exception in onConnect: {}", name, e.what());
     }
 
-    std::thread terminate_watcher([cdp, cancel_fd]()
+    auto connection_closed = std::make_shared<std::atomic<bool>>(false);
+
+    std::thread terminate_watcher([cdp, cancel_fd, connection_closed]()
     {
-        millennium_lifecycle::get().terminate.wait();
-        const uint64_t val = 1;
-        [[maybe_unused]] ssize_t _ = write(cancel_fd, &val, sizeof(val));
-        cdp->shutdown();
+        std::unique_lock<std::mutex> lk(millennium_lifecycle::get().terminate.mtx);
+        millennium_lifecycle::get().terminate.cv.wait(lk, [&]
+        {
+            return millennium_lifecycle::get().terminate.flag.load() || connection_closed->load();
+        });
+
+        if (millennium_lifecycle::get().terminate.flag.load()) {
+            const uint64_t val = 1;
+            [[maybe_unused]] ssize_t _ = write(cancel_fd, &val, sizeof(val));
+            cdp->shutdown();
+        }
     });
 
     if (read_thread.joinable()) {
@@ -327,11 +348,16 @@ void socket_utils::connect_socket(std::shared_ptr<socket_utils::socket_t> socket
 
     cdp->shutdown();
 
+    connection_closed->store(true);
+    millennium_lifecycle::get().terminate.cv.notify_all();
+
     if (terminate_watcher.joinable()) {
         terminate_watcher.join();
     }
 
     close(cancel_fd);
+    close(read_fd);
+    close(write_fd);
     logger.log("Disconnected from [{}] module...", name);
 }
 #else

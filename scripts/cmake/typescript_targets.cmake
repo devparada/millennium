@@ -13,9 +13,6 @@ add_custom_command(
         -D "RUN_INSTALL=1"
         -P "${TS_BUILDER}"
     COMMAND ${CMAKE_COMMAND} -E touch "${TS_STAMPS}/install.stamp"
-    DEPENDS
-        "${TS_ROOT}/bun.lock"
-        "${TS_ROOT}/package.json"
     COMMENT "TypeScript: bun install"
     VERBATIM
 )
@@ -25,6 +22,7 @@ file(GLOB_RECURSE _src_ttc    CONFIGURE_DEPENDS "${TS_ROOT}/ttc/src/*.ts")
 file(GLOB_RECURSE _src_client CONFIGURE_DEPENDS "${TS_ROOT}/sdk/packages/client/src/*.ts")
 file(GLOB_RECURSE _src_webkit CONFIGURE_DEPENDS "${TS_ROOT}/sdk/packages/browser/src/*.ts")
 file(GLOB_RECURSE _src_api    CONFIGURE_DEPENDS "${TS_ROOT}/sdk/packages/loader/src/*.ts")
+file(GLOB_RECURSE _src_cdp_isolated_ctx CONFIGURE_DEPENDS "${TS_ROOT}/sdk/packages/cdp-isolated-ctx/src/*.ts")
 file(GLOB_RECURSE _src_core   CONFIGURE_DEPENDS
     "${TS_ROOT}/frontend/*.ts"
     "${TS_ROOT}/frontend/*.tsx"
@@ -34,9 +32,9 @@ file(GLOB _src_locales CONFIGURE_DEPENDS
 )
 
 macro(_ts_package _name _dir)
-    set(_stamp "${TS_STAMPS}/${_name}.stamp")
-    file(RELATIVE_PATH _reldir "${MILLENNIUM_BASE}" "${_dir}")
-    add_custom_command(
+  set(_stamp "${TS_STAMPS}/${_name}.stamp")
+  file(RELATIVE_PATH _reldir "${MILLENNIUM_BASE}" "${_dir}")
+  add_custom_command(
         OUTPUT  "${_stamp}"
         COMMAND ${CMAKE_COMMAND}
             -D "BUN=${BUN_EXECUTABLE}"
@@ -50,8 +48,8 @@ macro(_ts_package _name _dir)
         COMMENT "Building TS library ${_reldir}"
         VERBATIM
     )
-    add_custom_target(ts_${_name} DEPENDS "${_stamp}")
-    add_dependencies(ts_${_name} ts_install)
+  add_custom_target(ts_${_name} DEPENDS "${_stamp}")
+  add_dependencies(ts_${_name} ts_install)
 endmacro()
 
 _ts_package(ttc "${TS_ROOT}/ttc"
@@ -85,6 +83,13 @@ _ts_package(api "${TS_ROOT}/sdk/packages/loader"
 )
 add_dependencies(ts_api ts_client)
 
+_ts_package(cdp_isolated_ctx "${TS_ROOT}/sdk/packages/cdp-isolated-ctx"
+    "${TS_ROOT}/sdk/packages/cdp-isolated-ctx/package.json"
+    "${TS_ROOT}/sdk/packages/cdp-isolated-ctx/rollup.config.js"
+    "${TS_ROOT}/sdk/packages/cdp-isolated-ctx/tsconfig.json"
+    ${_src_cdp_isolated_ctx}
+)
+
 _ts_package(core "${TS_ROOT}/frontend"
     "${TS_STAMPS}/client.stamp"
     "${TS_STAMPS}/webkit.stamp"
@@ -96,9 +101,9 @@ add_dependencies(ts_core ts_client ts_webkit)
 
 set(_virtfs_h "${MILLENNIUM_BASE}/src/include/millennium/virtfs.h")
 if(WIN32 AND (CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo"))
-    set(_virtfs_outputs "${_virtfs_h}" "${MILLENNIUM_BASE}/scripts/resources.rc")
+  set(_virtfs_outputs "${_virtfs_h}" "${MILLENNIUM_BASE}/scripts/resources.rc")
 else()
-    set(_virtfs_outputs "${_virtfs_h}")
+  set(_virtfs_outputs "${_virtfs_h}")
 endif()
 add_custom_command(
     OUTPUT  ${_virtfs_outputs}
@@ -109,8 +114,9 @@ add_custom_command(
     DEPENDS
         "${TS_STAMPS}/api.stamp"
         "${TS_STAMPS}/core.stamp"
+        "${TS_STAMPS}/cdp_isolated_ctx.stamp"
     COMMENT "Generating virtfs.h"
     VERBATIM
 )
 add_custom_target(virtfs_header DEPENDS "${_virtfs_h}")
-add_dependencies(virtfs_header ts_api ts_core)
+add_dependencies(virtfs_header ts_api ts_core ts_cdp_isolated_ctx)

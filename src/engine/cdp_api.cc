@@ -253,6 +253,7 @@ void cdp_client::off(const std::string& event)
     m_event_callbacks.erase(event);
 }
 
+
 /**
  * Handle an incoming message from the CDP endpoint.
  */
@@ -328,8 +329,13 @@ void cdp_client::process_message(const std::string& payload)
         }
     } else if (message.contains("method") && message["method"].is_string()) {
         std::string method = message["method"].get<std::string>();
-        std::shared_ptr<event_callback> callback;
 
+        json params = message.contains("params") ? message["params"] : json::object();
+        if (message.contains("sessionId") && message["sessionId"].is_string()) {
+            params["sessionId"] = message["sessionId"].get<std::string>();
+        }
+
+        std::shared_ptr<event_callback> callback;
         {
             std::shared_lock<std::shared_mutex> lock(m_events_mutex);
             auto it = m_event_callbacks.find(method);
@@ -339,12 +345,6 @@ void cdp_client::process_message(const std::string& payload)
         }
 
         if (callback) {
-            json params = message.contains("params") ? message["params"] : json::object();
-
-            if (message.contains("sessionId") && message["sessionId"].is_string()) {
-                params["sessionId"] = message["sessionId"].get<std::string>();
-            }
-
             if (m_callback_pool) {
                 m_callback_pool->enqueue([this, callback, params]()
                 {
@@ -366,6 +366,7 @@ void cdp_client::process_message(const std::string& payload)
                 });
             }
         }
+
     }
 }
 

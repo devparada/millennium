@@ -41,6 +41,7 @@
 #include <fcntl.h>
 #include <linux/limits.h>
 #include <pthread.h>
+#include <sys/eventfd.h>
 #include <sys/stat.h>
 #include <unistd.h>
 #endif
@@ -54,6 +55,7 @@
 std::mutex g_cdp_pipe_mutex;
 std::condition_variable g_cdp_pipe_cv;
 bool g_cdp_pipes_ready = false;
+int g_cdp_pipe_generation = 0;
 
 #ifdef _WIN32
 HANDLE g_cdp_pipe_read = INVALID_HANDLE_VALUE;
@@ -61,6 +63,7 @@ HANDLE g_cdp_pipe_write = INVALID_HANDLE_VALUE;
 #elif __linux__
 int g_cdp_pipe_read_fd = -1;
 int g_cdp_pipe_write_fd = -1;
+int g_cdp_pipe_change_efd = -1;
 #endif
 
 #ifdef __linux__
@@ -179,8 +182,7 @@ const char* Plat_HookedCreateSimpleProcess(const char* cmd)
         millennium_lifecycle::get().backends_loaded.wait();
     }
 
-    logger.log("Plat_HookedCreateSimpleProcess called!");
-
+    logger.log("[CDPShim] Plat_HookedCreateSimpleProcess: cmd='{}'", cmd);
     command cmd_line(cmd);
 
     const char* target_executable =
@@ -228,6 +230,7 @@ const char* Plat_HookedCreateSimpleProcess(const char* cmd)
 
             {
                 std::lock_guard<std::mutex> lock(g_cdp_pipe_mutex);
+                g_cdp_pipe_generation++;
                 g_cdp_pipes_ready = true;
             }
             g_cdp_pipe_cv.notify_all();
@@ -245,9 +248,18 @@ const char* Plat_HookedCreateSimpleProcess(const char* cmd)
             cmd_line.params.insert(cmd_line.params.begin(), cmd_line.exec);
             cmd_line.params.insert(cmd_line.params.begin(), "PRESSURE_VESSEL_PREFIX=" + g_pv_shim_dir);
             cmd_line.exec = "/usr/bin/env";
+
+            if (g_cdp_pipe_change_efd < 0) {
+                g_cdp_pipe_change_efd = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK);
+            } else {
+                /** signal pipe_read_loop to exit, a new pipe has replaced the old one */
+                const uint64_t val = 1;
+                [[maybe_unused]] ssize_t _ = write(g_cdp_pipe_change_efd, &val, sizeof(val));
+            }
         }
         {
             std::lock_guard<std::mutex> lock(g_cdp_pipe_mutex);
+            g_cdp_pipe_generation++;
             g_cdp_pipes_ready = true;
         }
         g_cdp_pipe_cv.notify_all();

@@ -252,6 +252,13 @@ const FRONTEND_TRANSFORMS: Transform[] = [
 	{ type: 'inject_arg', match: ['client', 'Millennium', 'callServerMethod'], arg: 'pluginName' },
 	{ type: 'inject_arg', match: ['client', 'Millennium', 'exposeObj'], arg: 'exports' },
 	...PLUGIN_NAME_INJECTIONS,
+	/* hoist ChromeDevToolsProtocol to a per-plugin instance; falls back to the shared singleton on old SDKs */
+	{
+		type: 'inject_const',
+		match: ['client', 'ChromeDevToolsProtocol'],
+		localName: 'ChromeDevToolsProtocol',
+		init: 'client.MillenniumChromeDevToolsProtocol ? new client.MillenniumChromeDevToolsProtocol(pluginName) : client.ChromeDevToolsProtocol',
+	},
 ];
 
 const WEBKIT_TRANSFORMS: Transform[] = [

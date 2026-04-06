@@ -49,6 +49,7 @@
 #include <unordered_set>
 
 extern std::atomic<unsigned long long> g_hookedModuleId;
+std::string get_cdp_isolated_ctx_script();
 
 /**
  * Millennium will not load JavaScript into the following URLs to favor user safety.
