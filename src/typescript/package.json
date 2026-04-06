@@ -4,6 +4,7 @@
 		"sdk/packages/client",
 		"sdk/packages/browser",
 		"sdk/packages/cdp-isolated-ctx",
+		"sdk/packages/loader",
 		"frontend"
 	]
 }
