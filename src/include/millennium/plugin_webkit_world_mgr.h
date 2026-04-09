@@ -79,6 +79,7 @@ class webkit_world_mgr
     std::mutex m_inflight_mutex;
 
     std::atomic<bool> m_shutdown{ false };
+    std::vector<int> m_listener_tokens;
 
     /** separate thread pool for attachment operations to avoid deadlock */
     std::shared_ptr<thread_pool> m_attachment_pool;

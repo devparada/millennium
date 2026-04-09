@@ -51,10 +51,9 @@ webkit_world_mgr::~webkit_world_mgr()
     m_shutdown.store(true, std::memory_order_release);
 
     /** unregister all event listeners to prevent new callbacks */
-    m_client->off("Target.targetCreated");
-    m_client->off("Target.targetDestroyed");
-    m_client->off("Target.targetInfoChanged");
-    m_client->off("Runtime.executionContextCreated");
+    for (int token : m_listener_tokens) {
+        m_client->off(token);
+    }
 
     logger.log("Successfully shut down webkit_world_mgr...");
 }
@@ -393,7 +392,7 @@ void webkit_world_mgr::target_change_hdlr(const json& params)
 
 void webkit_world_mgr::setup_event_listeners()
 {
-    m_client->on("Target.targetCreated", std::bind(&webkit_world_mgr::target_create_hdlr, this, std::placeholders::_1));
-    m_client->on("Target.targetDestroyed", std::bind(&webkit_world_mgr::target_destroy_hdlr, this, std::placeholders::_1));
-    m_client->on("Target.targetInfoChanged", std::bind(&webkit_world_mgr::target_change_hdlr, this, std::placeholders::_1));
+    m_listener_tokens.push_back(m_client->on("Target.targetCreated", std::bind(&webkit_world_mgr::target_create_hdlr, this, std::placeholders::_1)));
+    m_listener_tokens.push_back(m_client->on("Target.targetDestroyed", std::bind(&webkit_world_mgr::target_destroy_hdlr, this, std::placeholders::_1)));
+    m_listener_tokens.push_back(m_client->on("Target.targetInfoChanged", std::bind(&webkit_world_mgr::target_change_hdlr, this, std::placeholders::_1)));
 }

@@ -136,6 +136,7 @@ void cdp_client::shutdown()
     {
         std::unique_lock<std::shared_mutex> events_lock(m_events_mutex);
         m_event_callbacks.clear();
+        m_token_to_event.clear();
     }
 
     logger.log("Successfully shut down cdp_client...");
@@ -233,24 +234,60 @@ std::future<json> cdp_client::send_host(const std::string& method, const json& p
  * Listen for a method event from the CDP endpoint.
  * The callback will be invoked on a thread pool thread, meaning it's safe to do blocking operations,
  * or call back into the cdp_client without deadlocking the socket thread.
+ * Returns a token for targeted removal via off(int).
  */
-void cdp_client::on(const std::string& event, event_callback callback)
+int cdp_client::on(const std::string& event, event_callback callback)
 {
+    int token = m_next_event_token.fetch_add(1, std::memory_order_relaxed);
+
     if (m_shutdown.load(std::memory_order_acquire)) {
-        return;
+        return token;
     }
 
     std::unique_lock<std::shared_mutex> lock(m_events_mutex);
-    m_event_callbacks[event] = std::make_shared<event_callback>(std::move(callback));
+    m_event_callbacks[event].push_back({ token, std::make_shared<event_callback>(std::move(callback)) });
+    m_token_to_event[token] = event;
+    return token;
 }
 
 /**
- * Remove an event listener for a method event from the CDP endpoint.
+ * Remove a specific event listener by its registration token.
  */
-void cdp_client::off(const std::string& event)
+void cdp_client::off(int token)
 {
     std::unique_lock<std::shared_mutex> lock(m_events_mutex);
-    m_event_callbacks.erase(event);
+    auto tok_it = m_token_to_event.find(token);
+    if (tok_it == m_token_to_event.end()) return;
+
+    const std::string event = tok_it->second;
+    m_token_to_event.erase(tok_it);
+
+    auto ev_it = m_event_callbacks.find(event);
+    if (ev_it == m_event_callbacks.end()) return;
+
+    auto& listeners = ev_it->second;
+    listeners.erase(
+        std::remove_if(listeners.begin(), listeners.end(), [token](const event_listener& l) { return l.token == token; }),
+        listeners.end()
+    );
+    if (listeners.empty()) {
+        m_event_callbacks.erase(ev_it);
+    }
+}
+
+/**
+ * Remove ALL listeners for an event.
+ */
+void cdp_client::off_all(const std::string& event)
+{
+    std::unique_lock<std::shared_mutex> lock(m_events_mutex);
+    auto ev_it = m_event_callbacks.find(event);
+    if (ev_it == m_event_callbacks.end()) return;
+
+    for (const auto& listener : ev_it->second) {
+        m_token_to_event.erase(listener.token);
+    }
+    m_event_callbacks.erase(ev_it);
 }
 
 
@@ -335,16 +372,18 @@ void cdp_client::process_message(const std::string& payload)
             params["sessionId"] = message["sessionId"].get<std::string>();
         }
 
-        std::shared_ptr<event_callback> callback;
+        std::vector<std::shared_ptr<event_callback>> callbacks;
         {
             std::shared_lock<std::shared_mutex> lock(m_events_mutex);
             auto it = m_event_callbacks.find(method);
             if (it != m_event_callbacks.end()) {
-                callback = it->second;
+                for (const auto& listener : it->second) {
+                    callbacks.push_back(listener.callback);
+                }
             }
         }
 
-        if (callback) {
+        for (const auto& callback : callbacks) {
             if (m_callback_pool) {
                 m_callback_pool->enqueue([this, callback, params]()
                 {
