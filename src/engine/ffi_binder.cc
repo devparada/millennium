@@ -38,22 +38,23 @@
 ffi_binder::ffi_binder(std::shared_ptr<cdp_client> client, std::shared_ptr<plugin_manager> plugin_manager, std::shared_ptr<ipc_main> ipc_main)
     : m_client(client), m_plugin_manager(std::move(plugin_manager)), m_ipc_main(std::move(ipc_main))
 {
-    m_client->on("Runtime.bindingCalled", std::bind(&ffi_binder::binding_call_hdlr, this, std::placeholders::_1));
-    m_client->on("Runtime.executionContextCreated", std::bind(&ffi_binder::execution_ctx_created_hdlr, this, std::placeholders::_1));
-    m_client->on("Runtime.executionContextDestroyed", std::bind(&ffi_binder::execution_ctx_destroyed_hdlr, this, std::placeholders::_1));
+    m_internal_tokens.push_back(m_client->on("Runtime.bindingCalled", std::bind(&ffi_binder::binding_call_hdlr, this, std::placeholders::_1)));
+    m_internal_tokens.push_back(m_client->on("Runtime.executionContextCreated", std::bind(&ffi_binder::execution_ctx_created_hdlr, this, std::placeholders::_1)));
+    m_internal_tokens.push_back(m_client->on("Runtime.executionContextDestroyed", std::bind(&ffi_binder::execution_ctx_destroyed_hdlr, this, std::placeholders::_1)));
 }
 
 ffi_binder::~ffi_binder()
 {
     std::unique_lock<std::mutex> lock(m_ctx_mutex);
-    for (const auto& [event, _] : m_event_subs) {
-        m_client->off(event);
+    for (const auto& [event, token] : m_event_sub_tokens) {
+        m_client->off(token);
     }
+    m_event_sub_tokens.clear();
     lock.unlock();
 
-    m_client->off("Runtime.bindingCalled");
-    m_client->off("Runtime.executionContextCreated");
-    m_client->off("Runtime.executionContextDestroyed");
+    for (int token : m_internal_tokens) {
+        m_client->off(token);
+    }
     logger.log("Successfully shut down ffi_binder...");
 }
 
@@ -182,6 +183,12 @@ void ffi_binder::cdp_proxy_hdlr(const json& params)
         const std::string method = payload.value("method", "");
         const json cdp_params = payload.value("params", json::object());
 
+        /** target session for the CDP command (optional — nullopt targets browser host) */
+        std::optional<std::string> target_session;
+        if (payload.contains("sessionId") && payload["sessionId"].is_string()) {
+            target_session = payload["sessionId"].get<std::string>();
+        }
+
         if (plugin_name.empty() || callback_id == -1 || method.empty()) {
             LOG_ERROR("ffi_binder: cdp_proxy: malformed cdp_call payload");
             return;
@@ -195,7 +202,7 @@ void ffi_binder::cdp_proxy_hdlr(const json& params)
             ctx.main_session_id = session_id;
         }
 
-        cdp_proxy_call(plugin_name, callback_id, method, cdp_params, session_id, ctx_id);
+        cdp_proxy_call(plugin_name, callback_id, method, cdp_params, session_id, ctx_id, target_session);
     } else if (action == "relay" || action == "relay_error") {
         const int callback_id = payload.value("callbackId", -1);
         if (callback_id == -1) return;
@@ -254,10 +261,11 @@ void ffi_binder::cdp_proxy_hdlr(const json& params)
             plugin_ctx_ref.main_session_id = session_id;
 
             if (first) {
-                m_client->on(event, [this, event](const json& event_params)
+                int token = m_client->on(event, [this, event](const json& event_params)
                 {
                     cdp_event_dispatch(event, event_params);
                 });
+                m_event_sub_tokens[event] = token;
             }
         } else {
             auto it = m_event_subs.find(event);
@@ -265,16 +273,22 @@ void ffi_binder::cdp_proxy_hdlr(const json& params)
                 it->second.erase(plugin_name);
                 if (it->second.empty()) {
                     m_event_subs.erase(it);
-                    m_client->off(event);
+                    auto tok_it = m_event_sub_tokens.find(event);
+                    if (tok_it != m_event_sub_tokens.end()) {
+                        m_client->off(tok_it->second);
+                        m_event_sub_tokens.erase(tok_it);
+                    }
                 }
             }
         }
     }
 }
 
-void ffi_binder::cdp_proxy_call(const std::string& plugin_name, int callback_id, const std::string& method, const json& params, const std::string& session_id, int main_ctx_id)
+void ffi_binder::cdp_proxy_call(const std::string& plugin_name, int callback_id, const std::string& method, const json& params, const std::string& session_id, int main_ctx_id, const std::optional<std::string>& target_session)
 {
-    if (BLOCKED_CDP_METHODS_SET.count(method)) {
+    const bool targets_shared_js = target_session.has_value() && (target_session.value() == m_client->get_shared_js_session_id());
+
+    if (BLOCKED_CDP_METHODS_ALWAYS.count(method) || (targets_shared_js && BLOCKED_CDP_METHODS_SHARED_JS.count(method))) {
         const std::string msg = fmt::format("Millennium prohibits calls to '{}' for user safety", method);
         json eval_params = {
             { "contextId", main_ctx_id },
@@ -305,7 +319,7 @@ void ffi_binder::cdp_proxy_call(const std::string& plugin_name, int callback_id,
     };
 
     try {
-        auto result = m_client->send_host(method, params).get();
+        auto result = m_client->send_host(method, params, target_session).get();
         deliver(result, false);
     } catch (const std::exception& e) {
         deliver(json(std::string(e.what())), true);

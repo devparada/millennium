@@ -47,16 +47,8 @@ static const char* const millennium_cdp_reject = "window.__millennium_cdp_reject
 static const char* const millennium_cdp_resolve = "window.__millennium_cdp_resolve__";
 } // namespace ffi_constants
 
-static const std::unordered_set<std::string> BLOCKED_CDP_METHODS_SET = {
-    "Page.navigate",
-    "Page.reload",
-    "Page.close",
-    "Page.crash",
-    "Page.stopLoading",
-    "Page.setDocumentContent",
-    "Page.setBypassCSP",
-    "Page.addScriptToEvaluateOnNewDocument",
-    "Page.removeScriptToEvaluateOnNewDocument",
+/** methods blocked unconditionally regardless of session */
+static const std::unordered_set<std::string> BLOCKED_CDP_METHODS_ALWAYS = {
     "Debugger.pause",
     "Emulation.setScriptExecutionDisabled",
     "Debugger.setBreakpointOnException",
@@ -68,6 +60,19 @@ static const std::unordered_set<std::string> BLOCKED_CDP_METHODS_SET = {
     "Network.setCookies",
     "Network.deleteCookies",
     "Emulation.setDeviceMetricsOverride",
+};
+
+/** methods blocked only when targeting the SharedJSContext session */
+static const std::unordered_set<std::string> BLOCKED_CDP_METHODS_SHARED_JS = {
+    "Page.navigate",
+    "Page.reload",
+    "Page.close",
+    "Page.crash",
+    "Page.stopLoading",
+    "Page.setDocumentContent",
+    "Page.setBypassCSP",
+    "Page.addScriptToEvaluateOnNewDocument",
+    "Page.removeScriptToEvaluateOnNewDocument",
 };
 
 class ffi_binder
@@ -92,9 +97,11 @@ class ffi_binder
         std::string isolated_session_id;
     };
 
-    std::unordered_map<std::string, plugin_ctx> m_plugin_ctxs;                     // pluginName → ctx ids
-    std::unordered_map<int, std::string> m_ctx_to_plugin;                          // executionContextId → pluginName
-    std::unordered_map<std::string, std::unordered_set<std::string>> m_event_subs; // event → {pluginNames}
+    std::unordered_map<std::string, plugin_ctx> m_plugin_ctxs;                     // pluginName -> ctx ids
+    std::unordered_map<int, std::string> m_ctx_to_plugin;                          // executionContextId -> pluginName
+    std::unordered_map<std::string, std::unordered_set<std::string>> m_event_subs; // event -> {pluginNames}
+    std::unordered_map<std::string, int> m_event_sub_tokens;                       // event -> cdp listener token
+    std::vector<int> m_internal_tokens;                                            // tokens for our own internal listeners
     std::mutex m_ctx_mutex;
 
     void callback_into_js(const json params, const int request_id, json result);
@@ -108,7 +115,8 @@ class ffi_binder
     void execution_ctx_created_hdlr(const json& params);
     void execution_ctx_destroyed_hdlr(const json& params);
 
-    void cdp_proxy_call(const std::string& plugin_name, int callback_id, const std::string& method, const json& params, const std::string& session_id, int main_ctx_id);
+    void cdp_proxy_call(const std::string& plugin_name, int callback_id, const std::string& method, const json& params, const std::string& session_id, int main_ctx_id,
+                        const std::optional<std::string>& target_session);
     void cdp_proxy_relay(const std::string& plugin_name, int callback_id, const json& result, bool is_error, const std::string& session_id);
     void cdp_event_dispatch(const std::string& method, const json& params);
 
