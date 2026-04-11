@@ -49,8 +49,8 @@ class Bootstrap {
 				};
 
 			/* < mar 19 2026 */
-            const oldJsx = webpack.findModule((m) => m.jsx && Object.keys(m).length == 1)?.jsx;
-            /* >= mar 19 2026*/
+			const oldJsx = webpack.findModule((m) => m.jsx && Object.keys(m).length == 1)?.jsx;
+			/* >= mar 19 2026*/
 			const newJsx = webpack.findModule((m) => m?.jsx && m?.Fragment && m?.jsxs);
 
 			if (oldJsx) {
@@ -59,12 +59,10 @@ class Bootstrap {
 					jsx: oldJsx,
 					jsxs: oldJsx,
 				};
-            }
-            else if (newJsx) {
-                window.SP_JSX_FACTORY = newJsx;
-            }
-            else {
-                this.logger.error("Failed to find JSX Factory!");
+			} else if (newJsx) {
+				window.SP_JSX_FACTORY = newJsx;
+			} else {
+				this.logger.error('Failed to find JSX Factory!');
 			}
 		}
 
@@ -94,19 +92,20 @@ class Bootstrap {
 		});
 	}
 
+	private appendScriptTag(src: string): HTMLScriptElement | null {
+		if (document.querySelector(`script[src="${src}"][type="module"]`)) return null;
+		const script = Object.assign(document.createElement('script'), {
+			src,
+			type: 'module',
+			id: 'millennium-injected',
+		});
+		document.head.appendChild(script);
+		return script;
+	}
+
 	async appendShimsToDOM(shimList: string[]) {
 		/** Inject the JavaScript shims into the DOM */
-		shimList?.forEach(
-			(shim) =>
-				!document.querySelector(`script[src="${shim}"][type="module"]`) &&
-				document.head.appendChild(
-					Object.assign(document.createElement('script'), {
-						src: shim,
-						type: 'module',
-						id: 'millennium-injected',
-					}),
-				),
-		);
+		shimList?.forEach((shim) => this.appendScriptTag(shim));
 	}
 
 	async importShimsInContext(shimList: string[]) {
@@ -158,11 +157,25 @@ class Bootstrap {
 	async StartPreloader(millenniumAuthToken: string, shimList?: string[], enabledPlugins?: string[]) {
 		await this.init(millenniumAuthToken);
 
+		/** Start fetching millennium-frontend.js text while waiting for the client to be ready */
+		const frontendCodePromise = shimList?.length ? fetch(shimList[0]).then((r) => r.text()) : null;
+
 		this.logger.log('Running in client context...');
-		await this.waitForClientReady();
+
+		const [_, frontendCode] = await Promise.all([this.waitForClientReady(), frontendCodePromise]);
 		this.logger.log('Client is ready.');
 
-		await this.appendShimsToDOM(shimList);
+		if (frontendCode) {
+			const sourceUrl = shimList[0];
+			const mapUrl = `${sourceUrl}.map?t=${Date.now()}`;
+			const patchedCode = frontendCode.replace(/\/\/# sourceMappingURL=.*$/m, `//# sourceMappingURL=${mapUrl}\n//# sourceURL=${sourceUrl}`);
+			(0, eval)(patchedCode);
+		}
+
+		if (shimList?.length) {
+			this.appendShimsToDOM(shimList.slice(1));
+		}
+
 		this.logDbgInfo();
 	}
 }

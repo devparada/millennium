@@ -174,7 +174,7 @@ export default function astTransforms(transforms: Transform[]): Plugin {
 			}
 
 			if (!modified) return null;
-			return { code: magic.toString() };
+			return { code: magic.toString(), map: magic.generateMap({ hires: true }) };
 		},
 	};
 }

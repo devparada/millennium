@@ -267,6 +267,9 @@ std::string plugin_loader::cdp_generate_shim_module()
     std::vector<std::string> script_list;
     std::vector<plugin_manager::plugin_t> plugins = m_plugin_manager->get_all_plugins();
 
+    /** Add the builtin Millennium plugin first so it starts loading before all others */
+    script_list.push_back(fmt::format("{}{}/millennium-frontend.js", m_network_hook_ctl->get_ftp_url(), GetScrambledApiPathToken()));
+
     for (auto& plugin : plugins) {
         if (!m_plugin_manager->is_enabled(plugin.plugin_name)) {
             continue;
@@ -275,9 +278,6 @@ std::string plugin_loader::cdp_generate_shim_module()
         const auto frontEndAbs = plugin.plugin_frontend_dir.generic_string();
         script_list.push_back(utils::url::get_url_from_path(m_network_hook_ctl->get_ftp_url(), frontEndAbs));
     }
-
-    /** Add the builtin Millennium plugin */
-    script_list.push_back(fmt::format("{}{}/millennium-frontend.js", m_network_hook_ctl->get_ftp_url(), GetScrambledApiPathToken()));
     return this->cdp_generate_bootstrap_module(script_list);
 }
 
