@@ -43,7 +43,7 @@ export interface SysfsPlugin {
 
 // Stupid fix because @babel/traverse exports a CommonJS module
 import _traverse from '@babel/traverse';
-const traverse = (_traverse as any).default as typeof _traverse;
+const traverse = (typeof _traverse === 'function' ? _traverse : (_traverse as any).default) as typeof _traverse;
 
 interface EmbedPluginOptions {
 	include?: string | RegExp | (string | RegExp)[];
