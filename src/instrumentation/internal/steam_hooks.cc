@@ -182,7 +182,6 @@ const char* Plat_HookedCreateSimpleProcess(const char* cmd)
         millennium_lifecycle::get().backends_loaded.wait();
     }
 
-    logger.log("[CDPShim] Plat_HookedCreateSimpleProcess: cmd='{}'", cmd);
     command cmd_line(cmd);
 
     const char* target_executable =
@@ -268,7 +267,6 @@ const char* Plat_HookedCreateSimpleProcess(const char* cmd)
 
     static thread_local std::string result;
     result = cmd_line.build();
-    logger.log("[CDPShim] Final command: {}", result);
     return result.c_str();
 }
 

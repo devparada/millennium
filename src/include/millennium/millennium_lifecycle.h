@@ -50,7 +50,10 @@ class millennium_lifecycle
 
         void notify()
         {
-            flag.store(true);
+            {
+                std::lock_guard<std::mutex> lk(mtx);
+                flag.store(true);
+            }
             cv.notify_all();
         }
     };

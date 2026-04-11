@@ -6,6 +6,7 @@ set(VERSION_TRADEMARK1   "All Rights Reserved")
 set(VERSION_DESCRIPTION  "A plugin loader for the modern Steam Client")
 set(VERSION_FILENAME     "${MILLENNIUM_OUTPUT_NAME}")
 set(VERSION_PRODUCT      "Millennium")
+set(VERSION_FILETYPE     "VFT_DLL")
 
 set(CMAKE_CXX_STANDARD 17 CACHE STRING "C++ standard to use" FORCE)
 set(CMAKE_C_STANDARD   11 CACHE STRING "C standard to use"   FORCE)

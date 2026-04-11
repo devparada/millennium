@@ -9,6 +9,7 @@ set(VERSION_TRADEMARK1   "All Rights Reserved")
 set(VERSION_DESCRIPTION  "A hook utility library for Millennium")
 set(VERSION_FILENAME     "${MILLENNIUM_HOOK_HELPER_OUTPUT_NAME}")
 set(VERSION_PRODUCT      "Millennium Webhelper Hook")
+set(VERSION_FILETYPE     "VFT_DLL")
 
 set(VERSION_FILE "${CMAKE_BINARY_DIR}/${MILLENNIUM_HOOK_HELPER_OUTPUT_NAME}.rc")
 
