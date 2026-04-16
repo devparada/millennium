@@ -227,6 +227,10 @@ const char* Plat_HookedCreateSimpleProcess(const char* cmd)
             g_cdp_pipe_read = hParentRead;
             g_cdp_pipe_write = hParentWrite;
 
+            logger.log("CDP pipes created (child read={}, child write={}, parent read={}, parent write={})",
+                reinterpret_cast<uintptr_t>(hChildRead), reinterpret_cast<uintptr_t>(hChildWrite),
+                reinterpret_cast<uintptr_t>(hParentRead), reinterpret_cast<uintptr_t>(hParentWrite));
+
             {
                 std::lock_guard<std::mutex> lock(g_cdp_pipe_mutex);
                 g_cdp_pipe_generation++;
@@ -310,7 +314,9 @@ BOOL WINAPI hooked_create_process_w(LPCWSTR lpApplicationName, LPWSTR lpCommandL
     if (g_cdp_pipes_ready && lpCommandLine) {
         std::wstring cmd(lpCommandLine);
         if (cmd.find(L"steamwebhelper") != std::wstring::npos) {
+            BOOL prev = bInheritHandles;
             bInheritHandles = TRUE;
+            logger.log("CreateProcessW hook fired for steamwebhelper (bInheritHandles: {} -> TRUE, dwCreationFlags: 0x{:X})", prev, dwCreationFlags);
         }
     }
 
@@ -471,7 +477,16 @@ bool initialize_steam_hooks()
 
     /** hook CreateProcessW to ensure pipe handle inheritance for steamwebhelper */
     g_create_process_hook = snare_inline_new(reinterpret_cast<void*>(&CreateProcessW), reinterpret_cast<void*>(&hooked_create_process_w));
-    if (g_create_process_hook) snare_inline_install(g_create_process_hook);
+    if (g_create_process_hook) {
+        int hook_result = snare_inline_install(g_create_process_hook);
+        if (hook_result < 0) {
+            LOG_ERROR("CreateProcessW hook install failed (snare returned {})", hook_result);
+        } else {
+            logger.log("CreateProcessW hook installed successfully");
+        }
+    } else {
+        LOG_ERROR("CreateProcessW hook creation failed (snare_inline_new returned null)");
+    }
 
     /** only hook if developer mode is enabled */
     if (CommandLineArguments::has_argument("-dev")) {
