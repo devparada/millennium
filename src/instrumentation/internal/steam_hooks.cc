@@ -293,6 +293,7 @@ PVOID g_notification_cookie = nullptr;
 static snare_inline_t g_create_hook = nullptr;
 static snare_inline_t g_rdcw_hook = nullptr;
 static snare_inline_t g_create_process_hook = nullptr;
+static snare_inline_t g_create_process_a_hook = nullptr;
 
 HMODULE steam_tier0_module;
 
@@ -317,6 +318,29 @@ BOOL WINAPI hooked_create_process_w(LPCWSTR lpApplicationName, LPWSTR lpCommandL
             BOOL prev = bInheritHandles;
             bInheritHandles = TRUE;
             logger.log("CreateProcessW hook fired for steamwebhelper (bInheritHandles: {} -> TRUE, dwCreationFlags: 0x{:X})", prev, dwCreationFlags);
+        }
+    }
+
+    return orig(lpApplicationName, lpCommandLine, lpProcessAttributes, lpThreadAttributes, bInheritHandles, dwCreationFlags, lpEnvironment, lpCurrentDirectory, lpStartupInfo,
+                lpProcessInformation);
+}
+
+/**
+ * Hook CreateProcessA to ensure pipe handles are inherited by steamwebhelper.
+ * Steam's CreateSimpleProcess takes const char* and may call CreateProcessA
+ * instead of CreateProcessW, bypassing the W hook entirely.
+ */
+BOOL WINAPI hooked_create_process_a(LPCSTR lpApplicationName, LPSTR lpCommandLine, LPSECURITY_ATTRIBUTES lpProcessAttributes, LPSECURITY_ATTRIBUTES lpThreadAttributes,
+                                    BOOL bInheritHandles, DWORD dwCreationFlags, LPVOID lpEnvironment, LPCSTR lpCurrentDirectory, LPSTARTUPINFOA lpStartupInfo,
+                                    LPPROCESS_INFORMATION lpProcessInformation)
+{
+    auto orig = reinterpret_cast<decltype(&CreateProcessA)>(snare_inline_get_trampoline(g_create_process_a_hook));
+
+    if (g_cdp_pipes_ready && lpCommandLine) {
+        if (strstr(lpCommandLine, "steamwebhelper") != nullptr) {
+            BOOL prev = bInheritHandles;
+            bInheritHandles = TRUE;
+            logger.log("CreateProcessA hook fired for steamwebhelper (bInheritHandles: {} -> TRUE, dwCreationFlags: 0x{:X})", prev, dwCreationFlags);
         }
     }
 
@@ -488,6 +512,19 @@ bool initialize_steam_hooks()
         LOG_ERROR("CreateProcessW hook creation failed (snare_inline_new returned null)");
     }
 
+    /** hook CreateProcessA — Steam's CreateSimpleProcess takes const char* and calls the A variant, bypassing the W hook */
+    g_create_process_a_hook = snare_inline_new(reinterpret_cast<void*>(&CreateProcessA), reinterpret_cast<void*>(&hooked_create_process_a));
+    if (g_create_process_a_hook) {
+        int hook_result = snare_inline_install(g_create_process_a_hook);
+        if (hook_result < 0) {
+            LOG_ERROR("CreateProcessA hook install failed (snare returned {})", hook_result);
+        } else {
+            logger.log("CreateProcessA hook installed successfully");
+        }
+    } else {
+        LOG_ERROR("CreateProcessA hook creation failed (snare_inline_new returned null)");
+    }
+
     /** only hook if developer mode is enabled */
     if (CommandLineArguments::has_argument("-dev")) {
         g_rdcw_hook = snare_inline_new(reinterpret_cast<void*>(&ReadDirectoryChangesW), reinterpret_cast<void*>(&hooked_read_directory_changes_w));
@@ -513,6 +550,11 @@ void uninitialize_steam_hooks()
         snare_inline_remove(g_create_process_hook);
         snare_inline_free(g_create_process_hook);
         g_create_process_hook = nullptr;
+    }
+    if (g_create_process_a_hook) {
+        snare_inline_remove(g_create_process_a_hook);
+        snare_inline_free(g_create_process_a_hook);
+        g_create_process_a_hook = nullptr;
     }
 }
 #elif __linux__
