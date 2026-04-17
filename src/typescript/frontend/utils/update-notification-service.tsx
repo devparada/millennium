@@ -53,7 +53,6 @@ export class NotificationService {
 		await sleep(1000); // Wait for the toaster to be ready
 
 		if (this.libraryUpdateCount === 0) {
-			Logger.Log('No updates found, skipping notification.');
 			return;
 		}
 
@@ -93,7 +92,6 @@ export class NotificationService {
 		}
 
 		if (!pluginSelf?.millenniumUpdates?.hasUpdate) {
-			Logger.Log('No Millennium updates found, skipping notification.');
 			return;
 		}
 

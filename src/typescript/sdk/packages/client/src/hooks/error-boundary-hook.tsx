@@ -1,5 +1,5 @@
 import { ErrorBoundary } from '../components';
-import Logger from '../logger';
+import { Logger } from '../logger';
 import { callOriginal, Patch, replacePatch } from '../utils';
 import { findModuleExport } from '../webpack';
 import { getLikelyErrorSourceFromValveError } from './error-from-source';
@@ -19,7 +19,6 @@ class ErrorBoundaryHook extends Logger {
 	constructor() {
 		super('ErrorBoundaryHook');
 
-		this.log('Initialized');
 		window.__ERRORBOUNDARY_HOOK_INSTANCE?.deinit?.();
 		window.__ERRORBOUNDARY_HOOK_INSTANCE = this;
 

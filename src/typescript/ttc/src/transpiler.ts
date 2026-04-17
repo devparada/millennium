@@ -359,9 +359,10 @@ class FrontendBuild extends MillenniumBuild {
 	}
 
 	protected output(isMillennium: boolean): OutputOptions {
-		return {
+		const outFile = isMillennium ? '../.frontend.bin' : '.millennium/Dist/index.js';
+		const opts: OutputOptions = {
 			name: 'millennium_main',
-			file: isMillennium ? '../.frontend.bin' : '.millennium/Dist/index.js',
+			file: outFile,
 			globals: {
 				react: 'window.SP_REACT',
 				'react-dom': 'window.SP_REACTDOM',
@@ -371,8 +372,17 @@ class FrontendBuild extends MillenniumBuild {
 			},
 			exports: 'named',
 			format: 'iife',
-			...(!this.props.minify && { sourcemap: true as const }),
 		};
+
+		if (!this.props.minify) {
+			opts.sourcemap = true;
+			if (isMillennium) {
+				const absDir = path.resolve(path.dirname(outFile)).replace(/\\/g, '/');
+				opts.sourcemapBaseUrl = `file:///${absDir}`;
+			}
+		}
+
+		return opts;
 	}
 }
 

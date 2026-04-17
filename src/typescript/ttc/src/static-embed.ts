@@ -34,6 +34,7 @@ import fs from 'fs';
 import * as glob from 'glob';
 import MagicString from 'magic-string';
 import path from 'path';
+import _traverse from '@babel/traverse';
 import { Plugin, SourceDescription, TransformPluginContext } from 'rollup';
 
 export interface SysfsPlugin {
@@ -41,9 +42,7 @@ export interface SysfsPlugin {
 	getCount: () => number;
 }
 
-// Stupid fix because @babel/traverse exports a CommonJS module
-import _traverse from '@babel/traverse';
-const traverse = (_traverse as any).default as typeof _traverse;
+const traverse = (typeof _traverse === 'function' ? _traverse : (_traverse as any).default) as typeof _traverse;
 
 interface EmbedPluginOptions {
 	include?: string | RegExp | (string | RegExp)[];

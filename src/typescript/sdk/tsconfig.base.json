@@ -16,7 +16,9 @@
     "strict": true,
     "ignoreDeprecations": "5.0",
     "allowSyntheticDefaultImports": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "sourceMap": true,
+    "inlineSources": true
   },
   "files": [],
   "references": [

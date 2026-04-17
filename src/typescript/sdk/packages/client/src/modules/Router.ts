@@ -1,4 +1,4 @@
-import Logger from '../logger';
+import { Logger } from '../logger';
 import { Export, findModuleExport } from '../webpack';
 import { EDisplayStatus } from '../globals/steam-client/App';
 

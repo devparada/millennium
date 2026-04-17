@@ -1,5 +1,5 @@
 import Toast from '../components/Toast';
-import Logger from '../logger';
+import { Logger } from '../logger';
 import { ReactNode } from 'react';
 import { callOriginal, injectFCTrampoline, Patch, replacePatch } from '../utils';
 import { findModuleExport } from '../webpack';
@@ -70,8 +70,6 @@ class Toaster extends Logger {
 			}
 			return callOriginal;
 		});
-
-		this.log('Initialized');
 	}
 
 	toast(toast: ToastData): ToastNotification {
@@ -80,7 +78,7 @@ class Toaster extends Logger {
 		if (toast.showToast === undefined) toast.showToast = true;
 		if (toast.timestamp === undefined) toast.timestamp = new Date();
 		if (toast.showNewIndicator === undefined) toast.showNewIndicator = true;
-		/* eType 13 
+		/* eType 13
       13: {
         proto: m.mu,
         fnTray: null,

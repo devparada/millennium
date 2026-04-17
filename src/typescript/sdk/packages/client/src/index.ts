@@ -9,6 +9,7 @@ export * from './modules';
 export * from './constSysfsExpr';
 export * from './utils';
 export * from './webpack';
+export * from './logger';
 
 import { JSX } from 'react';
 import ErrorBoundaryHook from './hooks/error-boundary-hook';

@@ -3,7 +3,7 @@ import type { Route } from 'react-router';
 
 import { MillenniumGlobalComponentsState, MillenniumGlobalComponentsStateContextProvider, useMillenniumGlobalComponentsState } from './GlobalComponentsState';
 import { MillenniumRouterState, MillenniumRouterStateContextProvider, RoutePatch, RouterEntry, useMillenniumRouterState } from './MillenniumRouterState';
-import Logger from '../../logger';
+import { Logger } from '../../logger';
 import { EUIMode } from '../../globals/steam-client/shared';
 import { afterPatch, findInReactTree, findInTree, getReactRoot, injectFCTrampoline, Patch, sleep, wrapReactType } from '../../utils';
 import { findModuleByExport } from '../../webpack';
@@ -43,7 +43,6 @@ class RouterHook extends Logger {
 	constructor() {
 		super('RouterHook');
 
-		this.log('Initialized');
 		window.__ROUTER_HOOK_INSTANCE?.deinit?.();
 		window.__ROUTER_HOOK_INSTANCE = this;
 

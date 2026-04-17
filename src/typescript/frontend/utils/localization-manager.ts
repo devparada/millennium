@@ -93,13 +93,12 @@ const localizationFiles: { [key: string]: LocalizationData } = {
 
 const GetLocalization = async () => {
 	const language = await SteamClient.Settings.GetCurrentLanguage();
-	Logger.Log(`loading ${language} locales`, localizationFiles?.[language]);
-
 	if (localizationFiles.hasOwnProperty(language)) {
 		locale = new Proxy(localizationFiles[language], handler);
 	} else {
 		Logger.Warn(`Localization for language ${language} not found, defaulting to English.`);
-	}
+    }
+   	Logger.Log(`Loaded ${language} locales`);
 };
 
 // setup locales on startup

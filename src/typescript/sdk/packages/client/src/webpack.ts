@@ -1,4 +1,4 @@
-import Logger from './logger';
+import { Logger } from './logger';
 
 declare global {
 	interface Window {
@@ -19,8 +19,6 @@ type FindFn = (module: any) => any;
 export let modules = new Map<ModuleID, Module>();
 
 function initModuleCache() {
-	const startTime = performance.now();
-	logger.group('Webpack Module Init');
 	// Webpack 5, currently on beta
 	// Generate a fake module ID
 	const id = Symbol('@steambrew/client');
@@ -35,8 +33,6 @@ function initModuleCache() {
 		},
 	]);
 
-	logger.log('Initializing all modules. Errors here likely do not matter, as they are usually just failing module side effects.');
-
 	// Loop over every module ID
 	for (let id of Object.keys(webpackRequire.m)) {
 		try {
@@ -48,8 +44,6 @@ function initModuleCache() {
 			logger.debug('Ignoring require error for module', id, e);
 		}
 	}
-
-	logger.groupEnd(`Modules initialized in ${performance.now() - startTime}ms...`);
 }
 
 initModuleCache();

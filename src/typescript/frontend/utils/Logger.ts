@@ -28,19 +28,15 @@
  * SOFTWARE.
  */
 
+import { Logger as ClientLogger } from "@steambrew/client";
+
+const _logger = new ClientLogger("Frontend");
+
 const Logger = {
-	Error: (...message: any) => {
-		console.error('%c Millennium ', 'background: red; color: white', ...message);
-	},
-	Log: (...message: any) => {
-		console.log('%c Millennium ', 'background: purple; color: white', ...message);
-	},
-	Warn: (...message: any) => {
-		console.warn('%c Millennium ', 'background: orange; color: white', ...message);
-	},
-	Debug: (...message: any) => {
-		console.debug('%c Millennium ', 'background: blue; color: white', ...message);
-	},
+	Error: _logger.error,
+	Log: _logger.log,
+	Warn: _logger.warn,
+	Debug: _logger.debug,
 };
 
 export { Logger };

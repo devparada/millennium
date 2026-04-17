@@ -224,7 +224,8 @@ export interface SettingsProps {
 		updateInProgress: boolean;
 	};
 
-	buildDate: string;
+    buildDate: string;
+    gitCommitOid: string;
 	platformType: OSType;
 	millenniumLinuxUpdateScript?: string;
 	quickCss: string;
