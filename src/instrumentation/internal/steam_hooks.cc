@@ -227,9 +227,8 @@ const char* Plat_HookedCreateSimpleProcess(const char* cmd)
             g_cdp_pipe_read = hParentRead;
             g_cdp_pipe_write = hParentWrite;
 
-            logger.log("CDP pipes created (child read={}, child write={}, parent read={}, parent write={})",
-                reinterpret_cast<uintptr_t>(hChildRead), reinterpret_cast<uintptr_t>(hChildWrite),
-                reinterpret_cast<uintptr_t>(hParentRead), reinterpret_cast<uintptr_t>(hParentWrite));
+            logger.log("CDP pipes created (child read={}, child write={}, parent read={}, parent write={})", reinterpret_cast<uintptr_t>(hChildRead),
+                       reinterpret_cast<uintptr_t>(hChildWrite), reinterpret_cast<uintptr_t>(hParentRead), reinterpret_cast<uintptr_t>(hParentWrite));
 
             {
                 std::lock_guard<std::mutex> lock(g_cdp_pipe_mutex);
@@ -290,10 +289,12 @@ LdrRegisterDllNotification_t LdrRegisterDllNotification = nullptr;
 LdrUnregisterDllNotification_t LdrUnregisterDllNotification = nullptr;
 PVOID g_notification_cookie = nullptr;
 
+using CreateProcessInternalW_t = BOOL(WINAPI*)(HANDLE, LPCWSTR, LPWSTR, LPSECURITY_ATTRIBUTES, LPSECURITY_ATTRIBUTES, BOOL, DWORD, LPVOID, LPCWSTR, LPSTARTUPINFOW,
+                                               LPPROCESS_INFORMATION, PHANDLE);
+
 static snare_inline_t g_create_hook = nullptr;
 static snare_inline_t g_rdcw_hook = nullptr;
-static snare_inline_t g_create_process_hook = nullptr;
-static snare_inline_t g_create_process_a_hook = nullptr;
+static snare_inline_t g_create_process_internal_hook = nullptr;
 
 HMODULE steam_tier0_module;
 
@@ -303,49 +304,23 @@ INT hooked_create_simple_process(const char* a1, char a2, const char* lp_multi_b
     return orig(Plat_HookedCreateSimpleProcess(a1), a2, lp_multi_byte_str);
 }
 
-/**
- * Hook CreateProcessW to ensure pipe handles are inherited by steamwebhelper.
- */
-BOOL WINAPI hooked_create_process_w(LPCWSTR lpApplicationName, LPWSTR lpCommandLine, LPSECURITY_ATTRIBUTES lpProcessAttributes, LPSECURITY_ATTRIBUTES lpThreadAttributes,
-                                    BOOL bInheritHandles, DWORD dwCreationFlags, LPVOID lpEnvironment, LPCWSTR lpCurrentDirectory, LPSTARTUPINFOW lpStartupInfo,
-                                    LPPROCESS_INFORMATION lpProcessInformation)
+BOOL WINAPI hooked_create_process_internal_w(HANDLE hUserToken, LPCWSTR lpApplicationName, LPWSTR lpCommandLine, LPSECURITY_ATTRIBUTES lpProcessAttributes,
+                                             LPSECURITY_ATTRIBUTES lpThreadAttributes, BOOL bInheritHandles, DWORD dwCreationFlags, LPVOID lpEnvironment,
+                                             LPCWSTR lpCurrentDirectory, LPSTARTUPINFOW lpStartupInfo, LPPROCESS_INFORMATION lpProcessInformation, PHANDLE hNewToken)
 {
-    auto orig = reinterpret_cast<decltype(&CreateProcessW)>(snare_inline_get_trampoline(g_create_process_hook));
+    auto orig = reinterpret_cast<CreateProcessInternalW_t>(snare_inline_get_trampoline(g_create_process_internal_hook));
 
     if (g_cdp_pipes_ready && lpCommandLine) {
         std::wstring cmd(lpCommandLine);
         if (cmd.find(L"steamwebhelper") != std::wstring::npos) {
             BOOL prev = bInheritHandles;
             bInheritHandles = TRUE;
-            logger.log("CreateProcessW hook fired for steamwebhelper (bInheritHandles: {} -> TRUE, dwCreationFlags: 0x{:X})", prev, dwCreationFlags);
+            logger.log("CreateProcessInternalW hook fired for steamwebhelper (bInheritHandles: {} -> TRUE, dwCreationFlags: 0x{:X})", prev, dwCreationFlags);
         }
     }
 
-    return orig(lpApplicationName, lpCommandLine, lpProcessAttributes, lpThreadAttributes, bInheritHandles, dwCreationFlags, lpEnvironment, lpCurrentDirectory, lpStartupInfo,
-                lpProcessInformation);
-}
-
-/**
- * Hook CreateProcessA to ensure pipe handles are inherited by steamwebhelper.
- * Steam's CreateSimpleProcess takes const char* and may call CreateProcessA
- * instead of CreateProcessW, bypassing the W hook entirely.
- */
-BOOL WINAPI hooked_create_process_a(LPCSTR lpApplicationName, LPSTR lpCommandLine, LPSECURITY_ATTRIBUTES lpProcessAttributes, LPSECURITY_ATTRIBUTES lpThreadAttributes,
-                                    BOOL bInheritHandles, DWORD dwCreationFlags, LPVOID lpEnvironment, LPCSTR lpCurrentDirectory, LPSTARTUPINFOA lpStartupInfo,
-                                    LPPROCESS_INFORMATION lpProcessInformation)
-{
-    auto orig = reinterpret_cast<decltype(&CreateProcessA)>(snare_inline_get_trampoline(g_create_process_a_hook));
-
-    if (g_cdp_pipes_ready && lpCommandLine) {
-        if (strstr(lpCommandLine, "steamwebhelper") != nullptr) {
-            BOOL prev = bInheritHandles;
-            bInheritHandles = TRUE;
-            logger.log("CreateProcessA hook fired for steamwebhelper (bInheritHandles: {} -> TRUE, dwCreationFlags: 0x{:X})", prev, dwCreationFlags);
-        }
-    }
-
-    return orig(lpApplicationName, lpCommandLine, lpProcessAttributes, lpThreadAttributes, bInheritHandles, dwCreationFlags, lpEnvironment, lpCurrentDirectory, lpStartupInfo,
-                lpProcessInformation);
+    return orig(hUserToken, lpApplicationName, lpCommandLine, lpProcessAttributes, lpThreadAttributes, bInheritHandles, dwCreationFlags, lpEnvironment, lpCurrentDirectory,
+                lpStartupInfo, lpProcessInformation, hNewToken);
 }
 
 /**
@@ -360,12 +335,39 @@ VOID handle_tier0_dll(PVOID module_base_address)
     steam_tier0_module = static_cast<HMODULE>(module_base_address);
     logger.log("Setting up hooks for tier0_s.dll");
 
-    FARPROC proc = GetProcAddress(steam_tier0_module, "CreateSimpleProcess");
-    if (proc != nullptr) {
-        g_create_hook = snare_inline_new(reinterpret_cast<void*>(proc), reinterpret_cast<void*>(&hooked_create_simple_process));
-        if (!g_create_hook || snare_inline_install(g_create_hook) < 0) {
-            platform::messagebox::show("Millennium", "Failed to create hook for CreateSimpleProcess", platform::messagebox::error);
-            return;
+    if (!g_create_hook) {
+        FARPROC proc = GetProcAddress(steam_tier0_module, "CreateSimpleProcess");
+        if (proc != nullptr) {
+            g_create_hook = snare_inline_new(reinterpret_cast<void*>(proc), reinterpret_cast<void*>(&hooked_create_simple_process));
+            if (!g_create_hook || snare_inline_install(g_create_hook) < 0) {
+                platform::messagebox::show("Millennium", "Failed to create hook for CreateSimpleProcess", platform::messagebox::error);
+                return;
+            }
+        }
+    }
+
+    if (!g_create_process_internal_hook) {
+        HMODULE kernelbase = GetModuleHandleW(L"kernelbase.dll");
+        FARPROC proc = kernelbase ? GetProcAddress(kernelbase, "CreateProcessInternalW") : nullptr;
+        if (!proc) {
+            HMODULE kernel32 = GetModuleHandleW(L"kernel32.dll");
+            proc = kernel32 ? GetProcAddress(kernel32, "CreateProcessInternalW") : nullptr;
+        }
+
+        if (proc) {
+            g_create_process_internal_hook = snare_inline_new(reinterpret_cast<void*>(proc), reinterpret_cast<void*>(&hooked_create_process_internal_w));
+            if (g_create_process_internal_hook) {
+                int hook_result = snare_inline_install(g_create_process_internal_hook);
+                if (hook_result < 0) {
+                    LOG_ERROR("CreateProcessInternalW hook install failed (snare returned {})", hook_result);
+                } else {
+                    logger.log("CreateProcessInternalW hook installed successfully");
+                }
+            } else {
+                LOG_ERROR("CreateProcessInternalW hook creation failed (snare_inline_new returned null)");
+            }
+        } else {
+            LOG_ERROR("Failed to resolve CreateProcessInternalW from kernelbase.dll or kernel32.dll");
         }
     }
 }
@@ -499,32 +501,6 @@ bool initialize_steam_hooks()
     const auto end_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - start_time).count();
     logger.log("Steam UI loaded in {} ms, continuing Millennium startup...", end_time);
 
-    /** hook CreateProcessW to ensure pipe handle inheritance for steamwebhelper */
-    g_create_process_hook = snare_inline_new(reinterpret_cast<void*>(&CreateProcessW), reinterpret_cast<void*>(&hooked_create_process_w));
-    if (g_create_process_hook) {
-        int hook_result = snare_inline_install(g_create_process_hook);
-        if (hook_result < 0) {
-            LOG_ERROR("CreateProcessW hook install failed (snare returned {})", hook_result);
-        } else {
-            logger.log("CreateProcessW hook installed successfully");
-        }
-    } else {
-        LOG_ERROR("CreateProcessW hook creation failed (snare_inline_new returned null)");
-    }
-
-    /** hook CreateProcessA — Steam's CreateSimpleProcess takes const char* and calls the A variant, bypassing the W hook */
-    g_create_process_a_hook = snare_inline_new(reinterpret_cast<void*>(&CreateProcessA), reinterpret_cast<void*>(&hooked_create_process_a));
-    if (g_create_process_a_hook) {
-        int hook_result = snare_inline_install(g_create_process_a_hook);
-        if (hook_result < 0) {
-            LOG_ERROR("CreateProcessA hook install failed (snare returned {})", hook_result);
-        } else {
-            logger.log("CreateProcessA hook installed successfully");
-        }
-    } else {
-        LOG_ERROR("CreateProcessA hook creation failed (snare_inline_new returned null)");
-    }
-
     /** only hook if developer mode is enabled */
     if (CommandLineArguments::has_argument("-dev")) {
         g_rdcw_hook = snare_inline_new(reinterpret_cast<void*>(&ReadDirectoryChangesW), reinterpret_cast<void*>(&hooked_read_directory_changes_w));
@@ -546,15 +522,10 @@ void uninitialize_steam_hooks()
         snare_inline_free(g_create_hook);
         g_create_hook = nullptr;
     }
-    if (g_create_process_hook) {
-        snare_inline_remove(g_create_process_hook);
-        snare_inline_free(g_create_process_hook);
-        g_create_process_hook = nullptr;
-    }
-    if (g_create_process_a_hook) {
-        snare_inline_remove(g_create_process_a_hook);
-        snare_inline_free(g_create_process_a_hook);
-        g_create_process_a_hook = nullptr;
+    if (g_create_process_internal_hook) {
+        snare_inline_remove(g_create_process_internal_hook);
+        snare_inline_free(g_create_process_internal_hook);
+        g_create_process_internal_hook = nullptr;
     }
 }
 #elif __linux__
