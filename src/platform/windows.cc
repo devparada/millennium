@@ -35,10 +35,7 @@
 #include "millennium/plat_msg.h"
 #include "millennium/environment.h"
 #include "millennium/encoding.h"
-#include "millennium/http_hooks.h"
-#include "millennium/plugin_loader.h"
 #include "millennium/steam_hooks.h"
-#include "millennium/millennium_updater.h"
 #include "millennium/plat_msg.h"
 #include "shared/crash_handler.h"
 
@@ -274,15 +271,12 @@ static VOID Win32_MigrateLegacyLayout(VOID)
 
 VOID Win32_AttachMillennium(VOID)
 {
-    install_millennium_crash_handler();
-
-    Win32_MigrateLegacyLayout();
-
-    /** Starts the CEF arg hook, it doesn't wait for the hook to be installed, it waits for the hook to be setup */
     if (!platform::initialize_steam_hooks()) {
         platform::messagebox::show("Millennium Error", "Failed to initialize Steam hooks, Millennium cannot continue startup.", platform::messagebox::error);
     }
 
+    install_millennium_crash_handler();
+    Win32_MigrateLegacyLayout();
     Win32_MoveVersionHook();
 
     g_millennium = std::make_unique<millennium>();
@@ -334,6 +328,7 @@ DLL_EXPORT INT WINAPI DllMain([[maybe_unused]] HINSTANCE hinstDLL, DWORD fdwReas
         case DLL_PROCESS_ATTACH:
         {
             logger.log("Millennium-x86_64@{} attached...", MILLENNIUM_VERSION);
+            register_dll_notifications();
 
             g_millenniumThread = std::thread(Win32_AttachMillennium);
             break;
@@ -344,7 +339,7 @@ DLL_EXPORT INT WINAPI DllMain([[maybe_unused]] HINSTANCE hinstDLL, DWORD fdwReas
                 if (g_millenniumThread.joinable()) {
                     g_millenniumThread.detach();
                 }
-                g_millennium.release();
+                void(g_millennium.release());
                 break;
             }
 

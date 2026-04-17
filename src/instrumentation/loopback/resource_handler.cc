@@ -278,6 +278,7 @@ void* create_steamloopback_resource_handler(const char* url)
         return NULL;
     }
 
+
 #ifdef _WIN32
     QueryPerformanceCounter(&end);
     double elapsed = (double)(end.QuadPart - start.QuadPart) * 1000.0 / freq.QuadPart;

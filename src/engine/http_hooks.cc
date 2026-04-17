@@ -286,6 +286,8 @@ void network_hook_ctl::init()
     m_cdp->on("Fetch.requestPaused", [this](const nlohmann::json& message)
     {
         try {
+            const std::string requestUrl = message["request"]["url"].get<std::string>();
+
             if (this->is_vfs_request(message)) {
                 this->vfs_request_handler(message);
                 return;

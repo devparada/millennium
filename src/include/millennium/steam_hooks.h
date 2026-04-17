@@ -37,8 +37,6 @@
 #define DEFAULT_DEVTOOLS_PORT "8080"
 
 #ifdef _WIN32
-#include <iostream>
-#include <thread>
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
@@ -63,7 +61,12 @@ typedef NTSTATUS(NTAPI* LdrUnregisterDllNotification_t)(PVOID Cookie);
 bool initialize_steam_hooks();
 void uninitialize_steam_hooks();
 
-bool SetupEntryPointHook();
+/**
+ * Register DLL load/unload notifications and hook any already-loaded modules.
+ * MUST be called while holding the loader lock.
+ */
+void register_dll_notifications();
+
 #elif defined(__linux__) || defined(__APPLE__)
 bool initialize_steam_hooks();
 #endif

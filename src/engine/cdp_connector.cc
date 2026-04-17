@@ -44,7 +44,7 @@ extern HANDLE g_cdp_pipe_read;
 extern HANDLE g_cdp_pipe_write;
 extern std::mutex g_cdp_pipe_mutex;
 extern std::condition_variable g_cdp_pipe_cv;
-extern bool g_cdp_pipes_ready;
+extern std::atomic<bool> g_cdp_pipes_ready;
 
 static bool pipe_send(HANDLE hWrite, const std::string& payload)
 {
@@ -113,7 +113,7 @@ void socket_utils::connect_socket(std::shared_ptr<socket_utils::socket_t> socket
         std::unique_lock<std::mutex> lock(g_cdp_pipe_mutex);
         g_cdp_pipe_cv.wait(lock, []
         {
-            return g_cdp_pipes_ready;
+            return g_cdp_pipes_ready.load();
         });
     }
 
@@ -184,7 +184,7 @@ extern int g_cdp_pipe_write_fd;
 extern int g_cdp_pipe_change_efd;
 extern std::mutex g_cdp_pipe_mutex;
 extern std::condition_variable g_cdp_pipe_cv;
-extern bool g_cdp_pipes_ready;
+extern std::atomic<bool> g_cdp_pipes_ready;
 
 static bool pipe_send(int fd, const std::string& payload)
 {
@@ -278,7 +278,7 @@ void socket_utils::connect_socket(std::shared_ptr<socket_utils::socket_t> socket
         std::unique_lock<std::mutex> lock(g_cdp_pipe_mutex);
         g_cdp_pipe_cv.wait(lock, []
         {
-            return g_cdp_pipes_ready;
+            return g_cdp_pipes_ready.load();
         });
     }
 

@@ -232,6 +232,7 @@ builtin_payload head::millennium_backend::Core_GetStartConfig(const builtin_payl
         { "hasCheckedForUpdates", m_updater->has_checked_for_updates() },
         { "millenniumUpdates", m_millennium_updater->has_any_updates() },
         { "buildDate", GetBuildTimestamp() },
+        { "gitCommitOid", GIT_COMMIT_HASH },
         { "platformType", get_operating_system() },
         { "millenniumLinuxUpdateScript", this->get_millennium_updater_script() },
         { "quickCss", Core_LoadQuickCss(nullptr) },

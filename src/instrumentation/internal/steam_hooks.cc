@@ -34,7 +34,6 @@
 #include <mutex>
 #include <string>
 #include <string_view>
-#include <vector>
 
 #ifdef __linux__
 #include <dlfcn.h>
@@ -54,7 +53,7 @@
 
 std::mutex g_cdp_pipe_mutex;
 std::condition_variable g_cdp_pipe_cv;
-bool g_cdp_pipes_ready = false;
+std::atomic<bool> g_cdp_pipes_ready{ false };
 int g_cdp_pipe_generation = 0;
 
 #ifdef _WIN32
@@ -295,6 +294,7 @@ using CreateProcessInternalW_t = BOOL(WINAPI*)(HANDLE, LPCWSTR, LPWSTR, LPSECURI
 static snare_inline_t g_create_hook = nullptr;
 static snare_inline_t g_rdcw_hook = nullptr;
 static snare_inline_t g_create_process_internal_hook = nullptr;
+static std::once_flag g_tier0_hook_once;
 
 HMODULE steam_tier0_module;
 
@@ -310,7 +310,7 @@ BOOL WINAPI hooked_create_process_internal_w(HANDLE hUserToken, LPCWSTR lpApplic
 {
     auto orig = reinterpret_cast<CreateProcessInternalW_t>(snare_inline_get_trampoline(g_create_process_internal_hook));
 
-    if (g_cdp_pipes_ready && lpCommandLine) {
+    if (g_cdp_pipes_ready.load(std::memory_order_acquire) && lpCommandLine) {
         std::wstring cmd(lpCommandLine);
         if (cmd.find(L"steamwebhelper") != std::wstring::npos) {
             BOOL prev = bInheritHandles;
@@ -329,13 +329,18 @@ BOOL WINAPI hooked_create_process_internal_w(HANDLE hUserToken, LPCWSTR lpApplic
  *
  * It houses various functions, and we are interested in hooking its functions Steam
  * uses to spawn the Steam web helper.
+ *
+ * Guarded by std::once_flag because the DLL notification callback and the
+ * already-loaded check can both fire for the same module.  Without the guard,
+ * a second call would leak the first hook object and double-hook the function.
  */
 VOID handle_tier0_dll(PVOID module_base_address)
 {
-    steam_tier0_module = static_cast<HMODULE>(module_base_address);
-    logger.log("Setting up hooks for tier0_s.dll");
+    std::call_once(g_tier0_hook_once, [&]()
+    {
+        steam_tier0_module = static_cast<HMODULE>(module_base_address);
+        logger.log("Setting up hooks for tier0_s.dll");
 
-    if (!g_create_hook) {
         FARPROC proc = GetProcAddress(steam_tier0_module, "CreateSimpleProcess");
         if (proc != nullptr) {
             g_create_hook = snare_inline_new(reinterpret_cast<void*>(proc), reinterpret_cast<void*>(&hooked_create_simple_process));
@@ -344,32 +349,32 @@ VOID handle_tier0_dll(PVOID module_base_address)
                 return;
             }
         }
-    }
 
-    if (!g_create_process_internal_hook) {
-        HMODULE kernelbase = GetModuleHandleW(L"kernelbase.dll");
-        FARPROC proc = kernelbase ? GetProcAddress(kernelbase, "CreateProcessInternalW") : nullptr;
-        if (!proc) {
-            HMODULE kernel32 = GetModuleHandleW(L"kernel32.dll");
-            proc = kernel32 ? GetProcAddress(kernel32, "CreateProcessInternalW") : nullptr;
-        }
+        {
+            HMODULE kernelbase = GetModuleHandleW(L"kernelbase.dll");
+            FARPROC cpi_proc = kernelbase ? GetProcAddress(kernelbase, "CreateProcessInternalW") : nullptr;
+            if (!cpi_proc) {
+                HMODULE kernel32 = GetModuleHandleW(L"kernel32.dll");
+                cpi_proc = kernel32 ? GetProcAddress(kernel32, "CreateProcessInternalW") : nullptr;
+            }
 
-        if (proc) {
-            g_create_process_internal_hook = snare_inline_new(reinterpret_cast<void*>(proc), reinterpret_cast<void*>(&hooked_create_process_internal_w));
-            if (g_create_process_internal_hook) {
-                int hook_result = snare_inline_install(g_create_process_internal_hook);
-                if (hook_result < 0) {
-                    LOG_ERROR("CreateProcessInternalW hook install failed (snare returned {})", hook_result);
+            if (cpi_proc) {
+                g_create_process_internal_hook = snare_inline_new(reinterpret_cast<void*>(cpi_proc), reinterpret_cast<void*>(&hooked_create_process_internal_w));
+                if (g_create_process_internal_hook) {
+                    int hook_result = snare_inline_install(g_create_process_internal_hook);
+                    if (hook_result < 0) {
+                        LOG_ERROR("CreateProcessInternalW hook install failed (snare returned {})", hook_result);
+                    } else {
+                        logger.log("CreateProcessInternalW hook installed successfully");
+                    }
                 } else {
-                    logger.log("CreateProcessInternalW hook installed successfully");
+                    LOG_ERROR("CreateProcessInternalW hook creation failed (snare_inline_new returned null)");
                 }
             } else {
-                LOG_ERROR("CreateProcessInternalW hook creation failed (snare_inline_new returned null)");
+                LOG_ERROR("Failed to resolve CreateProcessInternalW from kernelbase.dll or kernel32.dll");
             }
-        } else {
-            LOG_ERROR("Failed to resolve CreateProcessInternalW from kernelbase.dll or kernel32.dll");
         }
-    }
+    });
 }
 
 /**
@@ -408,7 +413,7 @@ VOID CALLBACK dll_notification_callback(ULONG notification_reason, PLDR_DLL_NOTI
     }
 
     /** hook steam cross platform api (used to hook create proc) */
-    if (notification_reason == LDR_DLL_NOTIFICATION_REASON_LOADED && base_dll_name == L"tier0_s64.dll") {
+    if (notification_reason == LDR_DLL_NOTIFICATION_REASON_LOADED && (base_dll_name == L"tier0_s64.dll" || base_dll_name == L"tier0_s.dll")) {
         handle_tier0_dll(notification_data->DllBase);
         return;
     }
@@ -464,35 +469,37 @@ BOOL WINAPI hooked_read_directory_changes_w(HANDLE hDirectory, LPVOID lpBuffer, 
     return invoke_original();
 }
 
-bool initialize_steam_hooks()
+void register_dll_notifications()
 {
-    const auto start_time = std::chrono::system_clock::now();
-
-    HMODULE h_tier0 = GetModuleHandleW(L"tier0_s.dll");
-    if (h_tier0) {
-        handle_tier0_dll(h_tier0);
-    }
-
     HMODULE ntdll_module = GetModuleHandleA("ntdll.dll");
     if (!ntdll_module) {
-        platform::messagebox::show("Millennium", "Failed to get handle for ntdll.dll", platform::messagebox::error);
-        return false;
+        return;
     }
-
-    // Check if modules are already loaded and handle them
-    handle_already_loaded(L"steamui.dll");
-    handle_already_loaded(L"steamclient64.dll");
-    handle_already_loaded(L"tier0_s64.dll");
 
     LdrRegisterDllNotification = reinterpret_cast<LdrRegisterDllNotification_t>((void*)GetProcAddress(ntdll_module, "LdrRegisterDllNotification"));
     LdrUnregisterDllNotification = reinterpret_cast<LdrUnregisterDllNotification_t>((void*)GetProcAddress(ntdll_module, "LdrUnregisterDllNotification"));
 
     if (!LdrRegisterDllNotification || !LdrUnregisterDllNotification) {
-        platform::messagebox::show("Millennium", "Failed to get address for LdrRegisterDllNotification or LdrUnregisterDllNotification", platform::messagebox::error);
-        return false;
+        return;
     }
 
-    auto dll_reg_status = NT_SUCCESS(LdrRegisterDllNotification(0, dll_notification_callback, nullptr, &g_notification_cookie));
+    LdrRegisterDllNotification(0, dll_notification_callback, nullptr, &g_notification_cookie);
+
+    // Check modules that were already loaded before the notification was registered.
+    // handle_tier0_dll is idempotent via std::once_flag, so double-fire is safe.
+    handle_already_loaded(L"tier0_s.dll");
+    handle_already_loaded(L"tier0_s64.dll");
+    handle_already_loaded(L"steamui.dll");
+}
+
+/**
+ * Called from the background thread. By the time this runs, register_dll_notifications()
+ * has already been called from DllMain, so the CreateSimpleProcess hook is guaranteed
+ * to be in place.
+ */
+bool initialize_steam_hooks()
+{
+    const auto start_time = std::chrono::system_clock::now();
     logger.log("Waiting for Steam UI to load...");
 
     /** wait for steamui.dll to load (which signifies Steam is actually starting and not updating/verifying files) */
@@ -507,7 +514,7 @@ bool initialize_steam_hooks()
         if (g_rdcw_hook) snare_inline_install(g_rdcw_hook);
     }
 
-    return dll_reg_status;
+    return g_notification_cookie != nullptr;
 }
 
 void uninitialize_steam_hooks()

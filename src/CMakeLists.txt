@@ -224,9 +224,10 @@ elseif(UNIX)
     endif()
 endif()
 
-# Ensure TypeScript is built before C++ compilation (virtfs.h must exist).
 if(NOT DISTRO_NIX)
     add_dependencies(Millennium virtfs_header)
+    set_property(SOURCE engine/http_hooks.cc
+        APPEND PROPERTY OBJECT_DEPENDS "${MILLENNIUM_BASE}/src/include/millennium/virtfs.h")
 endif()
 
 find_steam_path(Millennium)
