@@ -32,21 +32,19 @@
 #include "millennium/environment.h"
 #include "millennium/linux_distro_helpers.h"
 #include "millennium/logger.h"
-#include "millennium/plugin_loader.h"
+#include "millennium/millennium_lifecycle.h"
 
+#include <cstring>
 #include <dlfcn.h>
-#include <string.h>
 #include <iostream>
 
-#include <fstream>
 #include <regex>
 #include <thread>
 
 /* Trampoline for the real main() */
 static int (*fnMainOriginal)(int, char**, char**);
 
-/** fwd decl of main thread: from new init_posix.cc */
-extern std::unique_ptr<std::thread> g_millenniumThread;
+/** fwd decl of main thread: from new init_posix.cc */extern std::unique_ptr<std::thread> g_millenniumThread;
 
 /** fwd decl of attach function */
 void Posix_AttachMillennium();
@@ -82,7 +80,7 @@ void RemoveFromLdPreload()
         ldPreloadStr.erase(pos, millenniumPath.length());
     }
 
-    std::regex spaceRegex("\\s+");
+    const std::regex spaceRegex("\\s+");
     std::string updatedLdPreload = std::regex_replace(ldPreloadStr, spaceRegex, " ");
 
     updatedLdPreload.erase(0, updatedLdPreload.find_first_not_of(' '));
@@ -101,7 +99,7 @@ void RemoveFromLdPreload()
  *
  * @deprecated This function is deprecated and is being replaced with module shimming.
  */
-int Deprecated_HookedMain(int argc, char** argv, char** envp)
+int Deprecated_HookedMain(const int argc, char** argv, char** envp)
 {
     RemoveFromLdPreload();
     logger.log("Hooked main() with PID: {}", getpid());
@@ -121,7 +119,7 @@ int Deprecated_HookedMain(int argc, char** argv, char** envp)
 /**
  * As of 1/7/2025 Steam offloads update checker to a child process. We don't want to hook that process.
  */
-bool IsChildUpdaterProc(int argc, char** argv)
+bool IsChildUpdaterProc(const int argc, char** argv)
 {
     for (int i = 0; i < argc; ++i) {
         if (strcmp(argv[i], "-child-update-ui") == 0 || strcmp(argv[i], "-child-update-ui-socket") == 0) {
@@ -137,7 +135,7 @@ bool IsChildUpdaterProc(int argc, char** argv)
  *
  * @deprecated This method of hooking is simply here for compatibility with NixOS.
  */
-extern "C" int __libc_start_main(int (*main)(int, char**, char**), int argc, char** argv, int (*init)(int, char**, char**), void (*fini)(void), void (*rtld_fini)(void),
+extern "C" int __libc_start_main(int (*main)(int, char**, char**), const int argc, char** argv, int (*init)(int, char**, char**), void (*fini)(void), void (*rtld_fini)(void),
                                  void* stack_end)
 {
     fnMainOriginal = main;
@@ -148,7 +146,11 @@ extern "C" int __libc_start_main(int (*main)(int, char**, char**), int argc, cha
     }
 
     logger.log("Hooked __libc_start_main() {} pid: {}", argv[0], getpid());
+
+#ifdef __linux__
     logger.log("Loaded Millennium on {}, system architecture {}", get_linux_distribution_id(), get_linux_architecture());
+#endif
     return orig(Deprecated_HookedMain, argc, argv, init, fini, rtld_fini, stack_end);
 }
+
 #endif
