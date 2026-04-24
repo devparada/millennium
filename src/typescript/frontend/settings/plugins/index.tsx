@@ -49,6 +49,10 @@ declare global {
 	}
 }
 
+function isLegacyPlugin(plugin: PluginComponent): boolean {
+	return plugin.data.name !== 'core' && plugin.data.useBackend !== false && plugin.data.backendType !== 'lua';
+}
+
 interface PluginStatusProps {
 	errors: number;
 	warnings: number;
@@ -117,6 +121,9 @@ class PluginViewModal extends Component<{}, PluginViewModalState> {
 
 	handleCheckboxChange(index: number) {
 		const plugin = this.state.plugins[index];
+
+		if (isLegacyPlugin(plugin)) return;
+
 		const originalChecked = plugin.enabled;
 		const updated = !this.state.checkedItems[index] || plugin.data.name === 'core';
 
@@ -163,6 +170,7 @@ class PluginViewModal extends Component<{}, PluginViewModalState> {
 				refetchPlugins={this.FetchAllPlugins.bind(this)}
 				allPlugins={this.state.plugins}
 				isPluginConfigurable={this.state.configurablePluginStore?.find((p) => p.name === plugin.data.name).isEditable}
+				isLegacy={isLegacyPlugin(plugin)}
 			/>
 		);
 	}

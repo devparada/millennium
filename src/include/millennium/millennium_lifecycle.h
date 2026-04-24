@@ -50,7 +50,10 @@ class millennium_lifecycle
 
         void notify()
         {
-            flag.store(true);
+            {
+                std::lock_guard<std::mutex> lk(mtx);
+                flag.store(true);
+            }
             cv.notify_all();
         }
     };
@@ -64,8 +67,8 @@ class millennium_lifecycle
     gate steam_ui_loaded;
     gate backends_loaded;
     gate steam_unloaded;
+    gate terminate;
 
-    std::atomic<bool> terminate{false};
     std::atomic<bool> disconnect_frontend{false};  // Windows only
 
     millennium_lifecycle(const millennium_lifecycle&) = delete;

@@ -36,7 +36,7 @@
 #include <memory>
 #include <unordered_map>
 
-cdp_client::cdp_client(ws_client::connection_ptr conn) : m_conn(std::move(conn)), m_callback_pool(std::make_shared<thread_pool>(4))
+cdp_client::cdp_client(send_fn sender) : m_sender(std::move(sender)), m_callback_pool(std::make_shared<thread_pool>(4))
 {
     /** start the cleanup thread worker */
     m_cleanup_thread = std::thread(&cdp_client::cleanup_loop, this);
@@ -99,8 +99,6 @@ cdp_client::~cdp_client()
 
 /**
  * Shutdown the connection to the CDP endpoint and clean up resources.
- * This does not close the underlying websocket connection, the websocket connection is
- * managed in cef_bridge.h
  */
 void cdp_client::shutdown()
 {
@@ -138,6 +136,7 @@ void cdp_client::shutdown()
     {
         std::unique_lock<std::shared_mutex> events_lock(m_events_mutex);
         m_event_callbacks.clear();
+        m_token_to_event.clear();
     }
 
     logger.log("Successfully shut down cdp_client...");
@@ -212,17 +211,16 @@ std::future<json> cdp_client::send_host(const std::string& method, const json& p
 
     std::lock_guard<std::mutex> send_lock(m_send_mutex);
 
-    websocketpp::lib::error_code ec;
-    ec = m_conn->send(payload, websocketpp::frame::opcode::text);
+    bool ok = m_sender(payload);
 
-    if (ec) {
+    if (!ok) {
         /** remove from pending and fail the promise */
         std::lock_guard<std::mutex> lock(m_requests_mutex);
         m_pending_requests.erase(id);
 
         if (!pending->completed.exchange(true, std::memory_order_acq_rel)) {
             try {
-                pending->promise.set_exception(std::make_exception_ptr(std::runtime_error("Send failed: " + ec.message())));
+                pending->promise.set_exception(std::make_exception_ptr(std::runtime_error("Send failed")));
             } catch (...) {
                 LOG_ERROR("Failed to set exception on pending request due to send failure");
             }
@@ -236,25 +234,62 @@ std::future<json> cdp_client::send_host(const std::string& method, const json& p
  * Listen for a method event from the CDP endpoint.
  * The callback will be invoked on a thread pool thread, meaning it's safe to do blocking operations,
  * or call back into the cdp_client without deadlocking the socket thread.
+ * Returns a token for targeted removal via off(int).
  */
-void cdp_client::on(const std::string& event, event_callback callback)
+int cdp_client::on(const std::string& event, event_callback callback)
 {
+    int token = m_next_event_token.fetch_add(1, std::memory_order_relaxed);
+
     if (m_shutdown.load(std::memory_order_acquire)) {
-        return;
+        return token;
     }
 
     std::unique_lock<std::shared_mutex> lock(m_events_mutex);
-    m_event_callbacks[event] = std::make_shared<event_callback>(std::move(callback));
+    m_event_callbacks[event].push_back({ token, std::make_shared<event_callback>(std::move(callback)) });
+    m_token_to_event[token] = event;
+    return token;
 }
 
 /**
- * Remove an event listener for a method event from the CDP endpoint.
+ * Remove a specific event listener by its registration token.
  */
-void cdp_client::off(const std::string& event)
+void cdp_client::off(int token)
 {
     std::unique_lock<std::shared_mutex> lock(m_events_mutex);
-    m_event_callbacks.erase(event);
+    auto tok_it = m_token_to_event.find(token);
+    if (tok_it == m_token_to_event.end()) return;
+
+    const std::string event = tok_it->second;
+    m_token_to_event.erase(tok_it);
+
+    auto ev_it = m_event_callbacks.find(event);
+    if (ev_it == m_event_callbacks.end()) return;
+
+    auto& listeners = ev_it->second;
+    listeners.erase(
+        std::remove_if(listeners.begin(), listeners.end(), [token](const event_listener& l) { return l.token == token; }),
+        listeners.end()
+    );
+    if (listeners.empty()) {
+        m_event_callbacks.erase(ev_it);
+    }
 }
+
+/**
+ * Remove ALL listeners for an event.
+ */
+void cdp_client::off_all(const std::string& event)
+{
+    std::unique_lock<std::shared_mutex> lock(m_events_mutex);
+    auto ev_it = m_event_callbacks.find(event);
+    if (ev_it == m_event_callbacks.end()) return;
+
+    for (const auto& listener : ev_it->second) {
+        m_token_to_event.erase(listener.token);
+    }
+    m_event_callbacks.erase(ev_it);
+}
+
 
 /**
  * Handle an incoming message from the CDP endpoint.
@@ -331,23 +366,24 @@ void cdp_client::process_message(const std::string& payload)
         }
     } else if (message.contains("method") && message["method"].is_string()) {
         std::string method = message["method"].get<std::string>();
-        std::shared_ptr<event_callback> callback;
 
+        json params = message.contains("params") ? message["params"] : json::object();
+        if (message.contains("sessionId") && message["sessionId"].is_string()) {
+            params["sessionId"] = message["sessionId"].get<std::string>();
+        }
+
+        std::vector<std::shared_ptr<event_callback>> callbacks;
         {
             std::shared_lock<std::shared_mutex> lock(m_events_mutex);
             auto it = m_event_callbacks.find(method);
             if (it != m_event_callbacks.end()) {
-                callback = it->second;
+                for (const auto& listener : it->second) {
+                    callbacks.push_back(listener.callback);
+                }
             }
         }
 
-        if (callback) {
-            json params = message.contains("params") ? message["params"] : json::object();
-
-            if (message.contains("sessionId") && message["sessionId"].is_string()) {
-                params["sessionId"] = message["sessionId"].get<std::string>();
-            }
-
+        for (const auto& callback : callbacks) {
             if (m_callback_pool) {
                 m_callback_pool->enqueue([this, callback, params]()
                 {
@@ -369,6 +405,7 @@ void cdp_client::process_message(const std::string& payload)
                 });
             }
         }
+
     }
 }
 

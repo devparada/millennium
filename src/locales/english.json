@@ -149,6 +149,8 @@
   "quickCssDescription": "Quick CSS is way to make simple tweaks to the UI, without needing a full fledged theme. All changes are applied in real-time with the exception of any web views, those require a reload.",
   "quickCssStatusLoaded": "Status: Loaded",
   "quickCssStatsTitle": "Quick CSS Stats",
+  "quickCssWatchFile": "Watch File",
+  "quickCssWatchFileDescription": "Watch and automatically apply changes when QuickCSS is externally modified",
   "quickAccessEmptyLibrary": "Nothing to see here!",
   "quickAccessEmptyLibraryBody": "Your library is empty, we've got nothing for you to manage.",
   "themeIsNotConfigurable": "This theme is not configurable!",
@@ -226,7 +228,12 @@
   "millenniumUpdateMacOS": "Automatic Millennium updates are not yet available on macOS.\n\nRebuild the current branch, reinstall it with `./scripts/install_macos.sh --repair`, then restart Steam to finish updating to {0}.",
   "millenniumUpdateLinux": "To update Millennium to {0}, run the following command in your terminal:\n\n`{1}`",
   "legacyPluginModalTitle": "Plugin Compatibility Warning",
-  "legacyPluginModalBody": "Heads up! The following plugins were built for an older version of Millennium and will not work. Good news — an update might already be available!",
+  "legacyPluginModalBody": "Heads up! The following plugins were built for an older version of Millennium and no longer work. Good news — an update might already be available!",
   "legacyPluginModalViewUpdates": "View Updates",
-  "legacyPluginModalDismiss": "Dismiss"
+  "legacyPluginModalDismiss": "Dismiss",
+  "legacyPluginDisabledTooltip": "This plugin uses the legacy Python runtime which is no longer supported. It has been automatically disabled.",
+  "supersededPluginModalTitle": "⚠️ Action Required",
+  "supersededPluginModalBody": "The following plugins were built on a legacy Millennium runtime, which has been removed. To continue using these plugins, install [Extendium](https://steambrew.app/plugin?id=788ed8554492) as a replacement. Refer to [Extendium's README](https://steambrew.app/plugin?id=788ed8554492) for usage instructions.",
+  "supersededPluginModalInstall": "Install Extendium",
+  "supersededPluginModalDismiss": "Not Now"
 }

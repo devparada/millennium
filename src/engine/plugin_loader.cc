@@ -28,10 +28,9 @@
  * SOFTWARE.
  */
 
+#include "millennium/millennium_lifecycle.h"
 #include "millennium/core_ipc.h"
 #include "millennium/plugin_config.h"
-#include "mep/crash_event_bus.h"
-#include "head/entry_point.h"
 #include "millennium/life_cycle.h"
 #include "millennium/millennium_updater.h"
 #include "millennium/filesystem.h"
@@ -49,20 +48,27 @@
 #include "millennium/plugin_webkit_store.h"
 #include "millennium/semver.h"
 #include "millennium/auth.h"
-#include <curl/curl.h>
-#include <cstdio>
+
 #include "state/shared_memory.h"
+
 #include "mep/console_capture.h"
-#include <memory>
-#include <mutex>
+#include "mep/crash_event_bus.h"
+
+#include "head/entry_point.h"
+
+#include <curl/curl.h>
 #include <fmt/ranges.h>
-#include <tuple>
-#include <utility>
+
+#ifdef __linux__
+#include <mutex>
+#include <condition_variable>
+extern std::mutex g_cdp_pipe_mutex;
+extern std::condition_variable g_cdp_pipe_cv;
+extern int g_cdp_pipe_generation;
+#endif
 
 using namespace std::placeholders;
 using namespace std::chrono;
-
-#include "millennium/millennium_lifecycle.h"
 
 plugin_loader::plugin_loader(std::shared_ptr<plugin_manager> plugin_manager, std::shared_ptr<millennium_updater> millennium_updater)
     : m_thread_pool(std::make_unique<thread_pool>(2)), m_plugin_manager(std::move(plugin_manager)), m_plugin_ptr(nullptr), m_enabledPluginsPtr(nullptr),
@@ -187,6 +193,7 @@ void plugin_loader::init_devtools()
 
             if (it != targets["targetInfos"].end()) {
                 auto targetId = it->at("targetId").get<std::string>();
+                m_shared_js_target_id = targetId;
 
                 const json attach_params = {
                     { "targetId", targetId },
@@ -197,12 +204,6 @@ void plugin_loader::init_devtools()
                 /** set the session ID of the SharedJSContext */
                 m_cdp->set_shared_js_session_id(result.at("sessionId").get<std::string>());
 
-                const json expose_devtools_params = {
-                    { "targetId",    targetId                                                                },
-                    { "bindingName", "MILLENNIUM_CHROME_DEV_TOOLS_PROTOCOL_DO_NOT_USE_OR_OVERRIDE_ONMESSAGE" }
-                };
-
-                m_cdp->send_host("Target.exposeDevToolsProtocol", expose_devtools_params);
                 break;
             }
         }
@@ -226,7 +227,6 @@ std::shared_ptr<std::thread> plugin_loader::connect_steam_socket(std::shared_ptr
     std::shared_ptr<socket_utils::socket_t> browserProps = std::make_shared<socket_utils::socket_t>();
 
     browserProps->name = "CEFBrowser";
-    browserProps->fetch_socket_url = std::bind(&socket_utils::get_steam_browser_context, socketHelpers);
     browserProps->on_connect = [this](std::shared_ptr<cdp_client> cdp)
     {
         this->devtools_connection_hdlr(std::move(cdp));
@@ -267,6 +267,9 @@ std::string plugin_loader::cdp_generate_shim_module()
     std::vector<std::string> script_list;
     std::vector<plugin_manager::plugin_t> plugins = m_plugin_manager->get_all_plugins();
 
+    /** Add the builtin Millennium plugin first so it starts loading before all others */
+    script_list.push_back(fmt::format("{}{}/millennium-frontend.js", m_network_hook_ctl->get_ftp_url(), GetScrambledApiPathToken()));
+
     for (auto& plugin : plugins) {
         if (!m_plugin_manager->is_enabled(plugin.plugin_name)) {
             continue;
@@ -275,9 +278,6 @@ std::string plugin_loader::cdp_generate_shim_module()
         const auto frontEndAbs = plugin.plugin_frontend_dir.generic_string();
         script_list.push_back(utils::url::get_url_from_path(m_network_hook_ctl->get_ftp_url(), frontEndAbs));
     }
-
-    /** Add the builtin Millennium plugin */
-    script_list.push_back(fmt::format("{}{}/millennium-frontend.js", m_network_hook_ctl->get_ftp_url(), GetScrambledApiPathToken()));
     return this->cdp_generate_bootstrap_module(script_list);
 }
 
@@ -298,6 +298,53 @@ void plugin_loader::inject_frontend_shims(bool reload_frontend)
             { "name", ffi_constants::binding_name }
         };
         self->m_cdp->send("Runtime.addBinding", add_binding_params).get();
+
+        const json add_extension_binding_params = {
+            { "name", ffi_constants::extension_binding_name }
+        };
+        self->m_cdp->send("Runtime.addBinding", add_extension_binding_params).get();
+
+        const json add_cdp_proxy_params = {
+            { "name", ffi_constants::cdp_proxy_binding_name }
+        };
+        self->m_cdp->send("Runtime.addBinding", add_cdp_proxy_params).get();
+
+        /** create an isolated world per enabled plugin and inject the CDP context script */
+        const std::string isolated_ctx_script = get_cdp_isolated_ctx_script();
+        const std::string shared_js_session = self->m_cdp->get_shared_js_session_id();
+
+        if (!isolated_ctx_script.empty()) {
+            const auto plugins = self->m_plugin_manager->get_enabled_plugins();
+            for (const auto& plugin : plugins) {
+                try {
+                    auto frame_result = self->m_cdp->send("Page.getFrameTree").get();
+                    const std::string frame_id = frame_result["frameTree"]["frame"]["id"].get<std::string>();
+
+                    const json create_world_params = {
+                        { "frameId", frame_id },
+                        { "worldName", fmt::format("millennium-{}", plugin.plugin_name) },
+                        { "grantUniversalAccess", false }
+                    };
+                    auto world_result = self->m_cdp->send("Page.createIsolatedWorld", create_world_params).get();
+                    const int ctx_id = world_result["executionContextId"].get<int>();
+
+                    const json eval_params = {
+                        { "expression", isolated_ctx_script },
+                        { "contextId",  ctx_id              }
+                    };
+                    self->m_cdp->send("Runtime.evaluate", eval_params).get();
+
+                    if (self->m_ffi_binder) {
+                        self->m_ffi_binder->register_isolated_ctx(plugin.plugin_name, ctx_id, shared_js_session);
+                    }
+
+                    logger.log("Created isolated CDP world for plugin '{}' (ctx {})", plugin.plugin_name, ctx_id);
+                } catch (const std::exception& e) {
+                    LOG_ERROR("Failed to create isolated world for plugin '{}': {}", plugin.plugin_name, e.what());
+                }
+            }
+        }
+
         logger.log("Frontend notifier finished!");
     });
 
@@ -381,13 +428,21 @@ void plugin_loader::inject_frontend_shims(bool reload_frontend)
 
 void plugin_loader::start_plugin_frontends()
 {
-    if (millennium_lifecycle::get().terminate.load()) {
+    if (millennium_lifecycle::get().terminate.flag.load()) {
         logger.log("Terminating frontend thread pool...");
         return;
     }
 
-    std::shared_ptr<socket_utils> helper = std::make_shared<socket_utils>();
+#ifdef __linux__
+    /** snapshot generation before connecting so we can detect a new pipe on reconnect. */
+    int generation_before_connect;
+    {
+        std::lock_guard<std::mutex> lock(g_cdp_pipe_mutex);
+        generation_before_connect = g_cdp_pipe_generation;
+    }
+#endif
 
+    std::shared_ptr<socket_utils> helper = std::make_shared<socket_utils>();
     logger.log("Starting frontend socket...");
     std::shared_ptr<std::thread> socket_thread = this->connect_steam_socket(helper);
 
@@ -395,27 +450,38 @@ void plugin_loader::start_plugin_frontends()
         socket_thread->join();
     }
 
-    if (millennium_lifecycle::get().terminate.load()) {
+    if (millennium_lifecycle::get().terminate.flag.load()) {
         logger.log("Steam is shutting down, terminating frontend thread pool...");
         return;
     }
 
     logger.warn("Unexpectedly Disconnected from Steam, attempting to reconnect...");
 
-    auto start = std::chrono::steady_clock::now();
-    while (std::chrono::steady_clock::now() - start < std::chrono::seconds(10)) {
 #ifdef _WIN32
-        if (millennium_lifecycle::get().disconnect_frontend.load())
-#else
-        if (millennium_lifecycle::get().terminate.load())
-#endif
-        {
-            logger.log("Steam is shutting down, terminating frontend thread pool...");
-            return;
+    {
+        auto start = std::chrono::steady_clock::now();
+        while (std::chrono::steady_clock::now() - start < std::chrono::seconds(10)) {
+            if (millennium_lifecycle::get().disconnect_frontend.load()) {
+                logger.log("Steam is shutting down, terminating frontend thread pool...");
+                return;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
         }
-
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
+#elif __linux__
+    {
+        std::unique_lock<std::mutex> lock(g_cdp_pipe_mutex);
+        g_cdp_pipe_cv.wait(lock, [&generation_before_connect]
+        {
+            return g_cdp_pipe_generation > generation_before_connect || millennium_lifecycle::get().terminate.flag.load();
+        });
+    }
+
+    if (millennium_lifecycle::get().terminate.flag.load()) {
+        logger.log("Steam is shutting down, terminating frontend thread pool...");
+        return;
+    }
+#endif
 
     logger.warn("Reconnecting to Steam...");
     this->start_plugin_frontends();
@@ -459,10 +525,10 @@ void plugin_loader::setup_child_request_handler()
             /* child sends {methodName, params}, but process_message expects
                {pluginName, methodName, argumentList} under "data" */
             nlohmann::json data = {
-                { "pluginName",  plugin_name },
-                { "methodName",  params.value("methodName", "") },
+                { "pluginName", plugin_name },
+                { "methodName", params.value("methodName", "") },
                 { "argumentList", params.contains("params") ? params["params"] : nlohmann::json::array() },
-                { "caller",      params.value("caller", std::string{}) }
+                { "caller", params.value("caller", std::string{}) }
             };
 
             nlohmann::json call = {

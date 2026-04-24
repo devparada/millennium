@@ -9,6 +9,7 @@ set(VERSION_TRADEMARK1   "All Rights Reserved")
 set(VERSION_DESCRIPTION  "Crash handler watchdog for Millennium")
 set(VERSION_FILENAME     "${MILLENNIUM_CRASH_HANDLER_NAME}.exe")
 set(VERSION_PRODUCT      "Millennium Crash Handler")
+set(VERSION_FILETYPE     "VFT_APP")
 
 set(VERSION_FILE "${CMAKE_BINARY_DIR}/${MILLENNIUM_CRASH_HANDLER_NAME}.rc")
 configure_file(${MILLENNIUM_BASE}/scripts/version.rc.in ${VERSION_FILE} @ONLY)
@@ -30,10 +31,13 @@ target_link_libraries(${MILLENNIUM_CRASH_HANDLER_NAME} dbghelp)
 
 # always ship with debug info
 target_compile_options(${MILLENNIUM_CRASH_HANDLER_NAME} PRIVATE /Z7)
-target_link_options(${MILLENNIUM_CRASH_HANDLER_NAME} PRIVATE /DEBUG)
+target_link_options(${MILLENNIUM_CRASH_HANDLER_NAME} PRIVATE /DEBUG /ENTRY:mainCRTStartup
+    "/MANIFESTDEPENDENCY:type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'"
+)
 
 set_target_properties(${MILLENNIUM_CRASH_HANDLER_NAME} PROPERTIES
     OUTPUT_NAME "${MILLENNIUM_CRASH_HANDLER_NAME}"
+    WIN32_EXECUTABLE TRUE
 )
 
 # In local dev builds, put the exe in the Steam directory alongside millennium.dll.

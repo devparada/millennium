@@ -33,8 +33,10 @@
 readonly GITHUB_ACCOUNT="SteamClientHomebrew/Millennium"
 readonly RELEASES_URI="https://api.github.com/repos/${GITHUB_ACCOUNT}/releases"
 readonly DOWNLOAD_URI="https://github.com/${GITHUB_ACCOUNT}/releases/download"
+readonly NIGHTLY_URI="https://nightly.link/${GITHUB_ACCOUNT}/actions/runs"
 readonly INSTALL_DIR="/tmp/millennium"
 DRY_RUN=0
+RUN_ID=""
 
 log() { printf "%b\n" "$1"; }
 is_root() { [ "$(id -u)" -eq 0 ]; }
@@ -51,7 +53,9 @@ verify_platform() {
 
 check_dependencies() {
     log "resolving dependencies..."
-    for cmd in curl tar jq sudo; do
+    local deps=(curl tar jq sudo)
+    [ -n "${RUN_ID}" ] && deps+=(unzip)
+    for cmd in "${deps[@]}"; do
         command -v "${cmd}" >/dev/null || {
             log "${cmd} isn't installed. Install it from your package manager." >&2
             exit 1
@@ -90,6 +94,23 @@ fetch_release_info() {
 
     log "No non-prerelease releases found."
     return 1
+}
+
+fetch_artifact_from_run() {
+    local run_id="$1"
+    local dest_dir="$2"
+    local zip_url="${NIGHTLY_URI}/${run_id}/millennium-linux.zip"
+    local zip_file="${dest_dir}.zip"
+
+    mkdir -p "${dest_dir}"
+    log "downloading from nightly.link (no auth required)..."
+    if ! curl --fail --location --output "${zip_file}" "${zip_url}"; then
+        log "Download failed. Check that run ${run_id} exists, is from a public repo, and has a 'millennium-linux' artifact."
+        return 1
+    fi
+
+    unzip -q "${zip_file}" -d "${dest_dir}"
+    rm -f "${zip_file}"
 }
 
 confirm_installation() {
@@ -157,10 +178,13 @@ main() {
     local target release_info tag size download_uri install_dir extract_path tar_file
 
     # Parse arguments
-    for arg in "$@"; do
-        case ${arg} in
-            --dry-run) DRY_RUN=1; shift ;;
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --dry-run) DRY_RUN=1 ;;
+            --run-id) shift; RUN_ID="$1" ;;
+            --run-id=*) RUN_ID="${1#*=}" ;;
         esac
+        shift
     done
 
     if is_root; then
@@ -172,46 +196,57 @@ main() {
     target=$(verify_platform)
     check_dependencies
 
-    release_info=$(fetch_release_info)
-    tag="${release_info%%:*}"
-    size=$(format_size "${release_info##*:}")
-
-    install_size_uri="${DOWNLOAD_URI}/v${tag}/millennium-v${tag}-${target}.installsize"
-    download_uri="${DOWNLOAD_URI}/v${tag}/millennium-v${tag}-${target}.tar.gz"
-    sha256_uri="${DOWNLOAD_URI}/v${tag}/millennium-v${tag}-${target}.sha256"
-
-    sha256digest=$(curl -sL "${sha256_uri}")
-    installed_size=$(format_size "$(curl -sL "${install_size_uri}")")
-
-    log "\nPackages (1) millennium@${tag}-x86_64\n"
-    log "Total Download Size:  $(printf "%10s\n" "${size}")"
-    log "Total Installed Size: $(printf "%10s\n" "${installed_size}")"
-
-    confirm_installation
-    log "receiving packages..."
-
     install_dir="${DRY_RUN:+./dry-run}"
     install_dir="${install_dir:-${INSTALL_DIR}}"
     extract_path="${install_dir}/files"
-    tar_file="${install_dir}/millennium-v${tag}-${target}.tar.gz"
 
     rm -rf "${install_dir}"
     mkdir -p "${install_dir}"
 
-    log "(1/4) Downloading millennium-v${tag}-${target}.tar.gz..."
-    download_package "${download_uri}" "${tar_file}"
-    log "(2/4) Verifying checksums..."
-    # use sub-shell to prevent actually changing the working directory
-    if (cd "${install_dir}" && echo "${sha256digest}" | sha256sum -c --status); then
-        echo -ne "\033[1A"
-        log "(2/4) Verifying checksums... OK"
+    if [ -n "${RUN_ID}" ]; then
+        log "\nInstalling from GitHub Actions run ${RUN_ID}\n"
+        confirm_installation
+        log "receiving packages..."
+
+        log "(1/2) Downloading and unpacking artifact from run ${RUN_ID}..."
+        fetch_artifact_from_run "${RUN_ID}" "${extract_path}"
+        log "(2/2) Installing millennium..."
+        install_millennium "${extract_path}"
     else
-        log "(2/4) Verifying checksums... FAILED"
+        release_info=$(fetch_release_info)
+        tag="${release_info%%:*}"
+        size=$(format_size "${release_info##*:}")
+
+        install_size_uri="${DOWNLOAD_URI}/v${tag}/millennium-v${tag}-${target}.installsize"
+        download_uri="${DOWNLOAD_URI}/v${tag}/millennium-v${tag}-${target}.tar.gz"
+        sha256_uri="${DOWNLOAD_URI}/v${tag}/millennium-v${tag}-${target}.sha256"
+
+        sha256digest=$(curl -sL "${sha256_uri}")
+        installed_size=$(format_size "$(curl -sL "${install_size_uri}")")
+
+        log "\nPackages (1) millennium@${tag}-x86_64\n"
+        log "Total Download Size:  $(printf "%10s\n" "${size}")"
+        log "Total Installed Size: $(printf "%10s\n" "${installed_size}")"
+
+        confirm_installation
+        log "receiving packages..."
+
+        tar_file="${install_dir}/millennium-v${tag}-${target}.tar.gz"
+
+        log "(1/4) Downloading millennium-v${tag}-${target}.tar.gz..."
+        download_package "${download_uri}" "${tar_file}"
+        log "(2/4) Verifying checksums..."
+        if (cd "${install_dir}" && echo "${sha256digest}" | sha256sum -c --status); then
+            echo -ne "\033[1A"
+            log "(2/4) Verifying checksums... OK"
+        else
+            log "(2/4) Verifying checksums... FAILED"
+        fi
+        log "(3/4) Unpacking millennium-v${tag}-${target}.tar.gz..."
+        extract_package "${tar_file}" "${extract_path}"
+        log "(4/4) Installing millennium..."
+        install_millennium "${extract_path}"
     fi
-    log "(3/4) Unpacking millennium-v${tag}-${target}.tar.gz..."
-    extract_package "${tar_file}" "${extract_path}"
-    log "(4/4) Installing millennium..."
-    install_millennium "${extract_path}"
 
     log ":: Running post-install scripts..."
     log "(1/1) Setting up shared object preloader hook..."

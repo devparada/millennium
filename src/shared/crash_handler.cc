@@ -129,9 +129,9 @@ static void spawn_watchdog()
     crash_ipc_done_event_name(done_name, sizeof(done_name), steam_pid);
     crash_ipc_shutdown_event_name(stop_name, sizeof(stop_name), steam_pid);
 
-    s_ctx.request_event = CreateEventA(nullptr, FALSE, FALSE, req_name);  /* auto-reset */
-    s_ctx.done_event = CreateEventA(nullptr, FALSE, FALSE, done_name);    /* auto-reset */
-    s_shutdown_event = CreateEventA(nullptr, TRUE, FALSE, stop_name);     /* manual-reset */
+    s_ctx.request_event = CreateEventA(nullptr, FALSE, FALSE, req_name); /* auto-reset */
+    s_ctx.done_event = CreateEventA(nullptr, FALSE, FALSE, done_name);   /* auto-reset */
+    s_shutdown_event = CreateEventA(nullptr, TRUE, FALSE, stop_name);    /* manual-reset */
 
     if (!s_ctx.request_event || !s_ctx.done_event || !s_shutdown_event) return;
 
@@ -141,22 +141,9 @@ static void spawn_watchdog()
         return;
     }
 
-    char dll_path[MAX_PATH];
-    HMODULE hSelf = nullptr;
-    GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, reinterpret_cast<LPCSTR>(&install_millennium_crash_handler), &hSelf);
-    GetModuleFileNameA(hSelf, dll_path, MAX_PATH);
-
-    // millennium.dll is in <steam>/millennium/lib/ — go up to millennium/, then into bin/
-    char* last_sep = strrchr(dll_path, '\\');
-    if (!last_sep) last_sep = strrchr(dll_path, '/');
-    if (last_sep)
-        *(last_sep + 1) = '\0';
-    else
-        dll_path[0] = '\0';
-
+    const std::string handler_exe = (platform::get_millennium_bin_path() / "millennium.crashhandler64.exe").string();
     char cmd[1024];
-    snprintf(cmd, sizeof(cmd), "\"%s..\\bin\\millennium.crashhandler64.exe\" --steam-pid=%u --steam-handle=%llX", dll_path, steam_pid,
-             (unsigned long long)(uintptr_t)inheritable_handle);
+    snprintf(cmd, sizeof(cmd), "\"%s\" --steam-pid=%u --steam-handle=%llX", handler_exe.c_str(), steam_pid, (unsigned long long)(uintptr_t)inheritable_handle);
 
     STARTUPINFOA si{};
     si.cb = sizeof(si);

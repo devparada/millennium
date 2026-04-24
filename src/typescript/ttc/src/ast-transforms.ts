@@ -47,7 +47,14 @@ export interface InjectArgTransform {
 	arg: string;
 }
 
-export type Transform = RenameTransform | InjectArgTransform;
+export interface InjectConstTransform {
+	type: 'inject_const';
+	match: string[];
+	localName: string;
+	init: string;
+}
+
+export type Transform = RenameTransform | InjectArgTransform | InjectConstTransform;
 
 function getMemberPath(node: any): string[] | null {
 	if (node.type === 'Identifier') return [node.name];
@@ -70,6 +77,7 @@ function findTransform<T extends Transform>(transforms: Transform[], path: strin
 export default function astTransforms(transforms: Transform[]): Plugin {
 	const renames = transforms.filter((t): t is RenameTransform => t.type === 'rename');
 	const injections = transforms.filter((t): t is InjectArgTransform => t.type === 'inject_arg');
+	const injectConsts = transforms.filter((t): t is InjectConstTransform => t.type === 'inject_const');
 
 	return {
 		name: 'ast-transforms',
@@ -83,6 +91,9 @@ export default function astTransforms(transforms: Transform[]): Plugin {
 
 			const magic = new MagicString(code);
 			let modified = false;
+
+			// transform → [{start, end}]
+			const icMatches = new Map<InjectConstTransform, Array<{ start: number; end: number }>>();
 
 			traverse(ast, {
 				CallExpression(nodePath) {
@@ -112,9 +123,6 @@ export default function astTransforms(transforms: Transform[]): Plugin {
 					const memberPath = getMemberPath(nodePath.node);
 					if (!memberPath) return;
 
-					const rename = findTransform<RenameTransform>(renames, memberPath, 'rename');
-					if (!rename) return;
-
 					if (nodePath.parentPath?.isMemberExpression() && nodePath.parentPath.node.object === nodePath.node) {
 						const parentProp = (nodePath.parentPath.node as any).property;
 						if (parentProp?.type === 'Identifier') {
@@ -127,13 +135,46 @@ export default function astTransforms(transforms: Transform[]): Plugin {
 
 					const start = (nodePath.node as any).start as number;
 					const end = (nodePath.node as any).end as number;
-					magic.overwrite(start, end, rename.replacement);
-					modified = true;
+
+					const rename = findTransform<RenameTransform>(renames, memberPath, 'rename');
+					if (rename) {
+						magic.overwrite(start, end, rename.replacement);
+						modified = true;
+						return;
+					}
+
+					const ic = findTransform<InjectConstTransform>(injectConsts, memberPath, 'inject_const');
+					if (ic) {
+						if (!icMatches.has(ic)) icMatches.set(ic, []);
+						icMatches.get(ic)!.push({ start, end });
+					}
 				},
 			});
 
+			if (icMatches.size > 0) {
+				let iifeBodyStart = -1;
+				traverse(ast, {
+					FunctionExpression(nodePath) {
+						if (nodePath.parentPath?.isCallExpression()) {
+							const body = nodePath.node.body;
+							iifeBodyStart = body.body.length > 0 ? (body.body[0] as any).start : (body as any).end - 1;
+							nodePath.stop();
+						}
+					},
+				});
+
+				for (const [ic, positions] of icMatches) {
+					if (iifeBodyStart === -1) continue;
+					for (const { start, end } of [...positions].sort((a, b) => b.start - a.start)) {
+						magic.overwrite(start, end, ic.localName);
+					}
+					magic.prependLeft(iifeBodyStart, `const ${ic.localName} = ${ic.init};\n`);
+					modified = true;
+				}
+			}
+
 			if (!modified) return null;
-			return { code: magic.toString() };
+			return { code: magic.toString(), map: magic.generateMap({ hires: true }) };
 		},
 	};
 }

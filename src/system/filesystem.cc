@@ -30,6 +30,8 @@
 
 #ifdef _WIN32
 #include <windows.h>
+#else
+#include <dlfcn.h>
 #endif
 
 #include "millennium/filesystem.h"
@@ -85,6 +87,29 @@ std::filesystem::path get_steam_path()
 std::filesystem::path get_millennium_path()
 {
     return get_steam_path() / "millennium";
+}
+
+std::filesystem::path get_millennium_bin_path()
+{
+    static const std::filesystem::path cached = []() -> std::filesystem::path
+    {
+#ifdef _WIN32
+        return get_millennium_path() / "bin";
+#else
+        Dl_info info;
+        if (dladdr(reinterpret_cast<const void*>(&get_millennium_bin_path), &info) && info.dli_fname) {
+            return std::filesystem::path(info.dli_fname).parent_path();
+        }
+
+        /* fall back */
+        const char* runtime = std::getenv("MILLENNIUM_RUNTIME_PATH");
+        if (runtime && runtime[0]) {
+            return std::filesystem::path(runtime).parent_path();
+        }
+        return get_millennium_path() / "bin";
+#endif
+    }();
+    return cached;
 }
 
 std::filesystem::path get_install_path()
@@ -222,8 +247,10 @@ void safe_remove_directory(const std::filesystem::path& root)
     logger.log("Collecting all files and directories...");
     collectPaths(root);
 
-    std::sort(all_directories.begin(), all_directories.end(),
-              [](const std::filesystem::path& a, const std::filesystem::path& b) { return std::distance(a.begin(), a.end()) > std::distance(b.begin(), b.end()); });
+    std::sort(all_directories.begin(), all_directories.end(), [](const std::filesystem::path& a, const std::filesystem::path& b)
+    {
+        return std::distance(a.begin(), a.end()) > std::distance(b.begin(), b.end());
+    });
 
     logger.log("Found {} files and {} directories to delete", all_files.size(), all_directories.size());
 

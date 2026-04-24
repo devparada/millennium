@@ -38,7 +38,7 @@
 #include <sstream>
 
 #ifdef _WIN32
-#include "millennium/cmdline_parse.h"
+#include "millennium/cmdline_api.h"
 #include <windows.h>
 #include "millennium/argp_win32.h"
 

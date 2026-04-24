@@ -4,8 +4,11 @@ function (find_steam_path project_name)
         if(result EQUAL 0)
             string(REGEX MATCH "[a-zA-Z]:/[^ ]+([ ]+[^ ]+)*" out_steam_path "${steam_path}")
             string(REPLACE "\n" "" out_steam_path "${out_steam_path}")
-            message(STATUS "[Millennium] Steam path: ${out_steam_path}")
-
+            execute_process(
+                COMMAND powershell -NoProfile -Command "(New-Object -ComObject Scripting.FileSystemObject).GetFolder('${out_steam_path}').Path"
+                OUTPUT_VARIABLE out_steam_path OUTPUT_STRIP_TRAILING_WHITESPACE
+                ERROR_QUIET
+            )
             set(out_steam_path "${out_steam_path}" PARENT_SCOPE)
 
             # Determine output dir based on target type:
@@ -17,8 +20,6 @@ function (find_steam_path project_name)
             else()
                 set(_out_dir "${out_steam_path}/millennium/bin")
             endif()
-
-            message(STATUS "[Millennium] Target build path (${project_name}): ${_out_dir}")
 
             set_target_properties(${project_name} PROPERTIES
                 RUNTIME_OUTPUT_DIRECTORY "${_out_dir}"

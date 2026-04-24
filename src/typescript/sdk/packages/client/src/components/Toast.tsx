@@ -1,6 +1,6 @@
 import { FC, memo, ReactNode } from 'react';
 import { findClassModule } from '../class-mapper';
-import Logger from '../logger';
+import { Logger } from '../logger';
 import { Navigation } from '../modules/Router';
 import { joinClassNames } from '../utils';
 import { Focusable } from './Focusable';

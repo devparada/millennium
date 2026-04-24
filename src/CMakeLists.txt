@@ -6,6 +6,7 @@ set(VERSION_TRADEMARK1   "All Rights Reserved")
 set(VERSION_DESCRIPTION  "A plugin loader for the modern Steam Client")
 set(VERSION_FILENAME     "${MILLENNIUM_OUTPUT_NAME}")
 set(VERSION_PRODUCT      "Millennium")
+set(VERSION_FILETYPE     "VFT_DLL")
 
 set(CMAKE_CXX_STANDARD 17 CACHE STRING "C++ standard to use" FORCE)
 set(CMAKE_C_STANDARD   11 CACHE STRING "C standard to use"   FORCE)
@@ -13,17 +14,14 @@ set(CMAKE_C_STANDARD   11 CACHE STRING "C standard to use"   FORCE)
 include(ExternalProject)
 include(FetchContent)
 project(Millennium LANGUAGES C CXX)
+
 include(${MILLENNIUM_BASE}/scripts/cmake/millennium_version.cmake)
+include(${MILLENNIUM_BASE}/scripts/cmake/find_steam_path.cmake)
 
 add_compile_definitions(
     "_CRT_SECURE_NO_WARNINGS"
     "USE_INTERNAL_FPCONV"
     "NGHTTP2_STATICLIB"
-    "_WEBSOCKETPP_CPP11_THREAD_"
-    "_WEBSOCKETPP_CPP11_TYPE_TRAITS_"
-    "_WEBSOCKETPP_CPP11_RANDOM_DEVICE_"
-    "ASIO_STANDALONE"
-    "ASIO_HAS_STD_INVOKE_RESULT"
     "FMT_HEADER_ONLY"
     "CURL_STATICLIB"
     $<$<BOOL:${WIN32}>:WIN32_LEAN_AND_MEAN>
@@ -31,8 +29,8 @@ add_compile_definitions(
     $<$<CONFIG:Debug>:__HOOK_HELPER_OUTPUT_ABSPATH__="$<TARGET_FILE:hhx64>">
     $<$<CONFIG:Debug>:__LUA_HOST_OUTPUT_ABSPATH__="$<TARGET_FILE:${MILLENNIUM_RTB_NAME}>">
     $<$<CONFIG:Debug>:__DBG_MILLENNIUM_OUTPUT_DIR__="$<TARGET_FILE_DIR:Millennium>">
+    $<$<AND:$<CONFIG:Debug>,$<PLATFORM_ID:Linux>>:__PVS64_OUTPUT_ABSPATH__="$<TARGET_FILE:libmillennium_pvs64>">
 )
-
 
 include_directories(
     ${MILLENNIUM_BASE}/src
@@ -50,7 +48,7 @@ set(SOURCE_FILES
     engine/child_process.cc
     engine/cdp_api.cc
     engine/cdp_connector.cc
-    engine/cmdline_parse.cc
+    engine/cmdline_api.cc
     engine/core_ipc.cc
     engine/ffi_binder.cc
     engine/http_hooks.cc
@@ -61,8 +59,11 @@ set(SOURCE_FILES
     engine/plugin_webkit_store.cc
     engine/plugin_webkit_world_mgr.cc
     engine/thread_pool.cc
+    util/cmdline_parser.cc
+    util/file_watcher.cc
     util/semver.cc
     util/zip.cc
+    bindings/plugin_config.cc
     bindings/css_parser.cc
     bindings/default_cfg.cc
     bindings/entry_point.cc
@@ -198,9 +199,6 @@ if(UNIX AND CMAKE_BUILD_TYPE STREQUAL "Release")
     set(CMAKE_CXX_FLAGS_DEBUG "")
 endif()
 
-
-include(${MILLENNIUM_BASE}/scripts/cmake/find_steam_path.cmake)
-
 # TypeScript build targets (individual per-package, incremental via stamp files).
 # Nix builds TS externally — this is a no-op for DISTRO_NIX.
 if(NOT DISTRO_NIX)
@@ -226,16 +224,20 @@ elseif(UNIX)
     endif()
 endif()
 
-
+if(NOT DISTRO_NIX)
+    add_dependencies(Millennium virtfs_header)
+    set_property(SOURCE engine/http_hooks.cc
+        APPEND PROPERTY OBJECT_DEPENDS "${MILLENNIUM_BASE}/src/include/millennium/virtfs.h")
+endif()
 
 find_steam_path(Millennium)
 
-# Ensure TypeScript is built before C++ compilation (virtfs.h must exist).
-if(NOT DISTRO_NIX)
-    add_dependencies(Millennium virtfs_header)
+if (WIN32 AND NOT GITHUB_ACTION_BUILD)
+    message(STATUS "[Millennium] Build Path: ${out_steam_path}")
 endif()
+message(STATUS "[Millennium] Version:    ${MILLENNIUM_VERSION}")
+message(STATUS "[Millennium] Commit OID: ${GIT_COMMIT_HASH}")
 
-target_include_directories(Millennium SYSTEM PRIVATE ${websocketpp_SOURCE_DIR})
 set_target_properties(Millennium PROPERTIES
     PREFIX ""
     OUTPUT_NAME "${MILLENNIUM_OUTPUT_NAME}"

@@ -45,6 +45,8 @@
 
 using builtin_payload = nlohmann::ordered_json;
 
+namespace platform { class file_watcher; }
+
 namespace head
 {
 class millennium_backend : public std::enable_shared_from_this<millennium_backend>
@@ -67,6 +69,8 @@ class millennium_backend : public std::enable_shared_from_this<millennium_backen
     /** Quick CSS utilities */
     builtin_payload Core_LoadQuickCss(const builtin_payload& args);
     builtin_payload Core_SaveQuickCss(const builtin_payload& args);
+    builtin_payload Core_WatchQuickCss(const builtin_payload& args);
+    builtin_payload Core_UnwatchQuickCss(const builtin_payload& args);
 
     /** General utilities */
     builtin_payload Core_GetSteamPath(const builtin_payload& args);
@@ -131,5 +135,7 @@ class millennium_backend : public std::enable_shared_from_this<millennium_backen
     std::shared_ptr<network_hook_ctl> m_network_hook_ctl; /** store network hook controller as shared_ptr (was reference) */
 
     std::map<std::string, std::function<builtin_payload(const builtin_payload&)>> function_map;
+
+    std::unique_ptr<platform::file_watcher> m_quickcss_watcher;
 };
 } // namespace head

@@ -62,10 +62,7 @@ class SettingsManager {
 
 	public updateConfig(recipe: (draft: AppConfig) => void) {
 		if (this.updateFn) {
-			this.updateFn((draft) => {
-				recipe(draft);
-				this.settings = draft as AppConfig; // Update internal reference
-			});
+			this.updateFn(recipe);
 		} else {
 			this.pendingUpdates.push(recipe);
 		}

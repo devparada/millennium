@@ -40,6 +40,7 @@
 
 #include <fmt/format.h>
 #include <regex>
+#include <sstream>
 
 head::theme_config_store::theme_config_store(std::shared_ptr<plugin_manager> plugin_manager, std::shared_ptr<theme_webkit_mgr> theme_webkit_mgr)
     : m_plugin_manager(std::move(plugin_manager)), m_theme_webkit_mgr(std::move(theme_webkit_mgr))
@@ -145,11 +146,6 @@ void head::theme_config_store::validate_theme()
 nlohmann::json head::theme_config_store::get_config()
 {
     return CONFIG.get_all();
-}
-
-void head::theme_config_store::set_config(const std::string& path, const nlohmann::json& value)
-{
-    CONFIG.set_path(path, value);
 }
 
 void head::theme_config_store::change_theme(const std::string& theme_name)

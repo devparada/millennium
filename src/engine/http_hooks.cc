@@ -286,6 +286,8 @@ void network_hook_ctl::init()
     m_cdp->on("Fetch.requestPaused", [this](const nlohmann::json& message)
     {
         try {
+            const std::string requestUrl = message["request"]["url"].get<std::string>();
+
             if (this->is_vfs_request(message)) {
                 this->vfs_request_handler(message);
                 return;
@@ -354,4 +356,15 @@ network_hook_ctl::~network_hook_ctl()
 void network_hook_ctl::set_cdp_client(std::shared_ptr<cdp_client> cdp)
 {
     m_cdp = std::move(cdp);
+}
+
+std::string get_cdp_isolated_ctx_script()
+{
+    const std::string url = fmt::format("https://millennium.ftp/{}/cdp-isolated-ctx.js", GetScrambledApiPathToken());
+    auto it = INTERNAL_FTP_CALL_DATA.find(url);
+    if (it != INTERNAL_FTP_CALL_DATA.end()) {
+        return it->second();
+    }
+    LOG_ERROR("get_cdp_isolated_ctx_script: cdp-isolated-ctx.js not found in virtfs");
+    return {};
 }

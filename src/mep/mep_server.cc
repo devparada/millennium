@@ -194,7 +194,7 @@ void server::start()
 
     ::DeleteFileA(m_socket_path.c_str());
 
-    m_server_fd = static_cast<socket_t>(::WSASocket(AF_UNIX, SOCK_STREAM, 0, nullptr, 0, WSA_FLAG_NO_HANDLE_INHERIT));
+    m_server_fd = static_cast<socket_t>(::WSASocketW(AF_UNIX, SOCK_STREAM, 0, nullptr, 0, WSA_FLAG_NO_HANDLE_INHERIT));
     if (m_server_fd == INVALID_SOCKET) {
         m_running = false;
         throw std::system_error(WSAGetLastError(), std::system_category(), "mep: WSASocket()");

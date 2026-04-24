@@ -1,4 +1,5 @@
 import fs from 'fs';
+import path from 'path';
 import del from 'rollup-plugin-del';
 import replace from '@rollup/plugin-replace';
 import resolve from '@rollup/plugin-node-resolve';
@@ -35,6 +36,20 @@ export default {
 			targets: ['build/*', 'build/.*'],
 			runOnce: true,
 		}),
+		{
+			name: 'load-sourcemaps',
+			load(id) {
+				if (!id.endsWith('.js')) return null;
+				try {
+					return {
+						code: fs.readFileSync(id, 'utf8'),
+						map: fs.readFileSync(id + '.map', 'utf8'),
+					};
+				} catch {
+					return null;
+				}
+			},
+		},
 		injectProcessEnv({
 			MILLENNIUM_FRONTEND_LIB_VERSION: clientVersion,
 			MILLENNIUM_BROWSER_LIB_VERSION: browserVersion,
@@ -53,5 +68,20 @@ export default {
 			'process.env.NODE_ENV': JSON.stringify('production'),
 		}),
 		terser(),
+		{
+			name: 'file-sourcemap-urls',
+			generateBundle(options, bundle) {
+				const outDir = path.resolve(options.dir || path.dirname(options.file || ''));
+				for (const [fileName, chunk] of Object.entries(bundle)) {
+					if (chunk.type === 'chunk' && chunk.code) {
+						const absMapPath = path.resolve(outDir, fileName + '.map').replace(/\\/g, '/');
+						chunk.code = chunk.code.replace(
+							/\/\/# sourceMappingURL=\S+\s*$/,
+							`//# sourceMappingURL=file:///${absMapPath}`,
+						);
+					}
+				}
+			},
+		},
 	],
 };

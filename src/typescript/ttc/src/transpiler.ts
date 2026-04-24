@@ -40,8 +40,7 @@ import ts from 'typescript';
 import url from '@rollup/plugin-url';
 import nodePolyfills from 'rollup-plugin-polyfill-node';
 import chalk from 'chalk';
-import { InputPluginOption, OutputBundle, OutputOptions, Plugin, RollupOptions, rollup, watch as rollupWatch } from 'rollup';
-import { minify_sync } from 'terser';
+import { InputPluginOption, OutputOptions, Plugin, RollupOptions, rollup, watch as rollupWatch } from 'rollup';
 import scss from 'rollup-plugin-scss';
 import * as sass from 'sass';
 import fs from 'fs';
@@ -113,27 +112,17 @@ const buildPluginWrapper = template.statements({
 function insertMillennium(target: BuildTarget, props: TranspilerProps): InputPluginOption {
 	return {
 		name: 'insert-millennium',
-		generateBundle(_: unknown, bundle: OutputBundle) {
-			for (const fileName in bundle) {
-				const chunk = bundle[fileName];
-				if (chunk.type !== 'chunk') {
-					continue;
-				}
+		renderChunk(code, chunk) {
+			const chunkAst = parse(code, { sourceType: 'script', plugins: ['jsx'] });
+			const wrapped = buildPluginWrapper({
+				isClient: t.booleanLiteral(target === BuildTarget.Plugin),
+				pluginName: t.stringLiteral(props.pluginName),
+				chunkBody: chunkAst.program.body,
+			});
 
-				const chunkAst = parse(chunk.code, { sourceType: 'script', plugins: ['jsx'] });
-				const wrapped = buildPluginWrapper({
-					isClient: t.booleanLiteral(target === BuildTarget.Plugin),
-					pluginName: t.stringLiteral(props.pluginName),
-					chunkBody: chunkAst.program.body,
-				});
-
-				const program = t.program(Array.isArray(wrapped) ? wrapped : [wrapped]);
-				let code = generate(program).code;
-				if (props.minify) {
-					code = minify_sync(code).code ?? code;
-				}
-				chunk.code = code;
-			}
+			const program = t.program(Array.isArray(wrapped) ? wrapped : [wrapped]);
+			const result = generate(program, { sourceMaps: true, sourceFileName: chunk.fileName });
+			return { code: result.code, map: result.map };
 		},
 	};
 }
@@ -252,6 +241,13 @@ const FRONTEND_TRANSFORMS: Transform[] = [
 	{ type: 'inject_arg', match: ['client', 'Millennium', 'callServerMethod'], arg: 'pluginName' },
 	{ type: 'inject_arg', match: ['client', 'Millennium', 'exposeObj'], arg: 'exports' },
 	...PLUGIN_NAME_INJECTIONS,
+	/* hoist ChromeDevToolsProtocol to a per-plugin instance; falls back to the shared singleton on old SDKs */
+	{
+		type: 'inject_const',
+		match: ['client', 'ChromeDevToolsProtocol'],
+		localName: 'ChromeDevToolsProtocol',
+		init: 'client.MillenniumChromeDevToolsProtocol ? new client.MillenniumChromeDevToolsProtocol(pluginName) : client.ChromeDevToolsProtocol',
+	},
 ];
 
 const WEBKIT_TRANSFORMS: Transform[] = [
@@ -344,7 +340,6 @@ class FrontendBuild extends MillenniumBuild {
 			...(this.props.minify ? [] : [tsconfigPathsPlugin(tsconfigPath)]),
 			tsPlugin,
 			url({ include: ['**/*.gif', '**/*.webm', '**/*.svg'], limit: 0, fileName: '[hash][extname]' }),
-			insertMillennium(BuildTarget.Plugin, this.props),
 			nodeResolve({ browser: true }),
 			commonjs(),
 			nodePolyfills(),
@@ -357,15 +352,17 @@ class FrontendBuild extends MillenniumBuild {
 				'process.env.NODE_ENV': JSON.stringify('production'),
 			}),
 			astTransforms(FRONTEND_TRANSFORMS),
+			insertMillennium(BuildTarget.Plugin, this.props),
 			...(Object.keys(env).length > 0 ? [injectProcessEnv(env)] : []),
-			...(this.props.minify ? [terser()] : []),
+			terser(),
 		];
 	}
 
 	protected output(isMillennium: boolean): OutputOptions {
-		return {
+		const outFile = isMillennium ? '../.frontend.bin' : '.millennium/Dist/index.js';
+		const opts: OutputOptions = {
 			name: 'millennium_main',
-			file: isMillennium ? '../.frontend.bin' : '.millennium/Dist/index.js',
+			file: outFile,
 			globals: {
 				react: 'window.SP_REACT',
 				'react-dom': 'window.SP_REACTDOM',
@@ -376,6 +373,16 @@ class FrontendBuild extends MillenniumBuild {
 			exports: 'named',
 			format: 'iife',
 		};
+
+		if (!this.props.minify) {
+			opts.sourcemap = true;
+			if (isMillennium) {
+				const absDir = path.resolve(path.dirname(outFile)).replace(/\\/g, '/');
+				opts.sourcemapBaseUrl = `file:///${absDir}`;
+			}
+		}
+
+		return opts;
 	}
 }
 
@@ -393,7 +400,6 @@ class WebkitBuild extends MillenniumBuild {
 
 		const base: InputPluginOption[] = [
 			...(this.props.minify ? [] : [tsconfigPathsPlugin(webkitTsconfig)]),
-			insertMillennium(BuildTarget.Webkit, this.props),
 			tsPlugin,
 			url({ include: ['**/*.mp4', '**/*.webm', '**/*.ogg'], limit: 0, fileName: '[name][extname]', destDir: 'dist/assets' }),
 			resolve(),
@@ -401,12 +407,13 @@ class WebkitBuild extends MillenniumBuild {
 			json(),
 			sysfsPlugin,
 			astTransforms(WEBKIT_TRANSFORMS),
+			insertMillennium(BuildTarget.Webkit, this.props),
 			...(this.props.minify ? [babel({ presets: ['@babel/preset-env', '@babel/preset-react'], babelHelpers: 'bundled' })] : []),
 			...(Object.keys(env).length > 0 ? [injectProcessEnv(env)] : []),
 		];
 
 		const merged = await withUserPlugins(base);
-		return this.props.minify ? [...merged, terser()] : merged;
+		return [...merged, terser()];
 	}
 
 	protected output(_isMillennium: boolean): OutputOptions {
@@ -416,6 +423,7 @@ class WebkitBuild extends MillenniumBuild {
 			exports: 'named',
 			format: 'iife',
 			globals: { '@steambrew/webkit': 'window.MILLENNIUM_API' },
+			...(!this.props.minify && { sourcemap: true as const }),
 		};
 	}
 }

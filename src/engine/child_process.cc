@@ -29,13 +29,9 @@
  */
 
 #include "millennium/child_process.h"
-#include "millennium/cmdline_parse.h"
 #include "millennium/logger.h"
 #include "millennium/plugin_ipc.h"
-#include "millennium/filesystem.h"
 #include "mep/crash_event_bus.h"
-
-#include <filesystem>
 
 #include <cstring>
 #include <future>
@@ -46,6 +42,7 @@
 #include <afunix.h>
 #include <windows.h>
 #include <io.h>
+#include "millennium/cmdline_api.h"
 #define unlink _unlink
 #else
 #include <fcntl.h>
@@ -583,7 +580,7 @@ std::unique_ptr<PluginProcess> spawn_plugin_process(const std::string& plugin_na
         }
 
         if (child_pid == 0) {
-            /* child process */
+            ::setpgid(0, 0);
             ::close(server_fd);
             ::execl(exe_path.c_str(), exe_path.c_str(), socket_path.c_str(), nullptr);
             /* execl only returns on error */
@@ -618,9 +615,7 @@ std::unique_ptr<PluginProcess> spawn_plugin_process(const std::string& plugin_na
             return nullptr;
         }
     }
-
     plugin_ipc::socket_fd client_fd = static_cast<plugin_ipc::socket_fd>(::accept(server_fd, nullptr, nullptr));
-
     plugin_ipc::close_fd(server_fd);
 
 #ifdef _WIN32
@@ -676,7 +671,6 @@ std::unique_ptr<PluginProcess> spawn_plugin_process(const std::string& plugin_na
     {
         auto entry = std::make_shared<PluginProcess::pending_entry>();
         auto future = entry->promise.get_future();
-
         {
             std::lock_guard<std::mutex> lock(process->m_pending_mutex);
             process->m_pending[0] = entry;

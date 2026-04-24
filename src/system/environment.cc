@@ -36,6 +36,7 @@
 
 #include "millennium/environment.h"
 #include "millennium/filesystem.h"
+#include "millennium/auth.h"
 
 #include <fmt/core.h>
 #include <stdlib.h>
@@ -142,7 +143,8 @@ void platform::environment::setup()
 {
     std::map<std::string, std::string> environment = {
         { "MILLENNIUM__VERSION",    MILLENNIUM_VERSION                  },
-        { "MILLENNIUM__STEAM_PATH", platform::get_steam_path().string() }
+        { "MILLENNIUM__STEAM_PATH", platform::get_steam_path().string() },
+        { "MILLENNIUM__FTP_TOKEN",  GetScrambledApiPathToken()          }
     };
 
 #if defined(MILLENNIUM_SDK_DEVELOPMENT_MODE_ASSETS)

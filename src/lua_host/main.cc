@@ -379,6 +379,7 @@ int main(int argc, char* argv[])
 
     if (argc < 2) {
 #ifdef _WIN32
+        SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
         MessageBoxA(nullptr,
                     "This is an internal Millennium runtime component.\n"
                     "It is not meant to be run directly.\n\n"

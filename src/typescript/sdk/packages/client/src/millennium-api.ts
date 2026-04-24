@@ -56,11 +56,19 @@ const callable: <
 const m_private_context: any = undefined;
 export const pluginSelf = m_private_context;
 
+const CDP_PROXY_BINDING = '__millennium_cdp_proxy__';
+const CDP_EXTENSION_BINDING = '__millennium_extension_route__';
+const CDP_EXT_RESP = 'MILLENNIUM_CHROME_DEV_TOOLS_PROTOCOL_DO_NOT_USE_OR_OVERRIDE_ONMESSAGE';
+
 declare global {
 	interface Window {
 		Millennium: Millennium;
-		MILLENNIUM_CHROME_DEV_TOOLS_PROTOCOL_DO_NOT_USE_OR_OVERRIDE_ONMESSAGE: any;
-		CHROME_DEV_TOOLS_PROTOCOL_API_BINDING: MillenniumChromeDevToolsProtocol;
+		[CDP_EXT_RESP]: { __handleCDPResponse: (response: any) => void };
+		[CDP_EXTENSION_BINDING]: (message: string) => void;
+		[CDP_PROXY_BINDING]: (message: string) => void;
+		__millennium_cdp_resolve__: (callbackId: number, result: any) => void;
+		__millennium_cdp_reject__: (callbackId: number, error: string) => void;
+		__millennium_cdp_event__: (data: any) => void;
 	}
 }
 
@@ -80,132 +88,204 @@ const usePluginConfig: {
 
 const subscribePluginConfig: (cb: (key: string, value: any) => void) => () => void = () => () => {};
 
-interface CDPMessage {
-	id?: number;
-	method: string;
-	params?: Record<string, any>;
-	sessionId?: string; // Optional session ID for targeted commands
-	result?: any;
-	error?: {
-		message: string;
-		code: number;
+let _nextId = 0;
+const _pending = new Map<number, { resolve: (value: any) => void; reject: (reason?: any) => void; callSite: Error }>();
+const _eventDispatchers = new Set<(data: any) => void>();
+let _busInitialized = false;
+
+function rejectWithCallSite(pending: { reject: (reason?: any) => void; callSite: Error }, message: string) {
+	pending.callSite.message = message;
+	/* V8 bakes the message into .stack, so setting .message alone won't update the prefix */
+	const stack = pending.callSite.stack ?? '';
+	const nl = stack.indexOf('\n');
+	pending.callSite.stack = `Error: ${message}` + (nl >= 0 ? stack.slice(nl) : '');
+	pending.reject(pending.callSite);
+}
+
+function initializeCDPBus() {
+	if (_busInitialized) return;
+	_busInitialized = true;
+
+	window.__millennium_cdp_resolve__ = (callbackId: number, result: any) => {
+		const pending = _pending.get(callbackId);
+		if (pending) {
+			_pending.delete(callbackId);
+			pending.resolve(result ?? {});
+		}
+	};
+
+	window.__millennium_cdp_reject__ = (callbackId: number, error: string) => {
+		const pending = _pending.get(callbackId);
+		if (pending) {
+			_pending.delete(callbackId);
+			rejectWithCallSite(pending, `CDP Error: ${error}`);
+		}
+	};
+
+	window.__millennium_cdp_event__ = (data: any) => {
+		for (const cb of _eventDispatchers) {
+			try {
+				cb(data);
+			} catch (_) {}
+		}
+	};
+
+	window[CDP_EXT_RESP] = {
+		__handleCDPResponse: (response: any) => {
+			if (response.id !== undefined) {
+				const pending = _pending.get(response.id);
+				if (pending) {
+					_pending.delete(response.id);
+					if (response.error) {
+						rejectWithCallSite(pending, `CDP Error: ${response.error.message}`);
+					} else {
+						pending.resolve(response.result ?? {});
+					}
+				}
+				return;
+			}
+			if (response.method !== undefined) {
+				for (const cb of _eventDispatchers) {
+					try {
+						cb(response);
+					} catch (_) {}
+				}
+			}
+		},
 	};
 }
 
-class MillenniumChromeDevToolsProtocol {
-	devTools: any;
-	currentId: number;
-	pendingRequests: Map<number, { resolve: (value: any) => void; reject: (reason?: any) => void }>;
+export class MillenniumChromeDevToolsProtocol {
+	protected readonly _pluginName: string;
 	eventListeners: Map<string, Set<(params: any) => void>>;
+	private readonly _eventDispatcher: (data: any) => void;
 
-	constructor() {
-		this.devTools = window.MILLENNIUM_CHROME_DEV_TOOLS_PROTOCOL_DO_NOT_USE_OR_OVERRIDE_ONMESSAGE;
-		this.currentId = 0;
-		this.pendingRequests = new Map();
+	constructor(pluginName: string) {
+		this._pluginName = pluginName;
 		this.eventListeners = new Map();
 
-		// Override the onmessage callback to handle responses
-		this.devTools.onmessage = (message: any) => {
-			this.handleMessage(message);
-		};
-	}
+		const eventListeners = this.eventListeners;
 
-	handleMessage(message: any) {
-		const data = typeof message === 'string' ? JSON.parse(message) : message;
-
-		if (data.id !== undefined && this.pendingRequests.has(data.id)) {
-			const pending = this.pendingRequests.get(data.id);
-			this.pendingRequests.delete(data.id);
-
-			if (pending) {
-				const { resolve, reject } = pending;
-				if (data.error) {
-					reject(new Error(`CDP Error: ${data.error.message} (${data.error.code})`));
-				} else {
-					resolve(data.result);
-				}
-			}
-		} else if (data.method) {
-			const listeners = this.eventListeners.get(data.method);
+		this._eventDispatcher = (data: any) => {
+			if (data.method === undefined) return;
+			const params = data.sessionId ? { ...data.params, sessionId: data.sessionId } : data.params;
+			const listeners = eventListeners.get(data.method);
 			if (listeners) {
 				for (const listener of listeners) {
-					listener(data.params);
+					try {
+						listener(params);
+					} catch (_) {}
 				}
 			}
-		}
+		};
+
+		initializeCDPBus();
+		_eventDispatchers.add(this._eventDispatcher);
 	}
 
-	on<T extends keyof ProtocolMapping.Events>(event: T, listener: (params: ProtocolMapping.Events[T][0]) => void): () => void {
+	on<T extends keyof ProtocolMapping.Events>(event: T, listener: (params: ProtocolMapping.Events[T][0] & { sessionId?: string }) => void): () => void {
+		const isFirst = !this.eventListeners.has(event) || this.eventListeners.get(event)!.size === 0;
 		if (!this.eventListeners.has(event)) {
 			this.eventListeners.set(event, new Set());
 		}
 		this.eventListeners.get(event)!.add(listener);
+
+		if (isFirst) {
+			try {
+				window[CDP_PROXY_BINDING](JSON.stringify({ action: 'subscribe', pluginName: this._pluginName, event }));
+			} catch (_) {}
+		}
+
 		return () => this.off(event, listener);
 	}
 
-	off<T extends keyof ProtocolMapping.Events>(event: T, listener: (params: ProtocolMapping.Events[T][0]) => void) {
+	off<T extends keyof ProtocolMapping.Events>(event: T, listener: (params: ProtocolMapping.Events[T][0] & { sessionId?: string }) => void): void {
 		const listeners = this.eventListeners.get(event);
 		if (listeners) {
 			listeners.delete(listener);
 			if (listeners.size === 0) {
 				this.eventListeners.delete(event);
+				try {
+					window[CDP_PROXY_BINDING](JSON.stringify({ action: 'unsubscribe', pluginName: this._pluginName, event }));
+				} catch (_) {}
 			}
 		}
 	}
 
 	send<T extends keyof ProtocolMapping.Commands>(
 		method: T,
-		params: ProtocolMapping.Commands[T]['paramsType'][0] = {},
+		params: ProtocolMapping.Commands[T]['paramsType'][0] = {} as any,
 		sessionId?: string,
 	): Promise<ProtocolMapping.Commands[T]['returnType']> {
+		if (method.startsWith('Extensions.')) {
+			return this._sendViaExtensionRoute(method, params, sessionId);
+		}
+
+		const callSite = new Error();
 		return new Promise((resolve, reject) => {
-			const id = this.currentId++;
+			const callbackId = _nextId++;
+			_pending.set(callbackId, { resolve, reject, callSite });
 
-			// Store the promise resolvers
-			this.pendingRequests.set(id, { resolve, reject });
-
-			// Prepare the message
-			const message: CDPMessage = {
-				id: id,
-				method: method,
-			};
-
-			// Only add params if they're provided and not empty
-			if (params && Object.keys(params).length > 0) {
-				message.params = params;
+			const payload: any = { action: 'cdp_call', pluginName: this._pluginName, callbackId, method };
+			if (params && Object.keys(params as object).length > 0) {
+				payload.params = params;
 			}
-
-			// If a sessionId is provided, include it in the message
 			if (sessionId) {
-				message.sessionId = sessionId;
+				payload.sessionId = sessionId;
 			}
 
-			// Send the message
 			try {
-				this.devTools.send(JSON.stringify(message));
+				window[CDP_PROXY_BINDING](JSON.stringify(payload));
 			} catch (error) {
-				// Clean up if send fails
-				this.pendingRequests.delete(id);
+				_pending.delete(callbackId);
 				reject(error);
 			}
 		});
 	}
 
-	// Helper method to send without waiting for response (fire and forget)
-	sendNoResponse<T extends keyof ProtocolMapping.Commands>(method: T, params: ProtocolMapping.Commands[T]['paramsType'][0] = {}) {
-		const message: CDPMessage = {
-			id: this.currentId++,
-			method: method,
-		};
+	protected _sendViaExtensionRoute<T extends keyof ProtocolMapping.Commands>(
+		method: T,
+		params: ProtocolMapping.Commands[T]['paramsType'][0],
+		sessionId?: string,
+	): Promise<ProtocolMapping.Commands[T]['returnType']> {
+		const callSite = new Error();
+		return new Promise((resolve, reject) => {
+			const id = _nextId++;
+			_pending.set(id, { resolve, reject, callSite });
 
-		if (params && Object.keys(params).length > 0) {
-			message.params = params;
-		}
+			const payload: any = { id, method };
+			if (params && Object.keys(params as object).length > 0) {
+				payload.params = params;
+			}
+			if (sessionId) {
+				payload.sessionId = sessionId;
+			}
 
-		this.devTools.send(JSON.stringify(message));
+			try {
+				window[CDP_EXTENSION_BINDING](JSON.stringify(payload));
+			} catch (error) {
+				_pending.delete(id);
+				reject(error);
+			}
+		});
 	}
 }
 
-const ChromeDevToolsProtocol: MillenniumChromeDevToolsProtocol = new MillenniumChromeDevToolsProtocol();
+/* backwards compat with old callers (without requiring recompile with new @steambrew/ttc version). falls back to Millenniums internal CDP. */
+class MillenniumChromeDevToolsProtocolShared extends MillenniumChromeDevToolsProtocol {
+	constructor() {
+		super('__millennium_internal__');
+	}
+
+	override send<T extends keyof ProtocolMapping.Commands>(
+		method: T,
+		params: ProtocolMapping.Commands[T]['paramsType'][0] = {} as any,
+		sessionId?: string,
+	): Promise<ProtocolMapping.Commands[T]['returnType']> {
+		return this._sendViaExtensionRoute(method, params, sessionId);
+	}
+}
+
+const ChromeDevToolsProtocol: MillenniumChromeDevToolsProtocol = new MillenniumChromeDevToolsProtocolShared();
 const Millennium: Millennium = window.Millennium;
 export { BindPluginSettings, callable, ChromeDevToolsProtocol, Millennium, pluginConfig, subscribePluginConfig, usePluginConfig };

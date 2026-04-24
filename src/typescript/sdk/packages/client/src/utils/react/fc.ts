@@ -1,7 +1,7 @@
 // Utilities for patching function components
 import { createElement, type FC } from 'react';
 import { applyHookStubs, removeHookStubs } from './react';
-import Logger from '../../logger';
+import { Logger } from '../../logger';
 
 export interface FCTrampoline {
 	component: FC;

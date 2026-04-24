@@ -437,7 +437,7 @@ export class RenderThemeEditor extends React.Component<ThemeEditorProps> {
 		const defaultPage = { ...tabPages.find((p) => !p.title), title: locale.customThemeSettingsConfig };
 		const finalTabs = hasTabs ? tabPages.filter((p) => p !== defaultPage) : [defaultPage];
 		const className = [settingsClasses.SettingsModal, settingsClasses.DesktopPopup, 'MillenniumSettings'].join(' ');
-		const pages = [...finalTabs, ...(hasColors ? ['separator', createColorPage()] : [])];
+		const pages: (SidebarNavigationPage | "separator")[] = [...finalTabs, ...(hasColors ? ['separator' as const, createColorPage()] : [])];
 		const title = name ?? activeTheme.native;
 
 		const hidePageListStyles = !hasTabs && !hasColors ? <style>{`.PageListColumn { display: none !important; }`}</style> : null;
@@ -450,7 +450,6 @@ export class RenderThemeEditor extends React.Component<ThemeEditorProps> {
 			<ModalPosition>
 				<Styles />
 				{hidePageListStyles}
-				{/* @ts-ignore: className hasn't been added to DFL yet */}
 				<SidebarNavigation className={className} pages={pages} title={title} />
 			</ModalPosition>
 		);

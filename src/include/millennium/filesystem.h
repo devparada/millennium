@@ -53,6 +53,7 @@ namespace platform
 
     std::filesystem::path get_steam_path();
     std::filesystem::path get_millennium_path();
+    std::filesystem::path get_millennium_bin_path();
     std::filesystem::path get_install_path();
     nlohmann::json read_file_json(const std::string& filename, bool* success = nullptr);
     std::string read_file(const std::string& filename);
