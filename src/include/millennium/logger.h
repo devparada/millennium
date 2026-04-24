@@ -159,7 +159,7 @@ class millennium_logger : public logger_base, public singleton<millennium_logger
 
   private:
     bool m_should_log = false;
-    bool m_bIsConsoleEnabled = false;
+    [[maybe_unused]] bool m_bIsConsoleEnabled = false;
 
     std::string get_local_time_stamp();
     millennium_logger();
@@ -261,6 +261,17 @@ void CleanupLoggers();
 #else
 #define PRETTY_FUNCTION __PRETTY_FUNCTION__
 #endif
-
+#ifndef LOG_ERROR
+#if defined(__clang__)
+#define LOG_ERROR(...) LOG_ERROR_IMPL(NUM(__VA_ARGS__), __VA_ARGS__)
+#define LOG_ERROR_IMPL(qty, ...) LOG_ERROR_IMPL2(qty, __VA_ARGS__)
+#define LOG_ERROR_IMPL2(qty, ...) LOG_ERROR_##qty(__VA_ARGS__)
+#define LOG_ERROR_ONE(fmt) logger.private_error_do_not_use(fmt, __sanitize_nt(__FILE__).data(), __LINE__, PRETTY_FUNCTION)
+#define LOG_ERROR_TWOORMORE(fmt, ...) logger.private_error_do_not_use(fmt, __sanitize_nt(__FILE__).data(), __LINE__, PRETTY_FUNCTION, __VA_ARGS__)
+#define NUM(...) SELECT_11TH(__VA_ARGS__, TWOORMORE, TWOORMORE, TWOORMORE, TWOORMORE, TWOORMORE, TWOORMORE, TWOORMORE, TWOORMORE, TWOORMORE, ONE, throwaway)
+#define SELECT_11TH(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, ...) a11
+#else
 #define LOG_ERROR(fmt, ...) logger.private_error_do_not_use(fmt, __sanitize_nt(__FILE__).data(), __LINE__, PRETTY_FUNCTION, ##__VA_ARGS__)
+#endif
+#endif
 #define GET_GITHUB_URL_FROM_HERE() fmt::format("{}/blob/{}{}#L{}", MILLENNIUM_REPOSITORY, GIT_COMMIT_HASH, __get_source_loc(__sanitize_nt(__FILE__).data()).data(), __LINE__)

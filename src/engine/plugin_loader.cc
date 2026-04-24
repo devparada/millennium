@@ -72,7 +72,7 @@ using namespace std::chrono;
 
 plugin_loader::plugin_loader(std::shared_ptr<plugin_manager> plugin_manager, std::shared_ptr<millennium_updater> millennium_updater)
     : m_thread_pool(std::make_unique<thread_pool>(2)), m_plugin_manager(std::move(plugin_manager)), m_plugin_ptr(nullptr), m_enabledPluginsPtr(nullptr),
-      m_millennium_updater(std::move(millennium_updater)), has_loaded_core_plugin(false)
+      m_millennium_updater(std::move(millennium_updater))
 {
     logger.log("Initializing plugin_loader...");
     this->init();

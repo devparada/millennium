@@ -104,7 +104,6 @@ class plugin_loader : public std::enable_shared_from_this<plugin_loader>
     std::chrono::system_clock::time_point m_socket_con_time;
     std::string document_script_id;
     std::string m_shared_js_target_id;
-    bool has_loaded_core_plugin;
     bool m_child_handler_installed = false;
     int m_crash_listener_id = -1;
 };
