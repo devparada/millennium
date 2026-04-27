@@ -31,10 +31,12 @@
 #include "millennium/filesystem.h"
 #include "millennium/logger.h"
 #include "millennium/health_check.h"
-#include "millennium/plat_msg.h"
 #include <filesystem>
 #include <vector>
 
+#ifdef _WIN32
+#include "millennium/plat_msg.h"
+#endif
 /**
  * The following keys in "Steam.cfg" block Steam from updating, which
  * breaks Millennium as Millennium requires the latest version of Steam.
