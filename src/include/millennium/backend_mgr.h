@@ -37,7 +37,6 @@
 #include <mutex>
 #include <unordered_map>
 
-
 class backend_manager
 {
   public:

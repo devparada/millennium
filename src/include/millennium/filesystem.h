@@ -36,36 +36,36 @@
 
 namespace platform
 {
-    class file_exception : public std::exception
+class file_exception : public std::exception
+{
+  public:
+    file_exception(const std::string& message) : msg(message)
     {
-      public:
-        file_exception(const std::string& message) : msg(message)
-        {
-        }
-        virtual const char* what() const noexcept override
-        {
-            return msg.c_str();
-        }
+    }
+    virtual const char* what() const noexcept override
+    {
+        return msg.c_str();
+    }
 
-      private:
-        std::string msg;
-    };
+  private:
+    std::string msg;
+};
 
-    std::filesystem::path get_steam_path();
-    std::filesystem::path get_millennium_path();
-    std::filesystem::path get_millennium_bin_path();
-    std::filesystem::path get_install_path();
-    nlohmann::json read_file_json(const std::string& filename, bool* success = nullptr);
-    std::string read_file(const std::string& filename);
-    std::vector<char> read_file_bytes(const std::string& filePath);
-    void write_file(const std::filesystem::path& filePath, std::string content);
-    void write_file_bytes(const std::filesystem::path& filePath, const std::vector<unsigned char>& fileContent);
-    std::string get_millennium_preload_path();
-    void safe_remove_directory(const std::filesystem::path& root);
-    void make_writable(const std::filesystem::path& p);
-    bool remove_directory(const std::filesystem::path& p);
+std::filesystem::path get_steam_path();
+std::filesystem::path get_millennium_path();
+std::filesystem::path get_millennium_bin_path();
+std::filesystem::path get_install_path();
+nlohmann::json read_file_json(const std::string& filename, bool* success = nullptr);
+std::string read_file(const std::string& filename);
+std::vector<char> read_file_bytes(const std::string& filePath);
+void write_file(const std::filesystem::path& filePath, std::string content);
+void write_file_bytes(const std::filesystem::path& filePath, const std::vector<unsigned char>& fileContent);
+std::string get_millennium_preload_path();
+void safe_remove_directory(const std::filesystem::path& root);
+void make_writable(const std::filesystem::path& p);
+bool remove_directory(const std::filesystem::path& p);
 
-    /** Generate a crash dump directory path for a plugin (e.g. <steam>/millennium/crashes/<name>-<timestamp>).
-     *  The directory is NOT created — the child's crash handler creates it only if a crash occurs. */
-    std::string get_crash_dump_dir(const std::string& plugin_name);
+/** Generate a crash dump directory path for a plugin (e.g. <steam>/millennium/crashes/<name>-<timestamp>).
+ *  The directory is NOT created — the child's crash handler creates it only if a crash occurs. */
+std::string get_crash_dump_dir(const std::string& plugin_name);
 }; // namespace platform

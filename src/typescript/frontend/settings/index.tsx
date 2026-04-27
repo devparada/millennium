@@ -151,7 +151,16 @@ export function handleSettingsReturnNavigation(): boolean {
 
 export function MillenniumSettings() {
 	const className = `${settingsClasses.SettingsModal} ${settingsClasses.DesktopPopup} MillenniumSettings ModalDialogPopup`;
-	const settingsPages: (SidebarNavigationPage | "separator")[] = [tabSpotGeneral, 'separator', tabSpotThemes, tabSpotQuickCSS, tabSpotPlugins, 'separator', tabSpotUpdates, tabSpotLogs];
+	const settingsPages: (SidebarNavigationPage | 'separator')[] = [
+		tabSpotGeneral,
+		'separator',
+		tabSpotThemes,
+		tabSpotQuickCSS,
+		tabSpotPlugins,
+		'separator',
+		tabSpotUpdates,
+		tabSpotLogs,
+	];
 	const [currentPage, setCurrentPage] = useState<string | undefined>(undefined);
 
 	useEffect(() => {
@@ -219,8 +228,8 @@ function RenderSettingsModal(_: any, retObj: any) {
 		'separator',
 	];
 
-	retObj.props.menuItems.splice(retObj.props.menuItems.length - 1, 0, ...items);
-	return retObj.type(retObj.props);
+	retObj?.props?.menuItems?.splice?.(retObj?.props?.menuItems?.length - 1, 0, ...items);
+	return retObj?.type?.(retObj.props);
 }
 
 export { RenderSettingsModal };

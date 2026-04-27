@@ -48,7 +48,10 @@ cdp_client::cdp_client(send_fn sender) : m_sender(std::move(sender)), m_callback
             {
                 std::unique_lock<std::mutex> lock(m_incoming_mutex);
                 /** wait for incoming messages or shutdown signal */
-                m_incoming_cv.wait(lock, [this] { return m_shutdown.load(std::memory_order_acquire) || !m_incoming_queue.empty(); });
+                m_incoming_cv.wait(lock, [this]
+                {
+                    return m_shutdown.load(std::memory_order_acquire) || !m_incoming_queue.empty();
+                });
 
                 if (!m_incoming_queue.empty()) {
                     payload = std::move(m_incoming_queue.front());
@@ -266,10 +269,12 @@ void cdp_client::off(int token)
     if (ev_it == m_event_callbacks.end()) return;
 
     auto& listeners = ev_it->second;
-    listeners.erase(
-        std::remove_if(listeners.begin(), listeners.end(), [token](const event_listener& l) { return l.token == token; }),
-        listeners.end()
-    );
+    listeners.erase(std::remove_if(listeners.begin(), listeners.end(),
+                                   [token](const event_listener& l)
+    {
+        return l.token == token;
+    }),
+                    listeners.end());
     if (listeners.empty()) {
         m_event_callbacks.erase(ev_it);
     }
@@ -290,7 +295,6 @@ void cdp_client::off_all(const std::string& event)
     m_event_callbacks.erase(ev_it);
 }
 
-
 /**
  * Handle an incoming message from the CDP endpoint.
  */
@@ -302,7 +306,10 @@ void cdp_client::handle_message(const std::string& payload)
 
     std::unique_lock<std::mutex> lock(m_incoming_mutex);
 
-    m_incoming_space_cv.wait(lock, [this] { return m_shutdown.load(std::memory_order_acquire) || m_incoming_queue.size() < m_incoming_queue_limit; });
+    m_incoming_space_cv.wait(lock, [this]
+    {
+        return m_shutdown.load(std::memory_order_acquire) || m_incoming_queue.size() < m_incoming_queue_limit;
+    });
 
     if (m_shutdown.load(std::memory_order_acquire)) {
         return;
@@ -405,7 +412,6 @@ void cdp_client::process_message(const std::string& payload)
                 });
             }
         }
-
     }
 }
 
@@ -417,7 +423,10 @@ void cdp_client::cleanup_loop()
     while (!m_shutdown.load(std::memory_order_acquire)) {
         {
             std::unique_lock<std::mutex> lock(m_cleanup_mutex);
-            m_cleanup_cv.wait_for(lock, std::chrono::seconds(1), [this] { return m_shutdown.load(std::memory_order_acquire); });
+            m_cleanup_cv.wait_for(lock, std::chrono::seconds(1), [this]
+            {
+                return m_shutdown.load(std::memory_order_acquire);
+            });
         }
 
         if (!m_shutdown.load(std::memory_order_acquire)) {

@@ -71,7 +71,12 @@ std::vector<crash_event> crash_event_bus::get_pending_crashes() const
 void crash_event_bus::acknowledge_crash(const std::string& plugin_name)
 {
     std::lock_guard<std::mutex> lock(m_mutex);
-    m_crash_buffer.erase(std::remove_if(m_crash_buffer.begin(), m_crash_buffer.end(), [&](const crash_event& ev) { return ev.plugin_name == plugin_name; }), m_crash_buffer.end());
+    m_crash_buffer.erase(std::remove_if(m_crash_buffer.begin(), m_crash_buffer.end(),
+                                        [&](const crash_event& ev)
+    {
+        return ev.plugin_name == plugin_name;
+    }),
+                         m_crash_buffer.end());
 }
 
 } // namespace mep

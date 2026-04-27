@@ -46,7 +46,6 @@
 #include <memory>
 #include <nlohmann/json.hpp>
 
-
 class plugin_loader : public std::enable_shared_from_this<plugin_loader>
 {
   public:

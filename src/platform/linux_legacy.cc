@@ -44,7 +44,7 @@
 /* Trampoline for the real main() */
 static int (*fnMainOriginal)(int, char**, char**);
 
-/** fwd decl of main thread: from new init_posix.cc */extern std::unique_ptr<std::thread> g_millenniumThread;
+/** fwd decl of main thread: from new init_posix.cc */ extern std::unique_ptr<std::thread> g_millenniumThread;
 
 /** fwd decl of attach function */
 void Posix_AttachMillennium();

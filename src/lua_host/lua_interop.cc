@@ -73,8 +73,7 @@ ipc_main::vm_call_result ipc_main::lua_evaluate(std::string pluginName, nlohmann
                     vm_result.value = parsed;
                 else
                     vm_result.value = str;
-            }
-            else if (val.is_boolean())
+            } else if (val.is_boolean())
                 vm_result.value = val.get<bool>();
             else if (val.is_number_float())
                 vm_result.value = val.get<double>();

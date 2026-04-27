@@ -284,7 +284,8 @@ void ffi_binder::cdp_proxy_hdlr(const json& params)
     }
 }
 
-void ffi_binder::cdp_proxy_call(const std::string& plugin_name, int callback_id, const std::string& method, const json& params, const std::string& session_id, int main_ctx_id, const std::optional<std::string>& target_session)
+void ffi_binder::cdp_proxy_call(const std::string& plugin_name, int callback_id, const std::string& method, const json& params, const std::string& session_id, int main_ctx_id,
+                                const std::optional<std::string>& target_session)
 {
     const bool targets_shared_js = target_session.has_value() && (target_session.value() == m_client->get_shared_js_session_id());
 

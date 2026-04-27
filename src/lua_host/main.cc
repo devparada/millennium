@@ -560,7 +560,9 @@ int main(int argc, char* argv[])
             std::string key = params.value("key", "");
             json value = params.value("value", json(nullptr));
             dispatch_config_change(L, key, value);
-            return {{ "ok", true }};
+            return {
+                { "ok", true }
+            };
         }
 
         if (method == plugin_ipc::parent_method::SHUTDOWN) {

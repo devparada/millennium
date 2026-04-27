@@ -166,7 +166,10 @@ void backend_event_dispatcher::backend_loaded_event_hdlr(plugin_t plugin)
        (e.g. a re-spawn or unexpected duplicate), the list would exceed
        pluginCount and are_all_backends_ready() would never return true,
        preventing Steam from being patched. */
-    auto it = std::find_if(this->emittedPlugins.begin(), this->emittedPlugins.end(), [&](const plugin_t& p) { return p.pluginName == plugin.pluginName; });
+    auto it = std::find_if(this->emittedPlugins.begin(), this->emittedPlugins.end(), [&](const plugin_t& p)
+    {
+        return p.pluginName == plugin.pluginName;
+    });
 
     if (it != this->emittedPlugins.end()) {
         *it = plugin;
@@ -191,7 +194,10 @@ void backend_event_dispatcher::backend_unloaded_event_hdlr(plugin_t plugin, bool
         std::unique_lock<std::mutex> lock(listenersMutex);
 
         // remove the plugin from the emitted list
-        auto it = std::remove_if(this->emittedPlugins.begin(), this->emittedPlugins.end(), [&](const plugin_t& p) { return p.pluginName == plugin.pluginName; });
+        auto it = std::remove_if(this->emittedPlugins.begin(), this->emittedPlugins.end(), [&](const plugin_t& p)
+        {
+            return p.pluginName == plugin.pluginName;
+        });
 
         if (it != this->emittedPlugins.end()) {
             this->emittedPlugins.erase(it, this->emittedPlugins.end());

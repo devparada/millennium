@@ -43,7 +43,10 @@ void console_capture::start(std::shared_ptr<cdp_client> cdp, std::shared_ptr<plu
 {
     m_pm = std::move(pm);
     m_cdp = cdp;
-    cdp->on("Runtime.consoleAPICalled", [this](const nlohmann::json& params) { on_console_event(params); });
+    cdp->on("Runtime.consoleAPICalled", [this](const nlohmann::json& params)
+    {
+        on_console_event(params);
+    });
     m_started.store(true);
 }
 

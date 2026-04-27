@@ -69,7 +69,10 @@ DESTRUCTOR void Posix_UnInitializeEnvironment()
 void Posix_AttachMillennium()
 {
     /** Handle signal interrupts (^C) */
-    signal(SIGINT, [](int /** signalCode */) { std::exit(128 + SIGINT); });
+    signal(SIGINT, [](int /** signalCode */)
+    {
+        std::exit(128 + SIGINT);
+    });
 
     platform::before_attach_millennium();
     platform::initialize_steam_hooks();

@@ -43,7 +43,6 @@
 #include <string>
 #include <iostream>
 #if defined(__linux__) || defined(__APPLE__)
-#include "millennium/logger.h"
 #include <unistd.h>
 #endif
 
@@ -176,13 +175,13 @@ void platform::environment::setup()
 #ifdef _WIN32
     const auto installPath = platform::get_install_path().string();
     std::map<std::string, std::string> environment_windows = {
-        { "MILLENNIUM__PLUGINS_PATH", installPath + "/plugins"  },
-        { "MILLENNIUM__CONFIG_PATH",  installPath + "/config"   },
-        { "MILLENNIUM__LOGS_PATH",    installPath + "/logs"     },
-        { "MILLENNIUM__DATA_LIB",     dataLibPath               },
-        { "MILLENNIUM__SHIMS_PATH",   shimsPath                 },
-        { "MILLENNIUM__ASSETS_PATH",  assetsPath                },
-        { "MILLENNIUM__INSTALL_PATH", installPath               }
+        { "MILLENNIUM__PLUGINS_PATH", installPath + "/plugins" },
+        { "MILLENNIUM__CONFIG_PATH",  installPath + "/config"  },
+        { "MILLENNIUM__LOGS_PATH",    installPath + "/logs"    },
+        { "MILLENNIUM__DATA_LIB",     dataLibPath              },
+        { "MILLENNIUM__SHIMS_PATH",   shimsPath                },
+        { "MILLENNIUM__ASSETS_PATH",  assetsPath               },
+        { "MILLENNIUM__INSTALL_PATH", installPath              }
     };
     environment.insert(environment_windows.begin(), environment_windows.end());
 #elif __linux__

@@ -101,9 +101,7 @@ static char s_buf_backend_file[260];
 
 static bool plugin_watchdog_available()
 {
-    return s_ctx.shm != nullptr
-        && s_ctx.request_event != nullptr
-        && s_ctx.done_event != nullptr;
+    return s_ctx.shm != nullptr && s_ctx.request_event != nullptr && s_ctx.done_event != nullptr;
 }
 
 static void plugin_fallback_write(EXCEPTION_POINTERS* ep)

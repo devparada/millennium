@@ -655,7 +655,10 @@ const nlohmann::json* head::theme_installer::find_remote_theme(const nlohmann::j
         return nullptr;
     }
 
-    auto it = std::find_if(remote.begin(), remote.end(), [&repoName](const nlohmann::json& item) { return item.value("name", "") == repoName; });
+    auto it = std::find_if(remote.begin(), remote.end(), [&repoName](const nlohmann::json& item)
+    {
+        return item.value("name", "") == repoName;
+    });
 
     return (it != remote.end()) ? &(*it) : nullptr;
 }
@@ -666,8 +669,7 @@ bool head::theme_installer::has_updates(const std::filesystem::path& path, const
     const std::string localCommit = get_commit_hash(path);
     const bool differs = localCommit != remoteCommit;
 
-    logger.log("[update-check] theme='{}' local='{}' remote='{}' has_update={}",
-               path.filename().string(), localCommit, remoteCommit, differs);
+    logger.log("[update-check] theme='{}' local='{}' remote='{}' has_update={}", path.filename().string(), localCommit, remoteCommit, differs);
 
     return differs;
 }

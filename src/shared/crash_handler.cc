@@ -31,11 +31,12 @@
 #include "shared/crash_handler.h"
 #include "shared/crash_handler_core.h"
 #include "shared/crash_report.h"
+#ifdef _WIN32
 #include "millennium/filesystem.h"
+#endif
 
 #include <csignal>
 #include <cstdlib>
-#include <cstring>
 #include <ctime>
 #include <filesystem>
 #include <string>

@@ -53,14 +53,13 @@ nlohmann::json head::Plugins::FindAllPlugins(std::shared_ptr<plugin_manager> plu
                 status = "crashed";
 
                 std::string display = crash.display_name;
-                if (display.empty())
-                    display = plugin.plugin_json.value("common_name", plugin.plugin_name);
+                if (display.empty()) display = plugin.plugin_json.value("common_name", plugin.plugin_name);
 
                 crash_info = {
-                    { "plugin",       crash.plugin_name   },
-                    { "displayName",  display             },
+                    { "plugin",       crash.plugin_name         },
+                    { "displayName",  display                   },
                     { "exitCode",     (uint32_t)crash.exit_code },
-                    { "crashDumpDir", crash.crash_dump_dir }
+                    { "crashDumpDir", crash.crash_dump_dir      }
                 };
                 break;
             }
@@ -68,11 +67,11 @@ nlohmann::json head::Plugins::FindAllPlugins(std::shared_ptr<plugin_manager> plu
 
         result.push_back({
             { "path",              plugin.plugin_base_dir.generic_string() },
-            { "enabled",           enabled                                },
-            { "status",            status                                 },
-            { "crash",             crash_info                             },
-            { "isChromeExtension", false                                  },
-            { "data",              plugin.plugin_json                     }
+            { "enabled",           enabled                                 },
+            { "status",            status                                  },
+            { "crash",             crash_info                              },
+            { "isChromeExtension", false                                   },
+            { "data",              plugin.plugin_json                      }
         });
     }
 
@@ -116,10 +115,15 @@ nlohmann::ordered_json head::Themes::FindAllThemes()
 
     try {
         std::vector<std::filesystem::directory_entry> dirs;
-        std::copy_if(std::filesystem::directory_iterator(path), std::filesystem::directory_iterator{}, std::back_inserter(dirs),
-                     [](const auto& entry) { return entry.is_directory(); });
+        std::copy_if(std::filesystem::directory_iterator(path), std::filesystem::directory_iterator{}, std::back_inserter(dirs), [](const auto& entry)
+        {
+            return entry.is_directory();
+        });
 
-        std::sort(dirs.begin(), dirs.end(), [](const auto& a, const auto& b) { return a.path().filename() < b.path().filename(); });
+        std::sort(dirs.begin(), dirs.end(), [](const auto& a, const auto& b)
+        {
+            return a.path().filename() < b.path().filename();
+        });
 
         for (const auto& dir : dirs) {
             auto skinJsonPath = dir.path() / "skin.json";

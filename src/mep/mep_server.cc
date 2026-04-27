@@ -301,9 +301,18 @@ void server::handle_client(socket_t fd)
     auto subs = std::make_shared<client_subscriptions>();
     auto ctx = std::make_shared<client_context>();
 
-    ctx->push = [this, fd](const nlohmann::json& event) -> bool { return write_frame(fd, nlohmann::json::to_msgpack(event)); };
-    ctx->subscribe = [subs, fd](std::function<void()> cancel_fn) -> std::string { return subs->subscribe(std::move(cancel_fn), fd); };
-    ctx->unsubscribe = [subs](const std::string& id) -> bool { return subs->unsubscribe(id); };
+    ctx->push = [this, fd](const nlohmann::json& event) -> bool
+    {
+        return write_frame(fd, nlohmann::json::to_msgpack(event));
+    };
+    ctx->subscribe = [subs, fd](std::function<void()> cancel_fn) -> std::string
+    {
+        return subs->subscribe(std::move(cancel_fn), fd);
+    };
+    ctx->unsubscribe = [subs](const std::string& id) -> bool
+    {
+        return subs->unsubscribe(id);
+    };
 
     std::vector<uint8_t> payload;
     while (m_running) {

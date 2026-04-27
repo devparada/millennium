@@ -664,8 +664,10 @@ static bool prepare_macos_bootstrap_assets(const char* steam_executable_path)
         return false;
     }
 
-    std::sort(chunk_files.begin(), chunk_files.end(),
-              [](const std::filesystem::path& lhs, const std::filesystem::path& rhs) { return lhs.filename().string() < rhs.filename().string(); });
+    std::sort(chunk_files.begin(), chunk_files.end(), [](const std::filesystem::path& lhs, const std::filesystem::path& rhs)
+    {
+        return lhs.filename().string() < rhs.filename().string();
+    });
 
     for (const std::filesystem::path& chunk_path : chunk_files) {
         if (!sync_text_file(chunk_path, chunks_target_dir / chunk_path.filename())) {

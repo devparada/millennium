@@ -28,7 +28,6 @@
  * SOFTWARE.
  */
 
-#include "millennium/filesystem.h"
 #include <atomic>
 #include <condition_variable>
 #include <mutex>
@@ -57,6 +56,7 @@ std::atomic<bool> g_cdp_pipes_ready{ false };
 int g_cdp_pipe_generation = 0;
 
 #ifdef _WIN32
+#include "millennium/filesystem.h"
 HANDLE g_cdp_pipe_read = INVALID_HANDLE_VALUE;
 HANDLE g_cdp_pipe_write = INVALID_HANDLE_VALUE;
 #elif __linux__

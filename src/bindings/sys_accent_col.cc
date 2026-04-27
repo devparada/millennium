@@ -224,7 +224,10 @@ nlohmann::json head::system_accent_color::get_accent_color_linux()
  */
 std::string head::system_accent_color::adjust_color_intensity(const std::string& hex_color, int percent)
 {
-    auto clamp = [](int v) { return std::max(0, std::min(255, v)); };
+    auto clamp = [](int v)
+    {
+        return std::max(0, std::min(255, v));
+    };
     std::string color = (hex_color[0] == '#') ? hex_color.substr(1) : hex_color;
     if (color.length() != 6) return hex_color;
 
@@ -232,7 +235,10 @@ std::string head::system_accent_color::adjust_color_intensity(const std::string&
     int g = std::stoi(color.substr(2, 2), nullptr, 16);
     int b = std::stoi(color.substr(4, 2), nullptr, 16);
 
-    auto adjust = [&](int c) { return clamp(percent < 0 ? static_cast<int>(c * (1.0 + percent / 100.0)) : static_cast<int>(c + (255 - c) * (percent / 100.0))); };
+    auto adjust = [&](int c)
+    {
+        return clamp(percent < 0 ? static_cast<int>(c * (1.0 + percent / 100.0)) : static_cast<int>(c + (255 - c) * (percent / 100.0)));
+    };
 
     r = adjust(r);
     g = adjust(g);

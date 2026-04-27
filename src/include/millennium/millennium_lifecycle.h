@@ -40,12 +40,15 @@ class millennium_lifecycle
     {
         std::mutex mtx;
         std::condition_variable cv;
-        std::atomic<bool> flag{false};
+        std::atomic<bool> flag{ false };
 
         void wait()
         {
             std::unique_lock<std::mutex> lk(mtx);
-            cv.wait(lk, [this] { return flag.load(); });
+            cv.wait(lk, [this]
+            {
+                return flag.load();
+            });
         }
 
         void notify()
@@ -69,7 +72,7 @@ class millennium_lifecycle
     gate steam_unloaded;
     gate terminate;
 
-    std::atomic<bool> disconnect_frontend{false};  // Windows only
+    std::atomic<bool> disconnect_frontend{ false }; // Windows only
 
     millennium_lifecycle(const millennium_lifecycle&) = delete;
     millennium_lifecycle& operator=(const millennium_lifecycle&) = delete;

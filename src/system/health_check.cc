@@ -66,7 +66,10 @@ void platform::health::check_health()
     if (std::filesystem::exists(steam_cfg)) {
         try {
             const std::string steamConfig = platform::read_file(steam_cfg.string());
-            if (std::any_of(blackListedKeys.begin(), blackListedKeys.end(), [&](const auto& key) { return steamConfig.find(key) != std::string::npos; })) {
+            if (std::any_of(blackListedKeys.begin(), blackListedKeys.end(), [&](const auto& key)
+            {
+                return steamConfig.find(key) != std::string::npos;
+            })) {
                 show_bootstrap_error();
             }
         } catch (const platform::file_exception&) {

@@ -50,7 +50,6 @@
 class webkit_world_mgr
 {
   public:
-
     explicit webkit_world_mgr(std::shared_ptr<cdp_client> client, std::shared_ptr<plugin_manager> plugin_manager, std::shared_ptr<network_hook_ctl> network_hook_ctl,
                               std::shared_ptr<plugin_webkit_store> plugin_webkit_store);
     ~webkit_world_mgr();

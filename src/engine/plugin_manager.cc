@@ -38,11 +38,13 @@
 #include <windows.h>
 #endif
 
-plugin_manager::plugin_manager() {}
+plugin_manager::plugin_manager()
+{
+}
 
 nlohmann::json reset_enabled_plugins()
 {
-    CONFIG.set({"plugins", "enabledPlugins"}, std::vector<std::string>{});
+    CONFIG.set({ "plugins", "enabledPlugins" }, std::vector<std::string>{});
     return {};
 }
 
@@ -51,7 +53,7 @@ nlohmann::json reset_enabled_plugins()
  */
 int plugin_manager::init()
 {
-    nlohmann::json enabledPlugins = CONFIG.get({"plugins", "enabledPlugins"}, std::vector<std::string>{});
+    nlohmann::json enabledPlugins = CONFIG.get({ "plugins", "enabledPlugins" }, std::vector<std::string>{});
 
     if (!enabledPlugins.is_array()) {
         enabledPlugins = reset_enabled_plugins();
@@ -75,7 +77,7 @@ int plugin_manager::init()
 bool plugin_manager::set_plugin_enabled(std::string pluginName, bool enabled)
 {
     logger.log("Opting to {} {}", enabled ? "enable" : "disable", pluginName);
-    nlohmann::json enabledPluginsJson = CONFIG.get({"plugins", "enabledPlugins"}, std::vector<std::string>{});
+    nlohmann::json enabledPluginsJson = CONFIG.get({ "plugins", "enabledPlugins" }, std::vector<std::string>{});
 
     std::vector<std::string> enabledPlugins;
     if (enabledPluginsJson.is_array()) {
@@ -97,7 +99,7 @@ bool plugin_manager::set_plugin_enabled(std::string pluginName, bool enabled)
         }
     }
 
-    CONFIG.set({"plugins", "enabledPlugins"}, enabledPlugins);
+    CONFIG.set({ "plugins", "enabledPlugins" }, enabledPlugins);
     return true;
 }
 
@@ -107,7 +109,7 @@ bool plugin_manager::set_plugin_enabled(std::string pluginName, bool enabled)
  */
 bool plugin_manager::is_enabled(std::string plugin_name)
 {
-    nlohmann::json enabledPluginsJson = CONFIG.get({"plugins", "enabledPlugins"}, std::vector<std::string>{});
+    nlohmann::json enabledPluginsJson = CONFIG.get({ "plugins", "enabledPlugins" }, std::vector<std::string>{});
 
     if (!enabledPluginsJson.is_array()) {
         return false;
@@ -240,7 +242,10 @@ std::vector<std::string> plugin_manager::get_enabled_plugin_names()
     std::vector<plugin_manager::plugin_t> plugins = this->get_enabled_plugins();
 
     /** only add the plugin name. */
-    std::transform(plugins.begin(), plugins.end(), std::back_inserter(enabledPlugins), [](auto& plugin) { return plugin.plugin_name; });
+    std::transform(plugins.begin(), plugins.end(), std::back_inserter(enabledPlugins), [](auto& plugin)
+    {
+        return plugin.plugin_name;
+    });
     return enabledPlugins;
 }
 
@@ -259,8 +264,8 @@ std::vector<plugin_manager::plugin_t> plugin_manager::get_enabled_backends()
         if (!this->is_enabled(plugin.plugin_name)) continue;
         if (!plugin.plugin_json.value("useBackend", true)) continue;
         if (plugin.plugin_json.value("backendType", "") != "lua") {
-            logger.warn("skipping backend for '{}': backendType is not 'lua' (got '{}'). Python backends are no longer supported.",
-                plugin.plugin_name, plugin.plugin_json.value("backendType", "<unset>"));
+            logger.warn("skipping backend for '{}': backendType is not 'lua' (got '{}'). Python backends are no longer supported.", plugin.plugin_name,
+                        plugin.plugin_json.value("backendType", "<unset>"));
             continue;
         }
         enabledBackends.push_back(plugin);

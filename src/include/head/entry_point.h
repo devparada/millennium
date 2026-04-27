@@ -45,7 +45,10 @@
 
 using builtin_payload = nlohmann::ordered_json;
 
-namespace platform { class file_watcher; }
+namespace platform
+{
+class file_watcher;
+}
 
 namespace head
 {
