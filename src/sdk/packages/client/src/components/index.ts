@@ -17,6 +17,7 @@ export * from './Panel';
 export * from './ProgressBar';
 export * from './SidebarNavigation';
 export * from './SliderField';
+export * from './IconsModule';
 export * from './Spinner';
 export * from './SteamSpinner';
 export * from './Tabs';

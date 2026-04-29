@@ -27,7 +27,7 @@ export interface ProgressBarWithInfoProps extends ProgressBarItemProps {
 export const ProgressBar = findModuleExport((e: Export) => e?.toString()?.includes('.ProgressBar,"standard"==')) as FC<ProgressBarProps>;
 
 /** @component React Components */
-export const ProgressBarWithInfo = findModuleExport((e: Export) => e?.toString()?.includes('.ProgressBarFieldStatus},')) as FC<ProgressBarWithInfoProps>;
+export const ProgressBarWithInfo = findModuleExport((e: Export) => e?.toString()?.includes('.ProgressBarFieldStatus') && e?.toString()?.includes('.OperationText')) as FC<ProgressBarWithInfoProps>;
 
 const progressBarItemRegex = createPropListRegex(['indeterminate', 'nTransitionSec', 'nProgress']);
 /** @component React Components */

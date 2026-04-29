@@ -123,13 +123,12 @@ const tabSpotLogs: SidebarNavigationPage = {
 
 export function MillenniumSettings() {
 	const className = `${settingsClasses.SettingsModal} ${settingsClasses.DesktopPopup} MillenniumSettings ModalDialogPopup`;
-	const settingsPages = [tabSpotGeneral, 'separator', tabSpotThemes, tabSpotQuickCSS, tabSpotPlugins, 'separator', tabSpotUpdates, tabSpotLogs];
+	const settingsPages: (SidebarNavigationPage | 'separator')[] = [tabSpotGeneral, 'separator', tabSpotThemes, tabSpotQuickCSS, tabSpotPlugins, 'separator', tabSpotUpdates, tabSpotLogs];
 
 	return (
 		<ConfigProvider>
 			<UpdateContextProvider>
 				<Styles />
-				{/* @ts-ignore */}
 				<SidebarNavigation className={className} pages={settingsPages} title={'Millennium'} />
 			</UpdateContextProvider>
 		</ConfigProvider>
