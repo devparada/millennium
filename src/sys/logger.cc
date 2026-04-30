@@ -92,11 +92,7 @@ OutputLogger::OutputLogger()
         freopen("CONOUT$", "w", stdout);
         freopen("CONOUT$", "w", stderr);
 
-        #ifdef _WIN64
-        SetConsoleTitleA("Millennium_x86_64@" MILLENNIUM_VERSION);
-        #elif defined(_WIN32)
-        SetConsoleTitleA("Millennium_i386@" MILLENNIUM_VERSION);
-        #endif
+        SetConsoleTitleA("Millennium " MILLENNIUM_VERSION);
 
         EnableVirtualTerminalProcessing();
         std::ios::sync_with_stdio(true);
