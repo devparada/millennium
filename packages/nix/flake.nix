@@ -4,7 +4,7 @@
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs?ref=nixos-unstable";
 
-    millennium-src.url = "github:SteamClientHomebrew/Millennium/1bc62c94a06f25f7e8d7e269f11cd968cf576bff?shallow=true";
+    millennium-src.url = "github:SteamClientHomebrew/Millennium/defffd7b6f0cf4d5e53f5a892819966801475704?shallow=true";
     millennium-src.flake = false;
 
     zlib-src.url = "github:zlib-ng/zlib-ng/2.2.5?shallow=true";
@@ -67,14 +67,18 @@
           };
 
           packages = {
-            default             = packages.millennium-steam;
-            millennium-assets   = pkgs.callPackage ./assets.nix         { inherit millennium-src; };
-            millennium-frontend = pkgs.callPackage ./frontend.nix       { inherit millennium-src; };
-            millennium-shims    = pkgs.callPackage ./shims.nix          { inherit millennium-src; };
-            millennium-32       = pkgs.callPackage ./millennium-32.nix  ( millennium-deps );
-            millennium-64       = pkgs.callPackage ./millennium-64.nix  ( millennium-deps );
-            millennium          = pkgs.callPackage ./millennium.nix     ( millennium-deps // { inherit (packages) millennium-32 millennium-64; } );
-            millennium-steam    = pkgs.callPackage ./steam.nix          { inherit (packages) millennium millennium-shims millennium-assets; };
+            default = packages.millennium-steam;
+            millennium-assets = pkgs.callPackage ./assets.nix { inherit millennium-src; };
+            millennium-frontend = pkgs.callPackage ./frontend.nix { inherit millennium-src; };
+            millennium-shims = pkgs.callPackage ./shims.nix { inherit millennium-src; };
+            millennium-32 = pkgs.callPackage ./millennium-32.nix (millennium-deps);
+            millennium-64 = pkgs.callPackage ./millennium-64.nix (millennium-deps);
+            millennium = pkgs.callPackage ./millennium.nix (
+              millennium-deps // { inherit (packages) millennium-32 millennium-64; }
+            );
+            millennium-steam = pkgs.callPackage ./steam.nix {
+              inherit (packages) millennium millennium-shims millennium-assets;
+            };
           };
         in
         packages;
