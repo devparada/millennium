@@ -78,6 +78,11 @@ void millennium::check_for_updates()
             return;
         }
 
+        if (update["platformRelease"].is_null()) {
+            LOG_ERROR("No platform-specific release asset found for Millennium {}. Cannot auto-update.", new_version);
+            return;
+        }
+
         const std::string download_url = update["platformRelease"]["browser_download_url"];
         const size_t download_size = update["platformRelease"]["size"].get<size_t>();
 

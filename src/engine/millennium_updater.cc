@@ -125,12 +125,12 @@ void millennium_updater::check_for_updates()
             }
         }
 
-        logger.log("Latest Millennium release: {}", latest_release.value("tag_name", "unknown"));
-
         if (latest_release.empty()) {
             logger.warn("No stable releases found in GitHub API response.");
             return;
         }
+
+        logger.log("Latest Millennium release: {}", latest_release.value("tag_name", "unknown"));
 
         if (!latest_release.contains("tag_name")) {
             LOG_ERROR("Latest release missing required 'tag_name' field.");
@@ -377,6 +377,7 @@ void millennium_updater::update_impl(const std::string& downloadUrl, const size_
         logger.log("Downloading update to: {}", tempFilePath.string());
         Http::DownloadWithProgress({ downloadUrl, downloadSize }, tempFilePath, [this](size_t downloaded, size_t total)
         {
+            if (total == 0) return;
             const double progress = (static_cast<double>(downloaded) / total) * 50.0;
             this->dispatch_progress_to_frontend("Downloading update assets...", progress, false);
         });
@@ -386,11 +387,16 @@ void millennium_updater::update_impl(const std::string& downloadUrl, const size_
         win32_move_old_millennium_version(lockedFiles);
 #endif
         logger.log("Extracting to {}", platform::get_install_path().generic_string());
-        Util::ExtractZipArchive(tempFilePath.string(), platform::get_install_path().generic_string(), [this](int current, int total, const char*)
+        bool extracted = Util::ExtractZipArchive(tempFilePath.string(), platform::get_install_path().generic_string(), [this](int current, int total, const char*)
         {
+            if (total == 0) return;
             const double progress = 50.0 + (static_cast<double>(current) / total) * 50.0;
             this->dispatch_progress_to_frontend(fmt::format("Processing file {}/{}", current, total), progress, false);
         });
+
+        if (!extracted) {
+            throw std::runtime_error("Failed to extract update archive. The download may be corrupt or an unsupported format.");
+        }
 
         std::error_code ec;
         if (!std::filesystem::remove(tempFilePath, ec)) {

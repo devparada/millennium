@@ -49,7 +49,7 @@ import { showLegacyPluginModal } from './components/LegacyPluginModal';
 import { showSupersededPluginModal, SUPERSEDED_PLUGIN_NAMES } from './components/SupersededPluginModal';
 
 async function initializeMillennium(settings: SettingsProps) {
-   	Logger.Log(`Initialized Millennium Frontend Settings Store:`, settings);
+	Logger.Log(`Initialized Millennium Frontend Settings Store:`, settings);
 
 	const theme: ThemeItem = settings.active_theme;
 	const systemColors: SystemAccentColor = settings.accent_color;
@@ -83,7 +83,7 @@ async function initializeMillennium(settings: SettingsProps) {
 		enabledPlugins: settings?.enabledPlugins ?? [],
 		updates: settings?.updates ?? [],
 		hasCheckedForUpdates: settings?.hasCheckedForUpdates ?? false,
-        buildDate: settings?.buildDate,
+		buildDate: settings?.buildDate,
 		gitCommitOid: settings?.gitCommitOid,
 		millenniumUpdates: settings?.millenniumUpdates ?? {},
 		platformType: settings?.platformType,

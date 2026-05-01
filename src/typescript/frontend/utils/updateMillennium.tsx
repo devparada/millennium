@@ -15,6 +15,7 @@ export async function updateMillennium(background: boolean) {
 			critical: true,
 			sound: 3,
 		});
+		return;
 	}
 
 	Core_UpdateMillennium({ downloadUrl, downloadSize, background });
