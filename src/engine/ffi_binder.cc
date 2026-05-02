@@ -68,7 +68,7 @@ void ffi_binder::register_isolated_ctx(const std::string& plugin_name, int isola
     logger.log("ffi_binder: registered isolated ctx {} for plugin '{}'", isolated_ctx_id, plugin_name);
 }
 
-void ffi_binder::callback_into_js(const json params, const int request_id, json result)
+void ffi_binder::callback_into_js(const json params, const int request_id, ordered_json result)
 {
     json eval_params = {
         { "contextId", params["executionContextId"] },
@@ -417,7 +417,7 @@ void ffi_binder::binding_call_hdlr(const json& params)
     } catch (const std::exception& e) {
         LOG_ERROR("ffi_binder: exception while handling binding call: {}", e.what());
 
-        const json callback_params = {
+        const ordered_json callback_params = {
             { "success",    false    },
             { "returnJson", e.what() }
         };

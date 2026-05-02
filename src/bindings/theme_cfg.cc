@@ -161,14 +161,14 @@ nlohmann::json head::theme_config_store::get_accent_color()
     return head::system_accent_color::plat_get_accent_color(CONFIG.get({ "general", "accentColor" }).get<std::string>());
 }
 
-nlohmann::json head::theme_config_store::get_active_theme()
+nlohmann::ordered_json head::theme_config_store::get_active_theme()
 {
     std::string active = CONFIG.get({ "themes", "activeTheme" }).get<std::string>();
     std::filesystem::path path = themes_path / active / "skin.json";
 
     try {
         std::ifstream file(path);
-        nlohmann::json data;
+        nlohmann::ordered_json data;
         file >> data;
         return {
             { "native", active },

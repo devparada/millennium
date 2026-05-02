@@ -51,7 +51,7 @@ class theme_config_store
 
     void change_theme(const std::string& theme_name);
     json get_accent_color();
-    json get_active_theme();
+    ordered_json get_active_theme();
 
     void setup_theme_hooks();
     void start_webkit_hook(const json& theme, const std::string& name);

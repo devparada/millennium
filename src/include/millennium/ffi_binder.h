@@ -104,7 +104,7 @@ class ffi_binder
     std::vector<int> m_internal_tokens;                                            // tokens for our own internal listeners
     std::mutex m_ctx_mutex;
 
-    void callback_into_js(const json params, const int request_id, json result);
+    void callback_into_js(const json params, const int request_id, ordered_json result);
 
     /**
      * event handlers for Runtime.bindingCalled events
