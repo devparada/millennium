@@ -17,7 +17,7 @@
 }:
 pkgsi686Linux.stdenv.mkDerivation (finalAttrs: {
   pname = "millennium-32";
-  version = "2.34.0";
+  version = "2.36.0";
 
   src = inputs.millennium-src;
 
