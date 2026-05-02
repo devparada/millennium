@@ -262,6 +262,8 @@ void head::theme_config_store::setup_colors()
             }
         }
     }
+
+    CONFIG.save_to_disk();
 }
 
 nlohmann::json head::theme_config_store::get_colors()
@@ -321,6 +323,7 @@ nlohmann::json head::theme_config_store::set_theme_color(const std::string& them
     }
 
     CONFIG.set({ "themes", "themeColors", theme, color_name }, parsed_color.value(), true);
+    CONFIG.save_to_disk();
     return parsed_color.value();
 }
 
@@ -411,6 +414,7 @@ void head::theme_config_store::setup_conditionals()
 nlohmann::json head::theme_config_store::set_condition(const std::string& theme, const nlohmann::json& newData, const std::string& condition)
 {
     CONFIG.set({ "themes", "conditions", theme, condition }, newData, true);
+    CONFIG.save_to_disk();
 
     return {
         { "success", true }  /** just assume it worked, too laze to impl :) */

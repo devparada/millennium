@@ -35,6 +35,9 @@
 
 #include <fmt/core.h>
 #include <fstream>
+#include <chrono>
+#include <ctime>
+#include <thread>
 #ifdef _WIN32
 #include <windows.h>
 #endif
@@ -147,6 +150,8 @@ void config_manager::load_from_disk()
         std::filesystem::remove(tempFilename);
     }
 
+    const bool file_exists = std::filesystem::exists(_filename);
+
     {
         std::ifstream file(_filename);
 
@@ -155,14 +160,34 @@ void config_manager::load_from_disk()
                 file >> _data;
             } catch (...) {
                 logger.warn("Invalid JSON in config file: {}", _filename);
-                platform::messagebox::show("Millennium", fmt::format("The config file at '{}' contains invalid JSON and will be reset to defaults.", _filename),
+                file.close();
+
+                /**
+                 * Preserve the corrupted file before we reset — once save_to_disk
+                 * runs it will overwrite the original, and the user has no other
+                 * recovery path.
+                 */
+                std::error_code bec;
+                const std::string backup = _filename + ".corrupted." + std::to_string(static_cast<long long>(std::time(nullptr)));
+                std::filesystem::copy_file(_filename, backup, std::filesystem::copy_options::overwrite_existing, bec);
+                const std::string backup_note = bec ? std::string("backup failed: ") + bec.message() : std::string("a backup has been saved to ") + backup;
+
+                platform::messagebox::show("Millennium", fmt::format("The config file at '{}' contains invalid JSON and will be reset to defaults ({}).", _filename, backup_note),
                                            platform::messagebox::level::warn);
                 _data = nlohmann::json::object();
             }
-        } else {
-            logger.warn("Failed to open config file: {}", _filename);
-            platform::messagebox::show("Millennium", fmt::format("The config file at '{}' could not be opened and will be reset to defaults.", _filename),
+        } else if (file_exists) {
+            logger.warn("Could not open existing config file (likely transient lock): {}. Disabling persistence for this session.", _filename);
+            platform::messagebox::show("Millennium",
+                                       fmt::format("Could not open the config file at '{}' (it may be temporarily locked by another process). Your settings on disk are preserved; "
+                                                   "defaults will be used until the next launch.",
+                                                   _filename),
                                        platform::messagebox::level::warn);
+            _data = nlohmann::json::object();
+            _save_disabled = true;
+        } else {
+            /** No file at all — fresh install path; constructor normally creates it first. */
+            logger.warn("Config file does not exist: {}", _filename);
             _data = nlohmann::json::object();
         }
     }
@@ -176,6 +201,8 @@ void config_manager::save_to_disk()
     // Serialize all file I/O operations to prevent concurrent writes
     std::lock_guard<std::mutex> save_lock(_save_mutex);
     std::lock_guard<std::recursive_mutex> lock(_mutex);
+
+    if (_save_disabled) return;
 
     /**
      * Use atomic write pattern: write to temp file, then rename
@@ -201,14 +228,20 @@ void config_manager::save_to_disk()
         }
     }
 
-    /** atomic rename - either the old file exists or the new one, never partial */
+    /**
+     * Atomic rename. either the old file exists or the new one, never partial.
+     * On Windows the destination can be momentarily locked by AV/backup/indexer
+     * software, so retry a few times with a short backoff before giving up.
+     */
     std::error_code ec;
-    std::filesystem::rename(tempFilename, _filename, ec);
-
-    if (ec) {
-        LOG_ERROR("Failed to rename temp config file: {} -> {}: {}", tempFilename, _filename, ec.message());
-        std::filesystem::remove(tempFilename);
+    for (int attempt = 0; attempt < 5; ++attempt) {
+        ec.clear();
+        std::filesystem::rename(tempFilename, _filename, ec);
+        if (!ec) return;
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
+
+    LOG_ERROR("Failed to rename temp config file after retries: {} -> {}: {}", tempFilename, _filename, ec.message());
 }
 
 void config_manager::set_default_config(const std::string& key, const nlohmann::json& value)
