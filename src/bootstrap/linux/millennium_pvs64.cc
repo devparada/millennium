@@ -35,7 +35,7 @@
  * https://gitlab.steamos.cloud/steamrt/steam-runtime-tools/-/blob/main/pressure-vessel/wrap.1.md#:~:text=variable%2Ddir.-,%2D%2Dpass%2Dfd,-FD
  * documents that 0,1,2 (stdin, stdout and stderr) are the only fd's implicitly passed.
  */
-
+#ifdef __linux__
 #include <cerrno>
 #include <cstdio>
 #include <cstdlib>
@@ -109,3 +109,4 @@ int main(int argc, char* argv[])
     fprintf(stderr, "[pvs64] execv failed: %s\n", strerror(errno));
     return 1;
 }
+#endif
