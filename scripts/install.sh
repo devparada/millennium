@@ -149,6 +149,9 @@ install_millennium() {
 }
 
 post_install() {
+    sudo chmod +x /usr/lib/millennium/libmillennium_pvs64 2>/dev/null || true
+    sudo chmod +x /usr/lib/millennium/libmillennium_luavm_x86 2>/dev/null || true
+
     log "installing for '${USER}'"
 
     beta_file="${HOME}/.steam/steam/package/beta"
