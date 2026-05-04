@@ -83,7 +83,7 @@ bool webkit_world_mgr::is_valid_target_url(const std::string& url) const
         return false;
     }
 
-    if (url.find("https://steamloopback.host/index.html") == 0) {
+    if (url.find("https://steamloopback.host/") == 0) {
         return false;
     }
 
