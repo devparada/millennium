@@ -139,7 +139,9 @@ install_millennium() {
 }
 
 post_install() {
-    sudo chmod +x /opt/python-i686-3.11.8/bin/python3.11
+    sudo chmod +x /opt/python-i686-3.11.8/bin/python3.11 2>/dev/null || true
+    sudo chmod +x /usr/lib/millennium/libmillennium_pvs64 2>/dev/null || true
+    sudo chmod +x /usr/lib/millennium/libmillennium_luavm_x86 2>/dev/null || true
 
     log "installing for '${USER}'"
 

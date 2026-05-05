@@ -1,381 +1,383 @@
 name: Build Millennium
 
 on:
-  workflow_dispatch:
-    inputs:
-      release_artifacts:
-        description: "Release build?"
-        required: true
-        default: "no"
+    workflow_dispatch:
+        inputs:
+            release_artifacts:
+                description: "Release build?"
+                required: true
+                default: "no"
 
 concurrency:
-  group: ci-build
-  cancel-in-progress: true
+    group: ci-build
+    cancel-in-progress: true
 
 jobs:
-  prepare:
-    runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.get_version.outputs.version }}
+    prepare:
+        runs-on: ubuntu-latest
+        outputs:
+            version: ${{ steps.get_version.outputs.version }}
 
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          submodules: true
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+              with:
+                  submodules: true
 
-      - name: Download Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: 24
+            - name: Download Node.js
+              uses: actions/setup-node@v3
+              with:
+                  node-version: 24
 
-      - name: Download Semantic Release
-        run: |
-          npm install -g pnpm
-          pnpm install --save-dev semantic-release @semantic-release/github @semantic-release/exec @semantic-release/changelog @semantic-release/git
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            - name: Download Semantic Release
+              run: |
+                  npm install -g pnpm
+                  pnpm install --save-dev semantic-release @semantic-release/github @semantic-release/exec @semantic-release/changelog @semantic-release/git
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Get Next Version
-        id: get_version
-        run: |
-          cd scripts && npx semantic-release --dry-run --no-ci
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            - name: Get Next Version
+              id: get_version
+              run: |
+                  cd scripts && npx semantic-release --dry-run --no-ci
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  build-windows:
-    needs: prepare
-    permissions:
-      contents: write
-      issues: write
-      pull-requests: write
+    build-windows:
+        needs: prepare
+        permissions:
+            contents: write
+            issues: write
+            pull-requests: write
 
-    runs-on: windows-latest
+        runs-on: windows-latest
 
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          submodules: true
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+              with:
+                  submodules: true
 
-      - name: Update Millennium Version
-        run: |
-          echo "# current version of millennium" > ./scripts/version
-          echo "v${{ needs.prepare.outputs.version }}" >> ./scripts/version
+            - name: Update Millennium Version
+              run: |
+                  echo "# current version of millennium" > ./scripts/version
+                  echo "v${{ needs.prepare.outputs.version }}" >> ./scripts/version
 
-      - name: Build Millennium Plugin Backend
-        run: |
-          function Install-EmbeddedPython {
-              param(
-                  [Parameter(Mandatory=$true)]
-                  [ValidateSet('x64', 'x86')]
-                  [string]$Architecture,
+            - name: Build Millennium Plugin Backend
+              run: |
+                  function Install-EmbeddedPython {
+                      param(
+                          [Parameter(Mandatory=$true)]
+                          [ValidateSet('x64', 'x86')]
+                          [string]$Architecture,
 
-                  [Parameter(Mandatory=$true)]
-                  [string]$DestinationPath
-              )
+                          [Parameter(Mandatory=$true)]
+                          [string]$DestinationPath
+                      )
 
-              $archSuffix = if ($Architecture -eq 'x64') { 'amd64' } else { 'win32' }
-              $pythonUrl = "https://www.python.org/ftp/python/3.11.8/python-3.11.8-embed-$archSuffix.zip"
-              $getPipUrl = "https://bootstrap.pypa.io/get-pip.py"
+                      $archSuffix = if ($Architecture -eq 'x64') { 'amd64' } else { 'win32' }
+                      $pythonUrl = "https://www.python.org/ftp/python/3.11.8/python-3.11.8-embed-$archSuffix.zip"
+                      $getPipUrl = "https://bootstrap.pypa.io/get-pip.py"
 
-              if (-Not (Test-Path $DestinationPath)) {
-                  New-Item -ItemType Directory -Path $DestinationPath | Out-Null
-              }
-
-              $zipFilePath = Join-Path $DestinationPath "python-3.11.8-embed-$archSuffix.zip"
-              $getPipFilePath = Join-Path $DestinationPath "get-pip.py"
-
-              function Download-File($Url, $DestinationPath) {
-                  $webRequest = [System.Net.HttpWebRequest]::Create($Url)
-                  $webRequest.Method = "GET"
-                  $webRequest.UserAgent = "Millennium.Installer/1.0"
-                  $response = $webRequest.GetResponse()
-                  $responseStream = $response.GetResponseStream()
-                  $fileStream = New-Object System.IO.FileStream($DestinationPath, [System.IO.FileMode]::Create, [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)
-                  $buffer = New-Object byte[] 8192
-                  while (($bytesRead = $responseStream.Read($buffer, 0, $buffer.Length)) -gt 0) {
-                      $fileStream.Write($buffer, 0, $bytesRead)
-                  }
-                  $fileStream.Close()
-                  $responseStream.Close()
-              }
-
-              function Extract-ZipFile($zipPath, $extractPath) {
-                  Add-Type -AssemblyName System.IO.Compression.FileSystem
-                  $zipArchive = [System.IO.Compression.ZipFile]::OpenRead($zipPath)
-                  foreach ($entry in $zipArchive.Entries) {
-                      $destinationPath = Join-Path $extractPath $entry.FullName
-                      $destinationDir = [System.IO.Path]::GetDirectoryName($destinationPath)
-                      if (-Not (Test-Path $destinationDir)) {
-                          New-Item -ItemType Directory -Path $destinationDir | Out-Null
+                      if (-Not (Test-Path $DestinationPath)) {
+                          New-Item -ItemType Directory -Path $DestinationPath | Out-Null
                       }
-                      if ($entry.Name -ne "") {
-                          if (Test-Path $destinationPath) {
-                              Remove-Item $destinationPath -Force
-                          }
-                          $fileStream = [System.IO.File]::Create($destinationPath)
-                          $entryStream = $entry.Open()
+
+                      $zipFilePath = Join-Path $DestinationPath "python-3.11.8-embed-$archSuffix.zip"
+                      $getPipFilePath = Join-Path $DestinationPath "get-pip.py"
+
+                      function Download-File($Url, $DestinationPath) {
+                          $webRequest = [System.Net.HttpWebRequest]::Create($Url)
+                          $webRequest.Method = "GET"
+                          $webRequest.UserAgent = "Millennium.Installer/1.0"
+                          $response = $webRequest.GetResponse()
+                          $responseStream = $response.GetResponseStream()
+                          $fileStream = New-Object System.IO.FileStream($DestinationPath, [System.IO.FileMode]::Create, [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)
                           $buffer = New-Object byte[] 8192
-                          while (($bytesRead = $entryStream.Read($buffer, 0, $buffer.Length)) -gt 0) {
+                          while (($bytesRead = $responseStream.Read($buffer, 0, $buffer.Length)) -gt 0) {
                               $fileStream.Write($buffer, 0, $bytesRead)
                           }
                           $fileStream.Close()
-                          $entryStream.Close()
+                          $responseStream.Close()
                       }
+
+                      function Extract-ZipFile($zipPath, $extractPath) {
+                          Add-Type -AssemblyName System.IO.Compression.FileSystem
+                          $zipArchive = [System.IO.Compression.ZipFile]::OpenRead($zipPath)
+                          foreach ($entry in $zipArchive.Entries) {
+                              $destinationPath = Join-Path $extractPath $entry.FullName
+                              $destinationDir = [System.IO.Path]::GetDirectoryName($destinationPath)
+                              if (-Not (Test-Path $destinationDir)) {
+                                  New-Item -ItemType Directory -Path $destinationDir | Out-Null
+                              }
+                              if ($entry.Name -ne "") {
+                                  if (Test-Path $destinationPath) {
+                                      Remove-Item $destinationPath -Force
+                                  }
+                                  $fileStream = [System.IO.File]::Create($destinationPath)
+                                  $entryStream = $entry.Open()
+                                  $buffer = New-Object byte[] 8192
+                                  while (($bytesRead = $entryStream.Read($buffer, 0, $buffer.Length)) -gt 0) {
+                                      $fileStream.Write($buffer, 0, $bytesRead)
+                                  }
+                                  $fileStream.Close()
+                                  $entryStream.Close()
+                              }
+                          }
+                          $zipArchive.Dispose()
+                      }
+
+                      Download-File -Url $pythonUrl -DestinationPath $zipFilePath
+                      Extract-ZipFile -zipPath $zipFilePath -extractPath $DestinationPath
+                      Remove-Item $zipFilePath
+                      Write-Host "Downloaded python packages to $DestinationPath"
+
+                      Set-Content -Path (Join-Path $DestinationPath "python311._pth") -Value @'
+                  python311.zip
+                  .
+                  # The following line has been added by Millennium
+                  # This will implicitly run site.main() which lets us pip from 'python -m pip'
+                  import site
+                  '@
+                      Write-Host "Enabled external site package support."
+
+                      Download-File -Url $getPipUrl -DestinationPath $getPipFilePath
+                      $pythonExe = Join-Path $DestinationPath "python.exe"
+                      & $pythonExe $getPipFilePath --no-warn-script-location
+                      Remove-Item $getPipFilePath
+                      Write-Host "Installed pip on embedded packages"
                   }
-                  $zipArchive.Dispose()
-              }
 
-              Download-File -Url $pythonUrl -DestinationPath $zipFilePath
-              Extract-ZipFile -zipPath $zipFilePath -extractPath $DestinationPath
-              Remove-Item $zipFilePath
-              Write-Host "Downloaded python packages to $DestinationPath"
+                  Install-EmbeddedPython -Architecture 'x64' -DestinationPath 'D:/a/env/ext/data/pyx64'
 
-              Set-Content -Path (Join-Path $DestinationPath "python311._pth") -Value @'
-          python311.zip
-          .
-          # The following line has been added by Millennium
-          # This will implicitly run site.main() which lets us pip from 'python -m pip'
-          import site
-          '@
-              Write-Host "Enabled external site package support."
+            - name: Setup Node.js
+              uses: actions/setup-node@v3
+              with:
+                  node-version: 24
 
-              Download-File -Url $getPipUrl -DestinationPath $getPipFilePath
-              $pythonExe = Join-Path $DestinationPath "python.exe"
-              & $pythonExe $getPipFilePath --no-warn-script-location
-              Remove-Item $getPipFilePath
-              Write-Host "Installed pip on embedded packages"
-          }
+            - name: Setup PNPM
+              run: npm install -g pnpm
 
-          Install-EmbeddedPython -Architecture 'x64' -DestinationPath 'D:/a/env/ext/data/pyx64'
+            - name: Build Millennium Backend
+              shell: pwsh
+              run: |
+                  pushd "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools"
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: 24
+                  # Initialize Visual Studio x64 host/toolchain and import the environment into PowerShell
+                  cmd /c "VsDevCmd.bat -arch=x64 -host_arch=x64 & set" |
+                  ForEach-Object {
+                    if ($_ -match "=") {
+                      $v = $_.Split("=", 2)
+                      Set-Item -Force -Path "ENV:\$($v[0])" -Value "$($v[1])"
+                    }
+                  }
 
-      - name: Setup PNPM
-        run: npm install -g pnpm
+                  popd
+                  Write-Host "`nVisual Studio 2022 x64 Command Prompt variables set." -ForegroundColor Yellow
 
-      - name: Build Millennium Backend
-        shell: pwsh
-        run: |
-          pushd "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools"
+                  # optional sanity checks (helpful for CI debugging)
+                  cmd /c "where cl.exe"
+                  cmd /c "cl.exe /Bv" 2>&1 | Write-Host
 
-          # Initialize Visual Studio x64 host/toolchain and import the environment into PowerShell
-          cmd /c "VsDevCmd.bat -arch=x64 -host_arch=x64 & set" |
-          ForEach-Object {
-            if ($_ -match "=") {
-              $v = $_.Split("=", 2)
-              Set-Item -Force -Path "ENV:\$($v[0])" -Value "$($v[1])"
-            }
-          }
+                  pnpm --dir src/sdk install
+                  pnpm --dir src/sdk run build
 
-          popd
-          Write-Host "`nVisual Studio 2022 x64 Command Prompt variables set." -ForegroundColor Yellow
+                  pnpm --dir src/frontend install
+                  pnpm --dir src/frontend run prod
 
-          # optional sanity checks (helpful for CI debugging)
-          cmd /c "where cl.exe"
-          cmd /c "cl.exe /Bv" 2>&1 | Write-Host
+                  cmake --preset=windows-release -DGITHUB_ACTION_BUILD=ON
+                  mkdir build/artifacts
+                  cmake --build build
 
-          pnpm --dir src/sdk install
-          pnpm --dir src/sdk run build
+                  Copy-Item ./src/vendor/python/lib64/python311.dll   D:/a/env/python311.dll
+                  Copy-Item ./build/src/millennium.dll                D:/a/env/millennium.dll
+                  Copy-Item ./build/src/boot/win32/wsock32.dll        D:/a/env/wsock32.dll
+                  Copy-Item ./build/src/boot/win32/legacy/version.dll D:/a/env/version.dll
+                  Copy-Item ./build/src/hhx64/millennium.hhx64.dll    D:/a/env/millennium.hhx64.dll
 
-          pnpm --dir src/frontend install
-          pnpm --dir src/frontend run prod
+                  mkdir D:/a/env/ext/data/assets
+                  Move-Item src/pipx D:/a/env/ext/data/assets/pipx
 
-          cmake --preset=windows-release -DGITHUB_ACTION_BUILD=ON
-          mkdir build/artifacts
-          cmake --build build
+            - name: Upload Unsigned Build Artifact
+              id: upload-unsigned-artifact
+              uses: actions/upload-artifact@v4
+              with:
+                  include-hidden-files: true
+                  name: unsigned-millennium-windows
+                  path: D:/a/env/
 
-          Copy-Item ./src/vendor/python/lib64/python311.dll   D:/a/env/python311.dll
-          Copy-Item ./build/src/millennium.dll                D:/a/env/millennium.dll
-          Copy-Item ./build/src/boot/win32/wsock32.dll        D:/a/env/wsock32.dll
-          Copy-Item ./build/src/boot/win32/legacy/version.dll D:/a/env/version.dll
-          Copy-Item ./build/src/hhx64/millennium.hhx64.dll    D:/a/env/millennium.hhx64.dll
+            - name: Sign Millennium Build
+              id: sign_artifact
+              uses: signpath/github-action-submit-signing-request@v1.1
+              with:
+                  api-token: "${{ secrets.SIGNPATH_API_TOKEN }}"
+                  organization-id: "f90532fc-e58c-4863-bc0d-72623720335f"
+                  project-slug: "Millennium"
+                  signing-policy-slug: "release-signing"
+                  artifact-configuration-slug: "millennium-legacy-release-config"
+                  github-artifact-id: "${{ steps.upload-unsigned-artifact.outputs.artifact-id }}"
+                  output-artifact-directory: "signed-millennium"
+                  wait-for-completion: true
 
-          mkdir D:/a/env/ext/data/assets
-          Move-Item src/pipx D:/a/env/ext/data/assets/pipx
+            - name: Upload Signed Build Release
+              id: upload-signed-artifact
+              uses: actions/upload-artifact@v4
+              with:
+                  include-hidden-files: true
+                  name: signed-millennium-windows
+                  path: D:\a\Millennium\Millennium\signed-millennium
 
-      - name: Upload Unsigned Build Artifact
-        id: upload-unsigned-artifact
-        uses: actions/upload-artifact@v4
-        with:
-          include-hidden-files: true
-          name: unsigned-millennium-windows
-          path: D:/a/env/
+    build-linux:
+        needs: prepare
+        permissions:
+            contents: write
+            issues: write
+            pull-requests: write
 
-      - name: Sign Millennium Build
-        id: sign_artifact
-        uses: signpath/github-action-submit-signing-request@v1.1
-        with:
-          api-token: "${{ secrets.SIGNPATH_API_TOKEN }}"
-          organization-id: "f90532fc-e58c-4863-bc0d-72623720335f"
-          project-slug: "Millennium"
-          signing-policy-slug: "release-signing"
-          artifact-configuration-slug: "wsock32-hook"
-          github-artifact-id: "${{ steps.upload-unsigned-artifact.outputs.artifact-id }}"
-          output-artifact-directory: "signed-millennium"
-          wait-for-completion: true
+        runs-on: ubuntu-latest
 
-      - name: Upload Signed Build Release
-        id: upload-signed-artifact
-        uses: actions/upload-artifact@v4
-        with:
-          include-hidden-files: true
-          name: signed-millennium-windows
-          path: D:\a\Millennium\Millennium\signed-millennium
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+              with:
+                  submodules: true
 
-  build-linux:
-    needs: prepare
-    permissions:
-      contents: write
-      issues: write
-      pull-requests: write
+            - name: Update Millennium Version
+              run: |
+                  echo "# current version of millennium" > ./scripts/version
+                  echo "v${{ needs.prepare.outputs.version }}" >> ./scripts/version
 
-    runs-on: ubuntu-latest
+            - name: Install Dependencies
+              run: |
+                  sudo dpkg --add-architecture i386
+                  sudo apt-get update
+                  sudo apt-get install -y build-essential gcc-multilib g++-multilib libc6-dev-i386 libgtk-3-dev ninja-build libpsl-dev:i386 libssl-dev:i386 pkg-config:i386 nodejs npm
 
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          submodules: true
+            - name: Download Python Dependencies
+              run: |
+                  npm install -g pnpm
 
-      - name: Update Millennium Version
-        run: |
-          echo "# current version of millennium" > ./scripts/version
-          echo "v${{ needs.prepare.outputs.version }}" >> ./scripts/version
+                  wget https://github.com/shdwmtr/pybuilder/releases/download/v1.0.6/python-3.11.8-32-bit.tar.gz -O python-3.11.8-32-bit.tar.gz
+                  mkdir -p ~/build/opt/python-i686-3.11.8
+                  mkdir -p ~/build/usr/lib/millennium
+                  mkdir -p /opt/python-i686-3.11.8/lib
 
-      - name: Install Dependencies
-        run: |
-          sudo dpkg --add-architecture i386
-          sudo apt-get update
-          sudo apt-get install -y build-essential gcc-multilib g++-multilib libc6-dev-i386 libgtk-3-dev ninja-build libpsl-dev:i386 libssl-dev:i386 pkg-config:i386 nodejs npm
+                  tar -xzf python-3.11.8-32-bit.tar.gz -C ~/build/opt/python-i686-3.11.8
+                  mv ~/build/opt/python-i686-3.11.8/python-build/* ~/build/opt/python-i686-3.11.8/
 
-      - name: Download Python Dependencies
-        run: |
-          npm install -g pnpm
+                  cp ~/build/opt/python-i686-3.11.8/lib/libpython-3.11.8.so /opt/python-i686-3.11.8/lib/libpython-3.11.8.so
+                  ~/build/opt/python-i686-3.11.8/bin/python3.11 --version
 
-          wget https://github.com/shdwmtr/pybuilder/releases/download/v1.0.6/python-3.11.8-32-bit.tar.gz -O python-3.11.8-32-bit.tar.gz
-          mkdir -p ~/build/opt/python-i686-3.11.8
-          mkdir -p ~/build/usr/lib/millennium
-          mkdir -p /opt/python-i686-3.11.8/lib
+            - name: Install CMake
+              uses: jwlawson/actions-setup-cmake@v2
+              with:
+                  cmake-version: "3.21.1"
 
-          tar -xzf python-3.11.8-32-bit.tar.gz -C ~/build/opt/python-i686-3.11.8
-          mv ~/build/opt/python-i686-3.11.8/python-build/* ~/build/opt/python-i686-3.11.8/
+            - name: Build Millennium Backend
+              run: |
+                  export PKG_CONFIG_PATH="/usr/lib/i386-linux-gnu/pkgconfig:/usr/lib/pkgconfig"
+                  export CMAKE_LIBRARY_PATH="/usr/lib/i386-linux-gnu"
+                  export CMAKE_INCLUDE_PATH="/usr/include/i386-linux-gnu"
+                  export PKG_CONFIG_LIBDIR="/usr/lib/i386-linux-gnu/pkgconfig"
 
-          cp ~/build/opt/python-i686-3.11.8/lib/libpython-3.11.8.so /opt/python-i686-3.11.8/lib/libpython-3.11.8.so
-          ~/build/opt/python-i686-3.11.8/bin/python3.11 --version
+                  pnpm --dir src/sdk install
+                  pnpm --dir src/sdk run build
 
-      - name: Install CMake
-        uses: jwlawson/actions-setup-cmake@v2
-        with:
-          cmake-version: "3.21.1"
+                  pnpm --dir src/frontend install
+                  pnpm --dir src/frontend run prod
 
-      - name: Build Millennium Backend
-        run: |
-          export PKG_CONFIG_PATH="/usr/lib/i386-linux-gnu/pkgconfig:/usr/lib/pkgconfig"
-          export CMAKE_LIBRARY_PATH="/usr/lib/i386-linux-gnu"
-          export CMAKE_INCLUDE_PATH="/usr/include/i386-linux-gnu"
-          export PKG_CONFIG_LIBDIR="/usr/lib/i386-linux-gnu/pkgconfig"
+                  cmake --preset=linux-release -G "Ninja" -DGITHUB_ACTION_BUILD=ON \
+                    -DCMAKE_LIBRARY_PATH="/usr/lib/i386-linux-gnu" \
+                    -DCMAKE_INCLUDE_PATH="/usr/include" \
+                    -DCMAKE_FIND_ROOT_PATH="/usr/lib/i386-linux-gnu" \
+                    -DCMAKE_PREFIX_PATH="/usr/lib/i386-linux-gnu" \
+                    -DCMAKE_SYSTEM_LIBRARY_PATH="/usr/lib/i386-linux-gnu" \
+                    -DPKG_CONFIG_EXECUTABLE="/usr/bin/pkg-config" \
+                    -DPKG_CONFIG_USE_CMAKE_PREFIX_PATH=ON
 
-          pnpm --dir src/sdk install
-          pnpm --dir src/sdk run build
+                  # Build the project
+                  cmake --build build --config Release -- -j$(nproc)
 
-          pnpm --dir src/frontend install
-          pnpm --dir src/frontend run prod
+                  # Create final directory structure
+                  mkdir -p ~/build/usr/lib/millennium
+                  mkdir -p ~/build/usr/bin
+                  mkdir -p ~/build/usr/share/millennium
+                  mkdir -p ~/build/opt
 
-          cmake --preset=linux-release -G "Ninja" -DGITHUB_ACTION_BUILD=ON \
-            -DCMAKE_LIBRARY_PATH="/usr/lib/i386-linux-gnu" \
-            -DCMAKE_INCLUDE_PATH="/usr/include" \
-            -DCMAKE_FIND_ROOT_PATH="/usr/lib/i386-linux-gnu" \
-            -DCMAKE_PREFIX_PATH="/usr/lib/i386-linux-gnu" \
-            -DCMAKE_SYSTEM_LIBRARY_PATH="/usr/lib/i386-linux-gnu" \
-            -DPKG_CONFIG_EXECUTABLE="/usr/bin/pkg-config" \
-            -DPKG_CONFIG_USE_CMAKE_PREFIX_PATH=ON
+                  # Copy binaries and libraries directly to final locations
+                  cp build/src/libmillennium_x86.so ~/build/usr/lib/millennium/libmillennium_x86.so
+                  cp build/src/boot/linux/libmillennium_bootstrap_86x.so ~/build/usr/lib/millennium/libmillennium_bootstrap_86x.so
+                  cp build/src/hhx64/libmillennium_hhx64.so ~/build/usr/lib/millennium/libmillennium_hhx64.so
 
-          # Build the project
-          cmake --build build --config Release -- -j$(nproc)
+                  mkdir -p ~/build/usr/share/millennium/assets
+                  mv src/pipx ~/build/usr/share/millennium/assets/pipx
 
-          # Create final directory structure
-          mkdir -p ~/build/usr/lib/millennium
-          mkdir -p ~/build/usr/bin
-          mkdir -p ~/build/usr/share/millennium
-          mkdir -p ~/build/opt
+            - name: Upload Build Artifact
+              uses: actions/upload-artifact@v4
+              with:
+                  include-hidden-files: true
+                  name: millennium-linux
+                  path: ~/build/
 
-          # Copy binaries and libraries directly to final locations
-          cp build/src/libmillennium_x86.so ~/build/usr/lib/millennium/libmillennium_x86.so
-          cp build/src/boot/linux/libmillennium_bootstrap_86x.so ~/build/usr/lib/millennium/libmillennium_bootstrap_86x.so
-          cp build/src/hhx64/libmillennium_hhx64.so ~/build/usr/lib/millennium/libmillennium_hhx64.so
+    release:
+        needs: [prepare, build-windows, build-linux]
+        runs-on: ubuntu-latest
+        if: ${{ inputs.release_artifacts == 'yes' }}
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+              with:
+                  submodules: true
 
-          mkdir -p ~/build/usr/share/millennium/assets
-          mv src/pipx ~/build/usr/share/millennium/assets/pipx
+            - name: Download Node.js
+              uses: actions/setup-node@v3
+              with:
+                  node-version: 24
 
-      - name: Upload Build Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          include-hidden-files: true
-          name: millennium-linux
-          path: ~/build/
+            - name: Install Semantic Release
+              run: npm install --save-dev semantic-release @semantic-release/github
+                  @semantic-release/exec @semantic-release/changelog
+                  @semantic-release/git
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  release:
-    needs: [prepare, build-windows, build-linux]
-    runs-on: ubuntu-latest
-    if: ${{ inputs.release_artifacts == 'yes' }}
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          submodules: true
+            - name: Download Windows Build
+              uses: actions/download-artifact@v4
+              with:
+                  name: signed-millennium-windows
+                  path: ./artifacts/windows
 
-      - name: Download Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: 24
+            - name: Download Linux Build
+              uses: actions/download-artifact@v4
+              with:
+                  name: millennium-linux
+                  path: ./artifacts/linux
 
-      - name: Install Semantic Release
-        run: npm install --save-dev semantic-release @semantic-release/github @semantic-release/exec @semantic-release/changelog @semantic-release/git
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            - name: Update Millennium Version
+              run: |
+                  echo "# current version of millennium" > ./scripts/version
+                  echo "v${{ needs.prepare.outputs.version }}" >> ./scripts/version
 
-      - name: Download Windows Build
-        uses: actions/download-artifact@v4
-        with:
-          name: signed-millennium-windows
-          path: ./artifacts/windows
+            - name: Release Millennium
+              run: |
+                  mkdir -p ./artifacts/release
 
-      - name: Download Linux Build
-        uses: actions/download-artifact@v4
-        with:
-          name: millennium-linux
-          path: ./artifacts/linux
+                  linux_release_name="./artifacts/release/millennium-v${{ needs.prepare.outputs.version }}-linux-x86_64"
+                  win32_name="millennium-v${{ needs.prepare.outputs.version }}-windows-x86_64"
+                  win32_release_name="./artifacts/release/${win32_name}"
 
-      - name: Update Millennium Version
-        run: |
-          echo "# current version of millennium" > ./scripts/version
-          echo "v${{ needs.prepare.outputs.version }}" >> ./scripts/version
+                  # setup windows release
+                  cd ./artifacts/windows && zip -r ../release/${win32_name}.zip . && cd ../..
+                  sha256sum ${win32_release_name}.zip > ${win32_release_name}.sha256
+                  sed -i 's#\./artifacts/release/##g' ${win32_release_name}.sha256
+                  du -sb ./artifacts/windows | awk '{print $1}' > ${win32_release_name}.installsize
 
-      - name: Release Millennium
-        run: |
-          mkdir -p ./artifacts/release
+                  # setup linux release
+                  tar -czvf ${linux_release_name}.tar.gz -C ./artifacts/linux .
+                  sha256sum ${linux_release_name}.tar.gz > ${linux_release_name}.sha256
+                  sed -i 's#\./artifacts/release/##g' ${linux_release_name}.sha256
+                  du -sb ./artifacts/linux | awk '{print $1}' > ${linux_release_name}.installsize
 
-          linux_release_name="./artifacts/release/millennium-v${{ needs.prepare.outputs.version }}-linux-x86_64"
-          win32_name="millennium-v${{ needs.prepare.outputs.version }}-windows-x86_64"
-          win32_release_name="./artifacts/release/${win32_name}"
-
-          # setup windows release
-          cd ./artifacts/windows && zip -r ../release/${win32_name}.zip . && cd ../..
-          sha256sum ${win32_release_name}.zip > ${win32_release_name}.sha256
-          sed -i 's#\./artifacts/release/##g' ${win32_release_name}.sha256
-          du -sb ./artifacts/windows | awk '{print $1}' > ${win32_release_name}.installsize
-
-          # setup linux release
-          tar -czvf ${linux_release_name}.tar.gz -C ./artifacts/linux .
-          sha256sum ${linux_release_name}.tar.gz > ${linux_release_name}.sha256
-          sed -i 's#\./artifacts/release/##g' ${linux_release_name}.sha256
-          du -sb ./artifacts/linux | awk '{print $1}' > ${linux_release_name}.installsize
-
-          cd scripts && npx semantic-release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  cd scripts && npx semantic-release
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
