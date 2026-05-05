@@ -32,6 +32,7 @@ import english from '../../locales/english.json';
 import polish from '../../locales/polish.json';
 import spanish from '../../locales/spanish.json';
 import indonesian from '../../locales/indonesian.json';
+import tchinese from '../../locales/tchinese.json';
 import schinese from '../../locales/schinese.json';
 import german from '../../locales/german.json';
 import russian from '../../locales/russian.json';
@@ -75,6 +76,7 @@ const localizationFiles: { [key: string]: LocalizationData } = {
 	spanish,
 	indonesian,
 	schinese,
+	tchinese,
 	german,
 	russian,
 	italian,
