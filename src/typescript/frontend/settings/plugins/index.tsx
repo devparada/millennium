@@ -36,7 +36,7 @@ import { settingsClasses } from '../../utils/classes';
 import { FaFolderOpen, FaSave, FaStore } from 'react-icons/fa';
 import { PiPlugsFill } from 'react-icons/pi';
 import { Utils } from '../../utils';
-import { Core_FindAllPlugins, Core_GetEnvironmentVar, Core_GetPluginBackendLogs, Core_ChangePluginStatus } from '../../utils/ffi';
+import { backend } from '../../utils/ffi';
 import { showInstallPluginModal } from './PluginInstallerModal';
 import { LogData, LogLevel } from '../logs';
 import { RenderPluginComponent } from './PluginComponent';
@@ -99,12 +99,12 @@ class PluginViewModal extends Component<{}, PluginViewModalState> {
 	}
 
 	async FetchAllPlugins() {
-		const plugins: PluginComponent[] = await Core_FindAllPlugins();
+		const plugins: PluginComponent[] = await backend.plugins.getPlugins();
 		const checkedItems = this.getEnabledPlugins(plugins);
 		const pluginNames = plugins.map((p) => p.data.common_name);
 		const pluginsWithLogs = new Map<string, PluginStatusProps>();
 
-		const result = await Core_GetPluginBackendLogs();
+		const result = await backend.plugins.getBackendLogs();
 		const logData: LogData[] = JSON.parse(result as any);
 
 		for (let plugin of logData) {
@@ -137,7 +137,7 @@ class PluginViewModal extends Component<{}, PluginViewModalState> {
 
 	SavePluginChanges() {
 		const onOK = () => {
-			Core_ChangePluginStatus(JSON.stringify(this.state.updatedPlugins));
+			backend.plugins.togglePlugin(JSON.stringify(this.state.updatedPlugins));
 		};
 
 		showModal(
@@ -148,7 +148,7 @@ class PluginViewModal extends Component<{}, PluginViewModalState> {
 	}
 
 	async OpenPluginsFolder() {
-		const path = await Core_GetEnvironmentVar('MILLENNIUM__PLUGINS_PATH');
+		const path = await backend.environment.get('MILLENNIUM__PLUGINS_PATH');
 		Utils.BrowseLocalFolder(path);
 	}
 

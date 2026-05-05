@@ -1,7 +1,7 @@
 import { ConfirmModal, Field, pluginSelf, showModal } from '@steambrew/client';
 import { PluginComponent } from '../types';
 import { locale } from '../utils/localization-manager';
-import { Core_UninstallPlugin } from '../utils/ffi';
+import { backend } from '../utils/ffi';
 import { Installer } from '../settings/general/Installer';
 import { Logger } from '../utils/Logger';
 import Markdown from 'markdown-to-jsx';
@@ -10,21 +10,13 @@ const EXTENDIUM_ID = '788ed8554492';
 
 export const SUPERSEDED_PLUGIN_NAMES = ['augmented-steam', 'steam-db'];
 
-const SupersededPluginModal = ({
-	plugins,
-	closeModal,
-	onDismiss,
-}: {
-	plugins: PluginComponent[];
-	closeModal: () => void;
-	onDismiss: () => void;
-}): React.ReactElement => {
+const SupersededPluginModal = ({ plugins, closeModal, onDismiss }: { plugins: PluginComponent[]; closeModal: () => void; onDismiss: () => void }): React.ReactElement => {
 	const installExtendium = async () => {
 		closeModal();
 
 		for (const plugin of plugins) {
 			try {
-				await Core_UninstallPlugin(plugin.data.name);
+				await backend.plugins.uninstall(plugin.data.name);
 			} catch (e) {
 				Logger.Error(`Failed to uninstall superseded plugin ${plugin.data.name}`, e);
 			}
@@ -40,11 +32,7 @@ const SupersededPluginModal = ({
 			strTitle={locale.supersededPluginModalTitle}
 			strDescription={
 				<>
-					<Field description={
-						<Markdown options={{ overrides: { a: { props: { target: '_blank' } } } }}>
-							{locale.supersededPluginModalBody}
-						</Markdown>
-					} />
+					<Field description={<Markdown options={{ overrides: { a: { props: { target: '_blank' } } } }}>{locale.supersededPluginModalBody}</Markdown>} />
 					{plugins.map((plugin, index) => (
 						<Field
 							key={plugin.data.name}
@@ -77,12 +65,8 @@ export function showSupersededPluginModal(plugins: PluginComponent[], onDismiss?
 	let modalWindow: ReturnType<typeof showModal>;
 	const closeModal = () => modalWindow?.Close();
 
-	modalWindow = showModal(
-		<SupersededPluginModal plugins={plugins} closeModal={closeModal} onDismiss={onDismiss ?? (() => {})} />,
-		pluginSelf.mainWindow,
-		{
-			popupHeight: 180 + plugins.length * 72,
-			popupWidth: 580,
-		},
-	);
+	modalWindow = showModal(<SupersededPluginModal plugins={plugins} closeModal={closeModal} onDismiss={onDismiss ?? (() => {})} />, pluginSelf.mainWindow, {
+		popupHeight: 180 + plugins.length * 72,
+		popupWidth: 580,
+	});
 }

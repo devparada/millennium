@@ -1,5 +1,5 @@
 import { IconsModule, pluginSelf, toaster } from '@steambrew/client';
-import { Core_UpdateMillennium } from './ffi';
+import { backend } from './ffi';
 import { deferredSettingLabelClasses } from './classes';
 
 export async function updateMillennium(background: boolean) {
@@ -18,5 +18,5 @@ export async function updateMillennium(background: boolean) {
 		return;
 	}
 
-	Core_UpdateMillennium(downloadUrl, downloadSize, background);
+	backend.updater.updateMillennium(downloadUrl, downloadSize, background);
 }

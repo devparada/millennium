@@ -36,7 +36,7 @@ import { DesktopSideBarFocusedItemType } from '../../quick-access/DesktopMenuCon
 import { useQuickAccessStore } from '../../quick-access/quickAccessStore';
 import { PluginComponent } from '../../types';
 import { Utils } from '../../utils';
-import { Core_UninstallPlugin, PluginConfig_GetAll, PluginConfig_DeleteAll } from '../../utils/ffi';
+import { backend } from '../../utils/ffi';
 import { formatString, locale } from '../../utils/localization-manager';
 import { MillenniumIcons } from '../../components/Icons';
 import { showPluginCrashModal } from '../../components/PluginCrashModal';
@@ -73,7 +73,7 @@ export class RenderPluginComponent extends Component<PluginComponentProps> {
 		const shouldUninstall = await Utils.ShowMessageBox(formatString(locale.pluginUninstallConfirm, plugin.data.common_name ?? ''), locale.strHeadsUp);
 		if (!shouldUninstall) return;
 
-		const success = await Core_UninstallPlugin(plugin.data.name);
+		const success = await backend.plugins.uninstall(plugin.data.name);
 
 		if (success == false) {
 			Utils.ShowMessageBox(formatString(locale.pluginUninstallFailed, plugin.data.common_name ?? ''), locale.errorMessageTitle, {
@@ -81,14 +81,14 @@ export class RenderPluginComponent extends Component<PluginComponentProps> {
 			});
 		} else {
 			try {
-				const configData = await PluginConfig_GetAll(plugin.data.name);
+				const configData = await backend.config.plugins.getAll(plugin.data.name);
 				if (configData && Object.keys(configData).length > 0) {
 					const shouldDelete = await Utils.ShowMessageBox(
 						formatString(locale.pluginDeleteConfigPrompt ?? 'Do you want to delete saved settings for {0}?', plugin.data.common_name ?? ''),
 						locale.strHeadsUp,
 					);
 					if (shouldDelete) {
-						await PluginConfig_DeleteAll(plugin.data.name);
+						await backend.config.plugins.removeAll(plugin.data.name);
 					}
 				}
 			} catch {
@@ -109,8 +109,7 @@ export class RenderPluginComponent extends Component<PluginComponentProps> {
 		});
 	}
 
-	onExtensionSettings() {
-	}
+	onExtensionSettings() {}
 
 	showCtxMenu(e: React.MouseEvent<HTMLButtonElement>) {
 		const { plugin, isPluginConfigurable } = this.props;
@@ -231,7 +230,12 @@ export class RenderPluginComponent extends Component<PluginComponentProps> {
 				data-plugin-common-name={plugin.data.common_name}
 				data-plugin-status={type}
 			>
-				<Toggle key={plugin.data.name} disabled={plugin.data.name === 'core' || this.props.isLegacy} value={this.props.isLegacy ? false : isEnabled} onChange={() => onSelectionChange(index)} />
+				<Toggle
+					key={plugin.data.name}
+					disabled={plugin.data.name === 'core' || this.props.isLegacy}
+					value={this.props.isLegacy ? false : isEnabled}
+					onChange={() => onSelectionChange(index)}
+				/>
 				<IconButton name="KaratDown" onClick={(ev) => this.showCtxMenu(ev as React.MouseEvent<HTMLButtonElement>)} text={locale.strShowMenu} />
 			</Field>
 		);

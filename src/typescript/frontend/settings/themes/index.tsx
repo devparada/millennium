@@ -32,17 +32,13 @@ import { DialogButton, DialogControlsSection, joinClassNames, pluginSelf } from 
 import { Theme, ThemeItem } from '../../types';
 import { locale } from '../../utils/localization-manager';
 import { Placeholder } from '../../components/Placeholder';
-import { Core_FindAllThemes } from '../../utils/ffi';
+import { backend } from '../../utils/ffi';
 import { Component } from 'react';
 import { ChangeActiveTheme, ThemeItemComponent, UIReloadProps } from './ThemeComponent';
 import { settingsClasses } from '../../utils/classes';
 import { showInstallThemeModal } from './ThemeInstallerModal';
 import { FaFolderOpen, FaPaintRoller, FaStore } from 'react-icons/fa';
 import { Utils } from '../../utils';
-
-const findAllThemes = async (): Promise<ThemeItem[]> => {
-	return await Core_FindAllThemes();
-};
 
 interface ThemeViewModalState {
 	themes?: ThemeItem[];
@@ -75,7 +71,7 @@ export class ThemeViewModal extends Component<{}, ThemeViewModalState> {
 	ChangeActiveTheme = (item: ThemeItem) => {
 		ChangeActiveTheme(item.native, UIReloadProps.Prompt).then((hasClickedOk) => {
 			/** Reload the themes */
-			!hasClickedOk && findAllThemes().then((themes) => this.setState({ themes }));
+			!hasClickedOk && backend.themes.getThemes().then((themes) => this.setState({ themes }));
 		});
 	};
 
@@ -99,7 +95,7 @@ export class ThemeViewModal extends Component<{}, ThemeViewModalState> {
 	};
 
 	FetchAllPlugins = async (): Promise<void> => {
-		const themes = await findAllThemes();
+		const themes = await backend.themes.getThemes();
 		this.setState({ themes });
 	};
 

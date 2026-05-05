@@ -2,17 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { EditorView, basicSetup } from 'codemirror';
 import { css } from '@codemirror/lang-css';
 import { vscodeDark } from '@uiw/codemirror-theme-vscode';
-import {
-	ffi,
-	DialogButton,
-	DialogControlsSection,
-	DialogHeader,
-	Field,
-	IconsModule,
-	Millennium,
-	pluginSelf,
-	Toggle,
-} from '@steambrew/client';
+import { ffi, DialogButton, DialogControlsSection, DialogHeader, Field, IconsModule, Millennium, pluginSelf, Toggle } from '@steambrew/client';
 import { ViewUpdate } from '@codemirror/view';
 import ReactDOM from 'react-dom';
 import {
@@ -31,7 +21,7 @@ import {
 import { settingsClasses } from '../../utils/classes';
 import { setEditorCode, setIsMillenniumOpen, setIsWatching, useQuickCssState } from '../../utils/quick-css-state';
 import { locale } from '../../utils/localization-manager';
-import { Core_WatchQuickCss, Core_UnwatchQuickCss } from '../../utils/ffi';
+import { backend } from '../../utils/ffi';
 import Styles from '../../utils/styles';
 
 function UpdateStylesLive(cssContent: string) {
@@ -213,8 +203,10 @@ function useQuickCssFileWatcher(isWatching: boolean) {
 	useEffect(() => {
 		if (!isWatching) return undefined;
 
-		Core_WatchQuickCss();
-		return () => { Core_UnwatchQuickCss(); };
+		backend.quickCss.registerWatcher();
+		return () => {
+			backend.quickCss.destroyWatcher();
+		};
 	}, [isWatching]);
 }
 

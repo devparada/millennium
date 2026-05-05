@@ -32,7 +32,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { produce } from 'immer';
 import { Millennium } from '@steambrew/client';
 import { settingsManager } from './settings-manager';
-import { Core_GetBackendConfig, Core_SetBackendConfig } from './ffi';
+import { backend } from './ffi';
 import { AppConfig } from './AppConfig';
 
 type ConfigContextType = {
@@ -51,8 +51,8 @@ const OnBackendConfigUpdate = (config: string) => {
 /** Expose the function to allow it to be callable from the backend */
 Millennium.exposeObj?.({ OnBackendConfigUpdate });
 
-const GetBackendConfig = async (): Promise<AppConfig> => (await Core_GetBackendConfig()) as AppConfig;
-const SetBackendConfig = async (config: AppConfig): Promise<void> => config && (await Core_SetBackendConfig(JSON.stringify(config), true));
+const GetBackendConfig = async (): Promise<AppConfig> => (await backend.config.millennium.getConfig()) as AppConfig;
+const SetBackendConfig = async (config: AppConfig): Promise<void> => config && (await backend.config.millennium.setConfig(JSON.stringify(config), true));
 
 export const ConfigProvider = ({ children }: { children: React.ReactNode }) => {
 	const [config, setConfig] = useState<AppConfig>(settingsManager.getConfig());

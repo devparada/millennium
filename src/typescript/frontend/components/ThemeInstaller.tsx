@@ -31,7 +31,7 @@
 import { ConfirmModal, ProgressBarWithInfo } from '@steambrew/client';
 import { InstallerProps, Theme, ThemeItem } from '../types';
 import { RendererProps } from '../settings/general/Installer';
-import { Core_GetThemeFromGitPair, Core_IsThemeInstalled, Core_InstallTheme, Core_UninstallTheme } from '../utils/ffi';
+import { backend } from '../utils/ffi';
 import Styles from '../utils/styles';
 import { formatString, locale } from '../utils/localization-manager';
 import { ChangeActiveTheme, UIReloadProps } from '../settings/themes/ThemeComponent';
@@ -39,7 +39,7 @@ import { ChangeActiveTheme, UIReloadProps } from '../settings/themes/ThemeCompon
 const OnInstallComplete = (data: any, props: InstallerProps) => {
 	const UseNewTheme = async () => {
 		try {
-			const themeData: ThemeItem = await Core_GetThemeFromGitPair(data?.skin_data?.github?.repo_name, data?.skin_data?.github?.owner, true);
+			const themeData: ThemeItem = await backend.themes.getTheme(data?.skin_data?.github?.repo_name, data?.skin_data?.github?.owner, true);
 			await ChangeActiveTheme(themeData?.native, UIReloadProps.Force);
 		} catch (error) {
 			console.error('Error finding theme on disk:', error);
@@ -105,11 +105,11 @@ export const StartThemeInstaller = async (data: any, props: InstallerProps): Pro
 	const owner = theme?.github?.owner ?? '';
 	const repo = theme?.github?.repo_name ?? '';
 
-	const isInstalled = await Core_IsThemeInstalled(owner, repo);
+	const isInstalled = await backend.themes.isInstalled(owner, repo);
 	const { ShowMessageBox } = props;
 
 	const UninstallTheme = (resolve: (value: unknown) => void) => {
-		Core_UninstallTheme(owner, repo).then((response: any) => {
+		backend.themes.uninstall(owner, repo).then((response: any) => {
 			if (!response || !response?.success) {
 				ShowMessageBox(formatString(locale.errorFailedToUninstallTheme, response?.message ?? locale.strUnknown), locale.errorMessageTitle, {
 					onOK: () => props?.modal?.Close?.(),
@@ -144,7 +144,7 @@ export const StartThemeInstaller = async (data: any, props: InstallerProps): Pro
 	/** Start installer and extract opId for per-operation progress tracking */
 	let opId = 0;
 	try {
-		const result: any = await Core_InstallTheme(owner, repo);
+		const result: any = await backend.themes.install(owner, repo);
 		const response = typeof result === 'string' ? JSON.parse(result) : result;
 		if (!response?.success) {
 			ShowMessageBox(response?.message ?? locale.errorFailedToStartThemeInstaller, locale.errorMessageTitle, {

@@ -49,7 +49,7 @@ import { settingsClasses } from '../utils/classes';
 import { locale } from '../utils/localization-manager';
 import { BBCodeParser, SettingsDialogSubHeader } from './SteamComponents';
 import Styles from '../utils/styles';
-import { Core_ChangeColor, Core_ChangeCondition, Core_GetRootColors, Core_GetThemeColorOptions } from '../utils/ffi';
+import { backend } from '../utils/ffi';
 
 interface ConditionalComponent {
 	condition: string;
@@ -112,7 +112,7 @@ export class RenderThemeEditor extends React.Component<ThemeEditorProps> {
 		const activeTheme: ThemeItem = this.props.theme as ThemeItem;
 
 		return new Promise<boolean>((resolve) => {
-			Core_ChangeCondition(activeTheme.native, newData, conditionName).then((response: any) => {
+			backend.themes.setThemeConfig(activeTheme.native, newData, conditionName).then((response: any) => {
 				const success = (response?.success as boolean) ?? false;
 
 				success && (pluginSelf.ConditionConfigHasChanged = true);
@@ -239,8 +239,8 @@ export class RenderThemeEditor extends React.Component<ThemeEditorProps> {
 		const [colorState, setColorState] = useState(color?.hex ?? '#000000');
 
 		const saveColor = async (hexColor: string) => {
-			const newColor = await Core_ChangeColor(this.props.theme.native, color.color, hexColor, color.type);
-			pluginSelf.RootColors = await Core_GetRootColors();
+			const newColor = await backend.themes.setThemeColor(this.props.theme.native, color.color, hexColor, color.type);
+			pluginSelf.RootColors = await backend.themes.getRootColors();
 			return newColor;
 		};
 
@@ -279,7 +279,7 @@ export class RenderThemeEditor extends React.Component<ThemeEditorProps> {
 		const [themeColors, setThemeColors] = useState<ColorProps[]>();
 
 		useEffect(() => {
-			Core_GetThemeColorOptions(this.props.theme.native).then((result: any) => {
+			backend.themes.colorOptions(this.props.theme.native).then((result: any) => {
 				setThemeColors(result as ColorProps[]);
 			});
 		}, []);
@@ -293,13 +293,7 @@ export class RenderThemeEditor extends React.Component<ThemeEditorProps> {
 		);
 	};
 
-	RenderSidebarEditor = ({
-		pages,
-		activeTheme,
-	}: {
-		pages: (SidebarNavigationPage | 'separator')[];
-		activeTheme: ThemeItem;
-	}) => {
+	RenderSidebarEditor = ({ pages, activeTheme }: { pages: (SidebarNavigationPage | 'separator')[]; activeTheme: ThemeItem }) => {
 		const tabItems = useMemo(
 			() =>
 				pages
@@ -427,14 +421,9 @@ export class RenderThemeEditor extends React.Component<ThemeEditorProps> {
 			title: locale.customThemeSettingsConfig,
 			content: foundDefaultPage?.content ?? <></>,
 		};
-		const finalTabs: SidebarNavigationPage[] = hasTabs
-			? (tabPages.filter((p) => p !== foundDefaultPage) as SidebarNavigationPage[])
-			: [defaultPage];
+		const finalTabs: SidebarNavigationPage[] = hasTabs ? (tabPages.filter((p) => p !== foundDefaultPage) as SidebarNavigationPage[]) : [defaultPage];
 		const className = [settingsClasses.SettingsModal, settingsClasses.DesktopPopup, 'MillenniumSettings'].join(' ');
-		const pages: (SidebarNavigationPage | 'separator')[] = [
-			...finalTabs,
-			...(hasColors ? ['separator' as const, createColorPage()] : []),
-		];
+		const pages: (SidebarNavigationPage | 'separator')[] = [...finalTabs, ...(hasColors ? ['separator' as const, createColorPage()] : [])];
 		const title = name ?? activeTheme.native;
 
 		const hidePageListStyles = !hasTabs && !hasColors ? <style>{`.PageListColumn { display: none !important; }`}</style> : null;

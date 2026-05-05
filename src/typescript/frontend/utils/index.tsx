@@ -32,7 +32,7 @@ import { ConfirmModal, ConfirmModalProps, pluginSelf, showModal } from '@steambr
 import { PluginComponent } from '../types';
 import { Logger } from './Logger';
 import { SteamLocale } from './localization-manager';
-import { Core_FindAllPlugins } from './ffi';
+import { backend } from './ffi';
 
 export namespace Utils {
 	export function BrowseLocalFolder(path: string) {
@@ -45,7 +45,7 @@ export namespace Utils {
 	}
 
 	export async function GetPluginAssetUrl(): Promise<string> {
-		const plugins: Array<PluginComponent> = await Core_FindAllPlugins();
+		const plugins: Array<PluginComponent> = await backend.plugins.getPlugins();
 		const injectedScript = Array.from(document.scripts).find((script) => script.id === 'millennium-injected');
 
 		if (!injectedScript || !injectedScript.src) {

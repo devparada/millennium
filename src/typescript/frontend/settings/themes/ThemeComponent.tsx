@@ -35,7 +35,7 @@ import { Utils } from '../../utils';
 import { formatString, locale } from '../../utils/localization-manager';
 import { SiKofi } from 'react-icons/si';
 import { Component } from 'react';
-import { Core_UninstallTheme } from '../../utils/ffi';
+import { backend } from '../../utils/ffi';
 import { IconButton } from '../../components/IconButton';
 import { settingsClasses } from '../../utils/classes';
 import { useQuickAccessStore } from '../../quick-access/quickAccessStore';
@@ -133,7 +133,7 @@ export class ThemeItemComponent extends Component<ThemeItemComponentProps, Theme
 		const shouldUninstall = await Utils.ShowMessageBox(formatString(locale.themeUninstallConfirm, theme.data.name ?? ''), locale.strHeadsUp);
 		if (!shouldUninstall) return;
 
-		Core_UninstallTheme(theme.data.github?.owner ?? '', theme.data.github?.repo_name ?? '').then(() => {
+		backend.themes.uninstall(theme.data.github?.owner ?? '', theme.data.github?.repo_name ?? '').then(() => {
 			if (this.isActive) {
 				SteamClient.Browser.RestartJSContext();
 			} else {
@@ -147,7 +147,6 @@ export class ThemeItemComponent extends Component<ThemeItemComponentProps, Theme
 
 		showContextMenu(
 			<Menu label={theme?.data?.name ?? ''}>
-
 				<MenuItem disabled tone="emphasis" bInteractableItem={false}>
 					{theme?.data?.name} {theme?.data?.version && <>v{theme.data.version}</>}
 				</MenuItem>

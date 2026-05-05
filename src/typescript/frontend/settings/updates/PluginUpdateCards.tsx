@@ -30,7 +30,7 @@
 
 import { SettingsDialogSubHeader } from '../../components/SteamComponents';
 import { formatString, locale, SteamLocale } from '../../utils/localization-manager';
-import { Core_FindAllPlugins, Core_KillPluginBackend, Core_DownloadPluginUpdate, Core_ChangePluginStatus } from '../../utils/ffi';
+import { backend } from '../../utils/ffi';
 import { Utils } from '../../utils';
 import { UpdateCard } from './UpdateCard';
 import { UpdateContextProviderState, useUpdateContext } from './useUpdateContext';
@@ -40,7 +40,7 @@ import { waitForInstallerComplete } from '../general/Installer';
 type UpdateItemType = any;
 
 const FindPluginByName = async (pluginName: string) => {
-	const allPlugins = await Core_FindAllPlugins();
+	const allPlugins = await backend.plugins.getPlugins();
 	return allPlugins.find((plugin: any) => plugin.data.name === pluginName);
 };
 
@@ -56,10 +56,10 @@ const StartPluginUpdate = async (ctx: UpdateContextProviderState, updateObject: 
 	const wasEnabled = (await FindPluginByName(pluginName))?.enabled;
 
 	if (wasEnabled) {
-		await Core_KillPluginBackend(pluginName);
+		await backend.plugins.stop(pluginName);
 	}
 
-	const result: any = await Core_DownloadPluginUpdate(updateObject?.id, updateObject?.pluginDirectory, updateObject?.pluginInfo?.commit);
+	const result: any = await backend.plugins.update(updateObject?.id, updateObject?.pluginDirectory, updateObject?.pluginInfo?.commit);
 	const parsed = typeof result === 'string' ? JSON.parse(result) : result;
 	const opId: number = parsed?.opId ?? 0;
 
@@ -73,7 +73,7 @@ const StartPluginUpdate = async (ctx: UpdateContextProviderState, updateObject: 
 		}
 		setPluginProgress(key, { statusText: locale.strComplete, progress: 100 });
 		sessionStorage.setItem('millennium-settings-tab', '/millennium/settings/updates');
-		await Core_ChangePluginStatus(JSON.stringify([{ plugin_name: pluginName, enabled: true }]));
+		await backend.plugins.togglePlugin(JSON.stringify([{ plugin_name: pluginName, enabled: true }]));
 		return;
 	}
 

@@ -28,7 +28,7 @@
  * SOFTWARE.
  */
 
-import { Core_GetBackendConfig, Core_SetBackendConfig } from './ffi';
+import { backend } from './ffi';
 import { AppConfig } from './AppConfig';
 
 class SettingsManager {
@@ -37,7 +37,7 @@ class SettingsManager {
 	private pendingUpdates: ((draft: AppConfig) => void)[] = [];
 
 	constructor() {
-		Core_GetBackendConfig().then((cfg) => {
+		backend.config.millennium.getConfig().then((cfg) => {
 			this.settings = cfg as AppConfig;
 		});
 	}
@@ -78,7 +78,7 @@ class SettingsManager {
 	 * In the case no provider is available, the config will not be saved; so this function is used to force the config to be saved.
 	 */
 	public forceSaveConfig() {
-		Core_SetBackendConfig(JSON.stringify(this.settings), true);
+		backend.config.millennium.setConfig(JSON.stringify(this.settings), true);
 	}
 }
 

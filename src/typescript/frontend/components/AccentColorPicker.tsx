@@ -32,7 +32,7 @@ import { DialogButton, Field, pluginSelf } from '@steambrew/client';
 import { settingsClasses } from '../utils/classes';
 import { locale } from '../utils/localization-manager';
 import { useState, useRef } from 'react';
-import { Core_ChangeAccentColor } from '../utils/ffi';
+import { backend } from '../utils/ffi';
 import { DispatchSystemColors } from '../patcher/SystemColors';
 import { SystemAccentColor } from '../types';
 
@@ -76,7 +76,7 @@ const RenderAccentColorPicker = () => {
 
 		debounceTimer.current = setTimeout(async () => {
 			setAccentColor(sanitizedColor);
-			UpdateAllWindows(await Core_ChangeAccentColor(sanitizedColor));
+			UpdateAllWindows(await backend.themes.setAccentColor(sanitizedColor));
 		}, 300);
 	}
 

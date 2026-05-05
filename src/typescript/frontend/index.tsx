@@ -39,7 +39,7 @@ import { DesktopMenuProvider } from './quick-access/DesktopMenuContext';
 import { handleSettingsReturnNavigation, MillenniumSettings } from './settings';
 import { MillenniumQuickCssEditor } from './settings/quickcss';
 import { PluginComponent, PluginCrashInfo, SettingsProps, SystemAccentColor, ThemeItem, ThemeItemV1 } from './types';
-import { Core_ChangePluginStatus, Core_FindAllPlugins, Core_GetRootColors, Core_GetStartConfig } from './utils/ffi';
+import { backend } from './utils/ffi';
 import { Logger } from './utils/Logger';
 import { useQuickCssState } from './utils/quick-css-state';
 import { NotificationService } from './utils/update-notification-service';
@@ -65,7 +65,7 @@ async function initializeMillennium(settings: SettingsProps) {
 
 	if (theme?.data?.hasOwnProperty('RootColors')) {
 		try {
-			const rootColors = await Core_GetRootColors();
+			const rootColors = await backend.themes.getRootColors();
 			pluginSelf.RootColors = rootColors;
 		} catch (error) {
 			Logger.Error('Failed to load root colors from backend', error);
@@ -108,12 +108,12 @@ async function initializeMillennium(settings: SettingsProps) {
 
 	const checkLegacyPlugins = async () => {
 		try {
-			const plugins: PluginComponent[] = await Core_FindAllPlugins();
+			const plugins: PluginComponent[] = await backend.plugins.getPlugins();
 			const legacy = plugins.filter((p) => p.enabled && p.data.name !== 'core' && p.data.useBackend !== false && p.data.backendType !== 'lua');
 
 			if (legacy.length) {
 				const disablePayload = legacy.map((p) => ({ plugin_name: p.data.name, enabled: false }));
-				await Core_ChangePluginStatus(JSON.stringify(disablePayload));
+				await backend.plugins.togglePlugin(JSON.stringify(disablePayload));
 			}
 
 			const superseded = plugins.filter((p) => SUPERSEDED_PLUGIN_NAMES.includes(p.data.name));
@@ -147,8 +147,6 @@ async function initializeMillennium(settings: SettingsProps) {
 		else crashQueue.push(detail);
 	});
 
-	/* Show crash modals for any plugins that crashed before this init.
-	   The data comes from Core_GetStartConfig — no async poll needed. */
 	if (settings?.pendingCrashes?.length) {
 		Logger.Log(`Startup config contains ${settings.pendingCrashes.length} pending crash(es)`);
 		settings.pendingCrashes.forEach((d) => crashQueue.push(d));
@@ -158,7 +156,7 @@ async function initializeMillennium(settings: SettingsProps) {
 // Entry point on the front end of your plugin
 export default async function PluginMain() {
 	try {
-		await initializeMillennium(await Core_GetStartConfig());
+		await initializeMillennium(await backend.config.getInitService());
 	} catch (error) {
 		Logger.Error('Millennium frontend initialization failed, continuing with route registration.', error);
 	}

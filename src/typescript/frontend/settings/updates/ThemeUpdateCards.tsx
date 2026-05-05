@@ -33,7 +33,7 @@ import { SettingsDialogSubHeader } from '../../components/SteamComponents';
 import { formatString, locale, SteamLocale } from '../../utils/localization-manager';
 import { UpdateCard, UpdateItemType } from './UpdateCard';
 import { UpdateContextProviderState, useUpdateContext } from './useUpdateContext';
-import { Core_DownloadThemeUpdate } from '../../utils/ffi';
+import { backend } from '../../utils/ffi';
 import { ThemeItem } from '../../types';
 import { Utils } from '../../utils';
 import { waitForInstallerComplete } from '../general/Installer';
@@ -46,7 +46,7 @@ async function StartThemeUpdate(ctx: UpdateContextProviderState, updateObject: U
 	setUpdatingTheme(key, true);
 	setThemeProgress(key, { statusText: locale.strPreparing, progress: 0 });
 
-	const result: any = await Core_DownloadThemeUpdate(updateObject.native);
+	const result: any = await backend.themes.update(updateObject.native);
 	const parsed = typeof result === 'string' ? JSON.parse(result) : result;
 	const opId: number = parsed?.opId ?? 0;
 
