@@ -144,14 +144,24 @@ export function handleSettingsReturnNavigation(): boolean {
 		sessionStorage.removeItem(SETTINGS_ORIGINAL_START_PAGE_KEY);
 	}
 
-	Navigation.Navigate('/millennium/settings');
+	const savedTab = sessionStorage.getItem(SETTINGS_TAB_KEY);
+	Navigation.Navigate(savedTab || '/millennium/settings');
 	return true;
 }
 
 export function MillenniumSettings() {
 	const className = `${settingsClasses.SettingsModal} ${settingsClasses.DesktopPopup} MillenniumSettings ModalDialogPopup`;
-	const settingsPages: (SidebarNavigationPage | "separator")[] = [tabSpotGeneral, 'separator', tabSpotThemes, tabSpotQuickCSS, tabSpotPlugins, 'separator', tabSpotUpdates, tabSpotLogs];
-	const [currentPage, setCurrentPage] = useState(() => sessionStorage.getItem(SETTINGS_TAB_KEY) || undefined);
+	const settingsPages: (SidebarNavigationPage | 'separator')[] = [
+		tabSpotGeneral,
+		'separator',
+		tabSpotThemes,
+		tabSpotQuickCSS,
+		tabSpotPlugins,
+		'separator',
+		tabSpotUpdates,
+		tabSpotLogs,
+	];
+	const [currentPage, setCurrentPage] = useState<string | undefined>(undefined);
 
 	useEffect(() => {
 		// Flag that we're in settings — survives RestartJSContext since cleanup won't run.
@@ -188,7 +198,7 @@ export function MillenniumSettings() {
 					className={className}
 					pages={settingsPages}
 					title={locale.strMillennium}
-					page={currentPage}
+					{...(currentPage ? { page: currentPage } : {})}
 					onPageRequested={(page: string) => {
 						setCurrentPage(page);
 						sessionStorage.setItem(SETTINGS_TAB_KEY, page);
@@ -218,8 +228,8 @@ function RenderSettingsModal(_: any, retObj: any) {
 		'separator',
 	];
 
-	retObj.props.menuItems.splice(retObj.props.menuItems.length - 1, 0, ...items);
-	return retObj.type(retObj.props);
+	retObj?.props?.menuItems?.splice?.(retObj?.props?.menuItems?.length - 1, 0, ...items);
+	return retObj?.type?.(retObj.props);
 }
 
 export { RenderSettingsModal };

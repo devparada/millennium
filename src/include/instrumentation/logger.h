@@ -30,6 +30,7 @@
 #pragma once
 #include <fcntl.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <stdarg.h>
 #include <time.h>
 #ifdef _WIN32
@@ -37,6 +38,32 @@
 #else
 #include <sys/time.h>
 #endif
+
+static inline FILE* hhx64_log_file()
+{
+    static FILE* f = NULL;
+    if (!f) {
+#ifdef _WIN32
+        char* logs_dir = NULL;
+        size_t len = 0;
+        if (_dupenv_s(&logs_dir, &len, "MILLENNIUM__LOGS_PATH") == 0 && logs_dir) {
+            char path[1024];
+            snprintf(path, sizeof(path), "%s/hhx64.log", logs_dir);
+            fopen_s(&f, path, "w");
+            free(logs_dir);
+        }
+#else
+        const char* logs_dir = getenv("MILLENNIUM__LOGS_PATH");
+        if (logs_dir) {
+            char path[1024];
+            snprintf(path, sizeof(path), "%s/hhx64.log", logs_dir);
+            f = fopen(path, "w");
+        }
+#endif
+        if (!f) f = stderr;
+    }
+    return f;
+}
 
 static void get_time_mmss(char* buf, size_t len)
 {
@@ -59,16 +86,10 @@ static inline void log_debug(const char* fmt, ...)
     get_time_mmss(timebuf, sizeof(timebuf));
     va_list args;
     va_start(args, fmt);
-#ifdef _WIN32
-    char buf[1024];
-    snprintf(buf, sizeof(buf), "[%s] \033[1m\033[36mHHX64-DEBUG\033[0m ", timebuf);
-    OutputDebugStringA(buf);
-    vsnprintf(buf, sizeof(buf), fmt, args);
-    OutputDebugStringA(buf);
-#else
-    fprintf(stderr, "[%s] \033[1m\033[36mHHX64-DEBUG\033[0m ", timebuf);
-    vfprintf(stderr, fmt, args);
-#endif
+    FILE* f = hhx64_log_file();
+    fprintf(f, "[%s] HHX64-DEBUG ", timebuf);
+    vfprintf(f, fmt, args);
+    fflush(f);
     va_end(args);
 }
 
@@ -78,16 +99,10 @@ static inline void log_info(const char* fmt, ...)
     get_time_mmss(timebuf, sizeof(timebuf));
     va_list args;
     va_start(args, fmt);
-#ifdef _WIN32
-    char buf[1024];
-    snprintf(buf, sizeof(buf), "[%s] \033[1m\033[36mHHX64-INFO\033[0m ", timebuf);
-    OutputDebugStringA(buf);
-    vsnprintf(buf, sizeof(buf), fmt, args);
-    OutputDebugStringA(buf);
-#else
-    fprintf(stderr, "[%s] \033[1m\033[36mHHX64-INFO\033[0m ", timebuf);
-    vfprintf(stderr, fmt, args);
-#endif
+    FILE* f = hhx64_log_file();
+    fprintf(f, "[%s] HHX64-INFO ", timebuf);
+    vfprintf(f, fmt, args);
+    fflush(f);
     va_end(args);
 }
 
@@ -97,16 +112,10 @@ static inline void log_warning(const char* fmt, ...)
     get_time_mmss(timebuf, sizeof(timebuf));
     va_list args;
     va_start(args, fmt);
-#ifdef _WIN32
-    char buf[1024];
-    snprintf(buf, sizeof(buf), "[%s] \033[1m\033[33mHHX64-WARN\033[0m ", timebuf);
-    OutputDebugStringA(buf);
-    vsnprintf(buf, sizeof(buf), fmt, args);
-    OutputDebugStringA(buf);
-#else
-    fprintf(stderr, "[%s] \033[1m\033[33mHHX64-WARN\033[0m ", timebuf);
-    vfprintf(stderr, fmt, args);
-#endif
+    FILE* f = hhx64_log_file();
+    fprintf(f, "[%s] HHX64-WARN ", timebuf);
+    vfprintf(f, fmt, args);
+    fflush(f);
     va_end(args);
 }
 
@@ -116,15 +125,9 @@ static inline void log_error(const char* fmt, ...)
     get_time_mmss(timebuf, sizeof(timebuf));
     va_list args;
     va_start(args, fmt);
-#ifdef _WIN32
-    char buf[1024];
-    snprintf(buf, sizeof(buf), "[%s] \033[1m\033[31mHHX64-ERROR\033[0m  ", timebuf);
-    OutputDebugStringA(buf);
-    vsnprintf(buf, sizeof(buf), fmt, args);
-    OutputDebugStringA(buf);
-#else
-    fprintf(stderr, "[%s] \033[1m\033[31mHHX64-ERROR\033[0m ", timebuf);
-    vfprintf(stderr, fmt, args);
-#endif
+    FILE* f = hhx64_log_file();
+    fprintf(f, "[%s] HHX64-ERROR ", timebuf);
+    vfprintf(f, fmt, args);
+    fflush(f);
     va_end(args);
 }

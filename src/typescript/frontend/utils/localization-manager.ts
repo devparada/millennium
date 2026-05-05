@@ -28,24 +28,24 @@
  * SOFTWARE.
  */
 
-import english from '@/locales/english.json';
-import polish from '@/locales/polish.json';
-import spanish from '@/locales/spanish.json';
-import indonesian from '@/locales/indonesian.json';
-import schinese from '@/locales/schinese.json';
-import german from '@/locales/german.json';
-import russian from '@/locales/russian.json';
-import italian from '@/locales/italian.json';
-import swedish from '@/locales/swedish.json';
-import vietnamese from '@/locales/vietnamese.json';
-import brazilian from '@/locales/brazilian.json';
-import french from '@/locales/french.json';
-import turkish from '@/locales/turkish.json';
-import ukrainian from '@/locales/ukrainian.json';
-import japanese from '@/locales/japanese.json';
-import hungarian from '@/locales/hungarian.json';
-import koreana from '@/locales/koreana.json';
-import latam from '@/locales/latam.json';
+import english from '../../../locales/english.json';
+import polish from '../../../locales/polish.json';
+import spanish from '../../../locales/spanish.json';
+import indonesian from '../../../locales/indonesian.json';
+import schinese from '../../../locales/schinese.json';
+import german from '../../../locales/german.json';
+import russian from '../../../locales/russian.json';
+import italian from '../../../locales/italian.json';
+import swedish from '../../../locales/swedish.json';
+import vietnamese from '../../../locales/vietnamese.json';
+import brazilian from '../../../locales/brazilian.json';
+import french from '../../../locales/french.json';
+import turkish from '../../../locales/turkish.json';
+import ukrainian from '../../../locales/ukrainian.json';
+import japanese from '../../../locales/japanese.json';
+import hungarian from '../../../locales/hungarian.json';
+import koreana from '../../../locales/koreana.json';
+import latam from '../../../locales/latam.json';
 import { Logger } from './Logger';
 
 interface LocalizationData {
@@ -93,13 +93,12 @@ const localizationFiles: { [key: string]: LocalizationData } = {
 
 const GetLocalization = async () => {
 	const language = await SteamClient.Settings.GetCurrentLanguage();
-	Logger.Log(`loading ${language} locales`, localizationFiles?.[language]);
-
 	if (localizationFiles.hasOwnProperty(language)) {
 		locale = new Proxy(localizationFiles[language], handler);
 	} else {
 		Logger.Warn(`Localization for language ${language} not found, defaulting to English.`);
-	}
+    }
+   	Logger.Log(`Loaded ${language} locales`);
 };
 
 // setup locales on startup

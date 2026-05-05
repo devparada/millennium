@@ -28,7 +28,6 @@
  * SOFTWARE.
  */
 
-#include "shared/crash_handler.h"
 #include "state/shared_memory.h"
 #include "head/default_cfg.h"
 
@@ -65,7 +64,7 @@ void millennium::check_for_updates()
         m_millennium_updater->check_for_updates();
 
         const auto update = m_millennium_updater->has_any_updates();
-        const bool should_auto_install = CONFIG.get({"general", "onMillenniumUpdate"}, head::on_millennium_update::AUTO_INSTALL) == head::on_millennium_update::AUTO_INSTALL;
+        const bool should_auto_install = CONFIG.get({ "general", "onMillenniumUpdate" }, head::on_millennium_update::AUTO_INSTALL) == head::on_millennium_update::AUTO_INSTALL;
 
         if (!update["hasUpdate"]) {
             logger.log("No Millennium updates available.");
@@ -76,6 +75,11 @@ void millennium::check_for_updates()
 
         if (!should_auto_install) {
             logger.log("Millennium update available to version {}. Auto-install is disabled, please update manually.", new_version);
+            return;
+        }
+
+        if (update["platformRelease"].is_null()) {
+            LOG_ERROR("No platform-specific release asset found for Millennium {}. Cannot auto-update.", new_version);
             return;
         }
 

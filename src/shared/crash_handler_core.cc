@@ -165,10 +165,7 @@ static void crash_signal_handler(int sig)
     }
 }
 
-void crash_handler_core_install_signals(
-    crash_handler_signal_ctx* ctx,
-    const int* signals,
-    int num_signals)
+void crash_handler_core_install_signals(crash_handler_signal_ctx* ctx, const int* signals, int num_signals)
 {
     s_signal_ctx = ctx;
 
@@ -178,8 +175,7 @@ void crash_handler_core_install_signals(
     sa.sa_flags = SA_RESETHAND;
 
     for (int i = 0; i < num_signals; ++i) {
-        sigaction(signals[i], &sa,
-                  ctx->chain_to_previous ? &s_prev_handlers[signals[i]] : nullptr);
+        sigaction(signals[i], &sa, ctx->chain_to_previous ? &s_prev_handlers[signals[i]] : nullptr);
     }
 }
 

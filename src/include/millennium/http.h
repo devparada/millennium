@@ -111,7 +111,7 @@ inline std::string Get(const char* url, bool retry = true, const long timeout = 
                 break;
             }
 
-            if (millennium_lifecycle::get().terminate.load()) {
+            if (millennium_lifecycle::get().terminate.flag.load()) {
                 throw HttpError("Thread termination flag is set, aborting HTTP request.");
             }
             /** Calling the server to quickly seems to accident DoS. */
@@ -146,7 +146,7 @@ inline std::string Post(const char* url, const std::string& postData, bool retry
                 break;
             }
 
-            if (millennium_lifecycle::get().terminate.load()) {
+            if (millennium_lifecycle::get().terminate.flag.load()) {
                 throw HttpError("Thread termination flag is set, aborting HTTP request.");
             }
 

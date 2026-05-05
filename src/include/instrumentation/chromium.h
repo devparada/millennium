@@ -203,3 +203,16 @@ typedef struct _cef_resource_request_handler_t
     void(CEF_CALLBACK* _5)(void* self, void*, void*, void*, void*, void*, int64_t);
     void(CEF_CALLBACK* _6)(void* self, void*, void*, void*, int*);
 } cef_resource_request_handler_t;
+
+/** response filter status codes */
+#define CEF_RESPONSE_FILTER_NEED_MORE_DATA 0
+#define CEF_RESPONSE_FILTER_DONE 1
+#define CEF_RESPONSE_FILTER_ERROR 2
+
+typedef struct _cef_response_filter_t
+{
+    char _base[sizeof(size_t) + sizeof(void*) * 0x4];
+    int(CEF_CALLBACK* init_filter)(struct _cef_response_filter_t* self);
+    int(CEF_CALLBACK* filter)(struct _cef_response_filter_t* self, void* data_in, size_t data_in_size, size_t* data_in_read, void* data_out, size_t data_out_size,
+                              size_t* data_out_written);
+} cef_response_filter_t;

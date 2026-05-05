@@ -58,10 +58,6 @@ class config_manager : public singleton<config_manager>
     json get(std::initializer_list<std::string> segments, const json& def = nullptr);
     void set(std::initializer_list<std::string> segments, const json& value, bool skipPropagation = false);
 
-    /** runtime dot-separated path variants (for frontend API boundary) */
-    json get_path(const std::string& path, const json& def = nullptr);
-    void set_path(const std::string& path, const json& value, bool skipPropagation = false);
-
     config_manager();
     ~config_manager();
 
@@ -74,6 +70,13 @@ class config_manager : public singleton<config_manager>
     json _defaults;
     std::vector<listener> _listeners;
     std::string _filename;
+    /**
+     * Set to true when load_from_disk could not read an existing config file
+     * (e.g., transient AV/backup lock). When true, save_to_disk becomes a no-op
+     * for the remainder of the session so we don't overwrite the user's real
+     * data with in-memory defaults.
+     */
+    bool _save_disabled = false;
 };
 
 #define CONFIG config_manager::get_instance()

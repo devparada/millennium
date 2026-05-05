@@ -29,6 +29,7 @@
  */
 
 import { callOriginal, findClassModule, Patch, replacePatch, sleep, ChromeDevToolsProtocol } from '@steambrew/client';
+import { Logger } from 'utils/Logger';
 
 /**
  * BrowserManagerHook is a utility class that hooks into the MainWindowBrowserManager
@@ -49,7 +50,10 @@ export class BrowserManagerHook {
 	private async captureBrowserSnapshot() {
 		const targetInfos: any = await ChromeDevToolsProtocol.send('Target.getTargets');
 
-		const browserTarget = targetInfos?.targetInfos?.find((target: any) => target?.url === MainWindowBrowserManager.m_URL);
+        const browserTarget = targetInfos?.targetInfos?.find((target: any) => target?.url === MainWindowBrowserManager.m_URL);
+        if (!browserTarget) {
+            Logger.Error("Failed to find main browser target")
+        }
 
 		const attachedTarget: any = await ChromeDevToolsProtocol.send('Target.attachToTarget', {
 			targetId: browserTarget?.targetId,
@@ -140,7 +144,7 @@ export class BrowserManagerHook {
 		const interval = setInterval(() => {
 			const browser = MainWindowBrowserManager?.m_browser;
 
-			if (browser?.SetBounds !== this.setBrowserBoundsPatched.patchedFunction || browser?.SetVisible !== this.setBrowserVisiblePatched.patchedFunction) {
+			if (browser?.SetBounds !== this.setBrowserBoundsPatched?.patchedFunction || browser?.SetVisible !== this.setBrowserVisiblePatched?.patchedFunction) {
 				this.hook(true);
 			}
 		}, 100);

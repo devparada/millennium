@@ -37,6 +37,9 @@
 
 #include <atomic>
 #include <filesystem>
+#include <functional>
+#include <utility>
+#include <fmt/format.h>
 #include <memory>
 #include <nlohmann/json.hpp>
 #include <regex>
@@ -46,6 +49,7 @@
 #include <unordered_set>
 
 extern std::atomic<unsigned long long> g_hookedModuleId;
+std::string get_cdp_isolated_ctx_script();
 
 /**
  * Millennium will not load JavaScript into the following URLs to favor user safety.
@@ -102,6 +106,8 @@ class network_hook_ctl
     bool remove_hook(unsigned long long hookId);
     std::vector<hook_item> get_hook_list() const;
 
+    void set_dynamic_css_provider(std::function<std::pair<std::string, std::string>()> provider);
+
     void shutdown();
     const char* get_ftp_url() const
     {
@@ -114,9 +120,40 @@ class network_hook_ctl
 
     struct processed_hooks
     {
-        std::string cssContent, linkPreloads;
-        std::vector<std::string> script_modules;
+        // clang-format off
+        void add_stylesheet(const std::string& href)
+        {
+            m_css += fmt::format(R"(<link rel="stylesheet" href="{}">)""\n", href);
+        }
+        void add_script_module(const std::string& href)
+        {
+            m_preloads += fmt::format(R"(<link rel="modulepreload" href="{}" fetchpriority="high">)""\n", href);
+            m_scripts += fmt::format(R"(<script type="module" src="{}"></script>)""\n", href);
+        }
+        void add_inline_style(const std::string& id, const std::string& css)
+        {
+            m_css += fmt::format(R"(<style id="{}">{}</style>)""\n", id, css);
+        }
+        // clang-format on
+
+        const std::string& css() const
+        {
+            return m_css;
+        }
+        const std::string& preloads() const
+        {
+            return m_preloads;
+        }
+        const std::string& scripts() const
+        {
+            return m_scripts;
+        }
+
+      private:
+        std::string m_css, m_preloads, m_scripts;
     };
+
+    std::function<std::pair<std::string, std::string>()> m_dynamic_css_provider;
 
     std::atomic<bool> m_shutdown{ false };
     mutable std::shared_mutex m_hook_list_mtx;
@@ -135,15 +172,10 @@ class network_hook_ctl
     const std::vector<const char*> m_ftpUrls = { this->m_ftp_url, this->m_themes_url, this->m_legacy_virt_js_url, this->m_legacy_virt_css_url, this->m_legacy_hook_url };
 
     bool is_vfs_request(const nlohmann::basic_json<>& message);
-    std::string HandleCssHook(const std::string& body);
-    std::string HandleJsHook(const std::string& body);
-    void HandleHooks(const nlohmann::basic_json<>& message);
     void vfs_request_handler(const nlohmann::basic_json<>& message);
     void mime_doc_request_handler(const nlohmann::basic_json<>& message);
     std::filesystem::path path_from_url(const std::string& requestUrl);
     processed_hooks apply_user_webkit_hooks(const std::string& requestUrl) const;
     std::string patch_document(const std::string& requestUrl, const std::string& original) const;
-    std::string compile_preload_script(const processed_hooks& hooks, const std::string& millenniumPreloadPath) const;
     std::string inject_into_document_head(const std::string& original, const std::string& content) const;
-    bool is_url_blacklisted(const std::string& requestUrl) const;
 };

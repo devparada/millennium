@@ -40,7 +40,10 @@ thread_pool::thread_pool(size_t num_threads) : stop(false), shutdown_called(fals
                 std::function<void()> task;
                 {
                     std::unique_lock<std::mutex> lock(queueMutex);
-                    condition.wait(lock, [this] { return stop || !tasks.empty(); });
+                    condition.wait(lock, [this]
+                    {
+                        return stop || !tasks.empty();
+                    });
 
                     if (stop && tasks.empty()) {
                         return;

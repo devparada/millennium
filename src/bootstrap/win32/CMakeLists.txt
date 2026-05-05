@@ -11,6 +11,7 @@ set(VERSION_COPYRIGHT    "Steam Homebrew ${TIMESTAMP}")
 set(VERSION_FILENAME     "${MILLENNIUM_BOOTLOADER_OUTPUT_NAME}")
 set(VERSION_PRODUCT      "Millennium Bootstrapper")
 set(VERSION_TRADEMARK1   "All Rights Reserved")
+set(VERSION_FILETYPE     "VFT_DLL")
 
 set(VERSION_FILE "${CMAKE_BINARY_DIR}/${MILLENNIUM_BOOTLOADER_OUTPUT_NAME}.rc")
 configure_file(${MILLENNIUM_BASE}/scripts/version.rc.in ${VERSION_FILE} @ONLY)

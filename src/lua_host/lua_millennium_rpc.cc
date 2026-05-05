@@ -71,8 +71,7 @@ static int RPC_CallFrontendMethod(lua_State* L)
             if (*src == '@') ++src;
             std::string path(src);
             const std::string prefix = g_backend_dir + "/";
-            if (!prefix.empty() && path.substr(0, prefix.size()) == prefix)
-                path = path.substr(prefix.size());
+            if (!prefix.empty() && path.substr(0, prefix.size()) == prefix) path = path.substr(prefix.size());
             caller = path + ":" + std::to_string(ar.currentline);
         }
 

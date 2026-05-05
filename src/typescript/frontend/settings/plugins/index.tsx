@@ -29,14 +29,14 @@
  */
 
 import { Component } from 'react';
-import { ConfirmModal, DialogButton, DialogControlsSection, IconsModule, joinClassNames, pluginSelf, showModal } from '@steambrew/client';
+import { ConfirmModal, DialogButton, DialogControlsSection, joinClassNames, pluginSelf, showModal } from '@steambrew/client';
 import { PluginComponent } from '../../types';
 import { locale } from '../../utils/localization-manager';
 import { settingsClasses } from '../../utils/classes';
 import { FaFolderOpen, FaSave, FaStore } from 'react-icons/fa';
 import { PiPlugsFill } from 'react-icons/pi';
 import { Utils } from '../../utils';
-import { Core_FindAllPlugins, Core_GetEnvironmentVar, Core_GetPluginBackendLogs, Core_ChangePluginStatus } from '../../utils/ffi';
+import { backend } from '../../utils/ffi';
 import { showInstallPluginModal } from './PluginInstallerModal';
 import { LogData, LogLevel } from '../logs';
 import { RenderPluginComponent } from './PluginComponent';
@@ -47,6 +47,10 @@ declare global {
 	interface Window {
 		MILLENNIUM_PLUGIN_SETTINGS_STORE: any;
 	}
+}
+
+function isLegacyPlugin(plugin: PluginComponent): boolean {
+	return plugin.data.name !== 'core' && plugin.data.useBackend !== false && plugin.data.backendType !== 'lua';
 }
 
 interface PluginStatusProps {
@@ -60,7 +64,7 @@ interface UpdatedPluginProps {
 }
 
 interface PluginViewModalState {
-	plugins: PluginComponent[];
+	plugins: PluginComponent[] | undefined;
 	checkedItems: { [key: number]: boolean };
 	pluginsWithLogs?: Map<string, PluginStatusProps>;
 	updatedPlugins: UpdatedPluginProps[];
@@ -95,12 +99,12 @@ class PluginViewModal extends Component<{}, PluginViewModalState> {
 	}
 
 	async FetchAllPlugins() {
-		const plugins: PluginComponent[] = JSON.parse(await Core_FindAllPlugins());
+		const plugins: PluginComponent[] = await backend.plugins.getPlugins();
 		const checkedItems = this.getEnabledPlugins(plugins);
 		const pluginNames = plugins.map((p) => p.data.common_name);
 		const pluginsWithLogs = new Map<string, PluginStatusProps>();
 
-		const result = await Core_GetPluginBackendLogs();
+		const result = await backend.plugins.getBackendLogs();
 		const logData: LogData[] = JSON.parse(result as any);
 
 		for (let plugin of logData) {
@@ -116,7 +120,11 @@ class PluginViewModal extends Component<{}, PluginViewModalState> {
 	}
 
 	handleCheckboxChange(index: number) {
-		const plugin = this.state.plugins[index];
+		const plugin = this.state.plugins?.[index];
+		if (!plugin) return;
+
+		if (isLegacyPlugin(plugin)) return;
+
 		const originalChecked = plugin.enabled;
 		const updated = !this.state.checkedItems[index] || plugin.data.name === 'core';
 
@@ -129,7 +137,7 @@ class PluginViewModal extends Component<{}, PluginViewModalState> {
 
 	SavePluginChanges() {
 		const onOK = () => {
-			Core_ChangePluginStatus({ pluginJson: JSON.stringify(this.state.updatedPlugins) });
+			backend.plugins.togglePlugin(JSON.stringify(this.state.updatedPlugins));
 		};
 
 		showModal(
@@ -140,7 +148,7 @@ class PluginViewModal extends Component<{}, PluginViewModalState> {
 	}
 
 	async OpenPluginsFolder() {
-		const path = JSON.parse(await Core_GetEnvironmentVar({ variable: 'MILLENNIUM__PLUGINS_PATH' }));
+		const path = await backend.environment.get('MILLENNIUM__PLUGINS_PATH');
 		Utils.BrowseLocalFolder(path);
 	}
 
@@ -149,20 +157,21 @@ class PluginViewModal extends Component<{}, PluginViewModalState> {
 	}
 
 	renderPluginComponent({ plugin, index }: { plugin: PluginComponent; index: number }) {
-		const logState = this.state.pluginsWithLogs?.get(plugin.data.common_name);
+		const logState = this.state.pluginsWithLogs?.get(plugin.data.common_name ?? '');
 
 		return (
 			<RenderPluginComponent
 				plugin={plugin}
 				index={index}
-				isLastPlugin={index === this.state.plugins.length - 1}
+				isLastPlugin={index === (this.state.plugins?.length ?? 0) - 1}
 				isEnabled={this.state.checkedItems[index]}
-				hasErrors={logState?.errors > 0}
-				hasWarnings={logState?.warnings > 0}
+				hasErrors={(logState?.errors ?? 0) > 0}
+				hasWarnings={(logState?.warnings ?? 0) > 0}
 				onSelectionChange={(index: number) => this.handleCheckboxChange(index)}
 				refetchPlugins={this.FetchAllPlugins.bind(this)}
-				allPlugins={this.state.plugins}
-				isPluginConfigurable={this.state.configurablePluginStore?.find((p) => p.name === plugin.data.name).isEditable}
+				allPlugins={this.state.plugins ?? []}
+				isPluginConfigurable={this.state.configurablePluginStore?.find((p) => p.name === plugin.data.name)?.isEditable ?? false}
+				isLegacy={isLegacyPlugin(plugin)}
 			/>
 		);
 	}

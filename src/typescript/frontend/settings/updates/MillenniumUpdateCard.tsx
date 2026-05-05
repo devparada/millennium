@@ -28,7 +28,7 @@
  * SOFTWARE.
  */
 
-import { ConfirmModal, pluginSelf, ProgressBar, showModal, ShowModalResult } from '@steambrew/client';
+import { ConfirmModal, pluginSelf, showModal } from '@steambrew/client';
 import { Utils } from '../../utils';
 import { formatString, locale } from '../../utils/localization-manager';
 import { UpdateCard } from './UpdateCard';
@@ -38,7 +38,7 @@ import { useEffect } from 'react';
 import { OSType } from '../../types';
 import Markdown from 'markdown-to-jsx';
 import { useUpdateContext } from './useUpdateContext';
-import { Core_HasPendingMillenniumUpdateRestart } from '../../utils/ffi';
+import { backend } from '../../utils/ffi';
 import { registerInstallerProgressListener, unregisterInstallerProgressListener } from '../general/Installer';
 
 export const MillenniumUpdateCard = ({ millenniumUpdates }: { millenniumUpdates: any }) => {
@@ -58,7 +58,7 @@ export const MillenniumUpdateCard = ({ millenniumUpdates }: { millenniumUpdates:
 		});
 
 		let interval = setInterval(() => {
-			Core_HasPendingMillenniumUpdateRestart().then((result: any) => {
+			backend.updater.hasPendingMillenniumUpdateRestart().then((result: any) => {
 				if (JSON.parse(result)) {
 					pluginSelf.millenniumUpdates.updateInProgress = true;
 					ctx.setMillenniumUpdating(false);

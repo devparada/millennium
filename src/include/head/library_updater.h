@@ -82,6 +82,6 @@ class library_updater : public std::enable_shared_from_this<library_updater>
     std::optional<json> cached_updates;
     bool m_has_checked_for_updates;
 
-    std::atomic<int> m_next_op_id{1};
+    std::atomic<int> m_next_op_id{ 1 };
 };
 } // namespace head

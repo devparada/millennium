@@ -1,4 +1,4 @@
-import Logger from '../../logger';
+import { Logger } from '../../logger';
 import { GenericPatchHandler, afterPatch } from '../patcher';
 import { wrapReactClass, wrapReactType } from './react';
 
@@ -23,7 +23,7 @@ export function setReactPatcherPerformanceLoggingEnabled(value: boolean = true) 
 }
 
 function patchComponent(node: any, handler: GenericPatchHandler, steps: NodeStep[], step: number, caches: PatchedComponentCache[], logger: Logger, prop: string = 'type') {
-	loggingEnabled && logger.group('Patching node:', node);
+	loggingEnabled && logger.log('Patching node:', node);
 	// We need to take extra care to not mutate the original node.type
 	switch (typeof node?.[prop]) {
 		case 'function':
@@ -49,7 +49,6 @@ function patchComponent(node: any, handler: GenericPatchHandler, steps: NodeStep
 			logger.error('Unhandled component type', node);
 			break;
 	}
-	loggingEnabled && logger.groupEnd();
 }
 
 function handleStep(tree: any, handler: GenericPatchHandler, steps: NodeStep[], step: number, caches: PatchedComponentCache[], logger: Logger): any {

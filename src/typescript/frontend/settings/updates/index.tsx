@@ -78,7 +78,7 @@ const UpdatesViewModal: React.FC = () => {
 			<Placeholder icon={<IconsModule.ExclamationPoint />} header={locale.updatePanelErrorHeader} body={locale.updatePanelErrorBody + parseUpdateErrorMessage()}>
 				<DialogButton
 					className={joinClassNames(settingsClasses.SettingsDialogButton, 'MillenniumUpdates_CheckForUpdates')}
-					onClick={fetchAvailableUpdates.spread(true)}
+					onClick={() => fetchAvailableUpdates(true)}
 				>
 					{locale.updatePanelErrorButton}
 				</DialogButton>
@@ -105,7 +105,7 @@ const UpdatesViewModal: React.FC = () => {
 	return (
 		<RenderAvailableUpdates
 			millenniumUpdates={pluginSelf.millenniumUpdates}
-			themeUpdates={themeUpdates}
+			themeUpdates={themeUpdates ?? []}
 			pluginUpdates={pluginUpdates?.filter((update: any) => update?.hasUpdate)}
 		/>
 	);

@@ -379,6 +379,7 @@ int main(int argc, char* argv[])
 
     if (argc < 2) {
 #ifdef _WIN32
+        SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
         MessageBoxA(nullptr,
                     "This is an internal Millennium runtime component.\n"
                     "It is not meant to be run directly.\n\n"
@@ -559,7 +560,9 @@ int main(int argc, char* argv[])
             std::string key = params.value("key", "");
             json value = params.value("value", json(nullptr));
             dispatch_config_change(L, key, value);
-            return {{ "ok", true }};
+            return {
+                { "ok", true }
+            };
         }
 
         if (method == plugin_ipc::parent_method::SHUTDOWN) {

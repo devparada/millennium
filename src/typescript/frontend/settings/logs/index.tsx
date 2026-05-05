@@ -33,7 +33,7 @@ import { settingsClasses } from '../../utils/classes';
 import Ansi from 'ansi-to-react';
 import React, { Component } from 'react';
 import { formatString, locale } from '../../utils/localization-manager';
-import { Core_GetPluginBackendLogs } from '../../utils/ffi';
+import { backend } from '../../utils/ffi';
 import { DesktopTooltip, SettingsDialogSubHeader } from '../../components/SteamComponents';
 import { IconButton } from '../../components/IconButton';
 import { Placeholder } from '../../components/Placeholder';
@@ -88,7 +88,7 @@ export class RenderLogViewer extends Component<{}, RenderLogViewerState> {
 	}
 
 	componentDidMount() {
-		Core_GetPluginBackendLogs().then((data: any) => {
+		backend.plugins.getBackendLogs().then((data: any) => {
 			const parsed = JSON.parse(data);
 			this.setState({ logData: parsed });
 
@@ -180,6 +180,7 @@ export class RenderLogViewer extends Component<{}, RenderLogViewerState> {
 
 	renderSelector() {
 		const { logData } = this.state;
+		if (!logData) return [];
 
 		/** Millennium specific logs */
 		const millenniumNames = new Set(['Millennium', 'Standard Output', 'Package Manager']);
@@ -189,7 +190,7 @@ export class RenderLogViewer extends Component<{}, RenderLogViewerState> {
 				(millenniumNames.has(item.name) ? acc.millenniumItems : acc.userPlugins).push(item);
 				return acc;
 			},
-			{ millenniumItems: [], userPlugins: [] },
+			{ millenniumItems: [] as LogData[], userPlugins: [] as LogData[] },
 		);
 
 		let components = [];
@@ -222,7 +223,7 @@ export class RenderLogViewer extends Component<{}, RenderLogViewerState> {
 			<div className="MillenniumLogs_TextContainer">
 				<div className="MillenniumLogs_ControlSection">
 					<div className="MillenniumLogs_NavContainer">
-						<DialogButton onClick={() => this.setState({ selectedLog: null })} className={`MillenniumButton ${settingsClasses.SettingsDialogButton}`}>
+						<DialogButton onClick={() => this.setState({ selectedLog: undefined })} className={`MillenniumButton ${settingsClasses.SettingsDialogButton}`}>
 							<IconsModule.Carat direction="left" />
 							{locale.strBack}
 						</DialogButton>

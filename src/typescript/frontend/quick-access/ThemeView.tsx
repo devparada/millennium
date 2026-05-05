@@ -28,7 +28,7 @@
  * SOFTWARE.
  */
 
-import { DialogButton, Dropdown, ErrorBoundary, PanelSection, PanelSectionRow } from '@steambrew/client';
+import { DialogButton, ErrorBoundary, PanelSection, PanelSectionRow } from '@steambrew/client';
 import { ThemeItem } from '../types';
 import { DesktopSideBarFocusedItemType, useDesktopMenu } from './DesktopMenuContext';
 import { DesktopTooltip } from '../components/SteamComponents';
@@ -68,7 +68,7 @@ export const RenderThemeViews = ({ theme }: { theme: ThemeItem }) => {
 		disabledReason = ThemeDisabledReason.NOT_CONFIGURABLE;
 	}
 
-	return <ThemeItem disabledReason={disabledReason} onClick={setFocusedItem.spread(theme, DesktopSideBarFocusedItemType.THEME)} theme={theme} />;
+	return <ThemeItem disabledReason={disabledReason} onClick={() => setFocusedItem(theme, DesktopSideBarFocusedItemType.THEME)} theme={theme} />;
 };
 
 export const RenderThemeView = () => {

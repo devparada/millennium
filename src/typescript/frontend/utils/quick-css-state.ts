@@ -4,6 +4,7 @@ import { useSyncExternalStore } from 'react';
 interface QuickCssState {
 	isMillenniumOpen: boolean;
 	editorCode: string;
+	isWatching: boolean;
 }
 
 class Store<T> {
@@ -32,6 +33,7 @@ class Store<T> {
 export const quickCssStore = new Store<QuickCssState>({
 	isMillenniumOpen: false,
 	editorCode: '',
+	isWatching: false,
 });
 
 export function useQuickCssState(): QuickCssState {
@@ -50,5 +52,11 @@ export function setIsMillenniumOpen(value: boolean): void {
 export function setEditorCode(code: string): void {
 	quickCssStore.setState((d) => {
 		d.editorCode = code;
+	});
+}
+
+export function setIsWatching(value: boolean): void {
+	quickCssStore.setState((d) => {
+		d.isWatching = value;
 	});
 }

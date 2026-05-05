@@ -39,8 +39,11 @@ import { AppConfig } from '../../utils/AppConfig';
 import { deferredSettingLabelClasses } from '../../utils/classes';
 
 export const GeneralViewModal: React.FC = () => {
-	const config = useMillenniumState();
+	const configOrNull = useMillenniumState();
 	const updateConfig = useUpdateConfig();
+
+	if (!configOrNull) return null;
+	const config = configOrNull;
 
 	const handleChange = <K extends keyof AppConfig['general']>(key: K, value: AppConfig['general'][K]) => {
 		updateConfig((draft) => {
@@ -96,7 +99,7 @@ export const GeneralViewModal: React.FC = () => {
 						selectedOption={OnMillenniumUpdateOpts.findIndex((opt) => opt.data === config.general.onMillenniumUpdate)}
 						onChange={(e) => handleChange('onMillenniumUpdate', e.data)}
 						contextMenuPositionOptions={{ bMatchWidth: false }}
-						strDefaultLabel={OnMillenniumUpdateOpts.find((opt) => opt.data === config.general.onMillenniumUpdate)?.label}
+						strDefaultLabel={OnMillenniumUpdateOpts.find((opt) => opt.data === config.general.onMillenniumUpdate)?.label ?? ''}
 					/>
 				</Field>
 
@@ -117,7 +120,7 @@ export const GeneralViewModal: React.FC = () => {
 						selectedOption={millenniumUpdateChannel.findIndex((opt) => opt.data === config.general.millenniumUpdateChannel)}
 						onChange={(e) => handleChange('millenniumUpdateChannel', e.data)}
 						contextMenuPositionOptions={{ bMatchWidth: false }}
-						strDefaultLabel={millenniumUpdateChannel.find((opt) => opt.data === config.general.millenniumUpdateChannel)?.label}
+						strDefaultLabel={millenniumUpdateChannel.find((opt) => opt.data === config.general.millenniumUpdateChannel)?.label ?? ''}
 					/>
 				</Field>
 			</DialogControlsSection>
@@ -149,9 +152,9 @@ export const GeneralViewModal: React.FC = () => {
 				<Field label={locale.strAboutVersion}>{pluginSelf.version}</Field>
 				<Field label={locale.strClientApiVersion}>{window.MILLENNIUM_FRONTEND_LIB_VERSION}</Field>
 				<Field label={locale.strBrowserApiVersion}>{window.MILLENNIUM_BROWSER_LIB_VERSION}</Field>
-				<Field label={locale.strAboutBuildDate}>{new Date(pluginSelf.buildDate).toLocaleString(navigator.language)}</Field>
+				<Field label={locale.strAboutBuildDate}>{new Date(pluginSelf.buildDate ?? '').toLocaleString(navigator.language)}</Field>
 				<Field label={locale.strLoaderBuildDate} bottomSeparator="none">
-					{new Date(window.MILLENNIUM_LOADER_BUILD_DATE).toLocaleString(navigator.language)}
+					{new Date(window.MILLENNIUM_LOADER_BUILD_DATE ?? '').toLocaleString(navigator.language)}
 				</Field>
 			</DialogControlsSection>
 		</>

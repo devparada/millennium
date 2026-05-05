@@ -55,7 +55,10 @@ class rpc_client
     nlohmann::json call(const std::string& method, const nlohmann::json& params = nullptr);
     void notify(const std::string& method, const nlohmann::json& params = nullptr);
     void run(request_handler handler);
-    bool connected() const { return m_connected.load(); }
+    bool connected() const
+    {
+        return m_connected.load();
+    }
 
   private:
     bool read_message(nlohmann::json& out);
@@ -64,8 +67,8 @@ class rpc_client
     void respond_error(int id, const std::string& error);
 
     plugin_ipc::socket_fd m_fd;
-    std::atomic<bool> m_connected{true};
-    std::atomic<int> m_next_id{1};
+    std::atomic<bool> m_connected{ true };
+    std::atomic<int> m_next_id{ 1 };
     std::mutex m_write_mutex;
 
     std::vector<nlohmann::json> m_deferred_notifications;

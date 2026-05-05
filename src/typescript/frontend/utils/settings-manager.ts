@@ -28,17 +28,17 @@
  * SOFTWARE.
  */
 
-import { Core_GetBackendConfig, Core_SetBackendConfig } from './ffi';
+import { backend } from './ffi';
 import { AppConfig } from './AppConfig';
 
 class SettingsManager {
-	private settings: AppConfig;
+	private settings!: AppConfig;
 	private updateFn: ((recipe: (draft: AppConfig) => void) => void) | null = null;
 	private pendingUpdates: ((draft: AppConfig) => void)[] = [];
 
 	constructor() {
-		Core_GetBackendConfig().then((cfg) => {
-			this.settings = JSON.parse(cfg) as AppConfig;
+		backend.config.millennium.getConfig().then((cfg) => {
+			this.settings = cfg as AppConfig;
 		});
 	}
 
@@ -62,10 +62,7 @@ class SettingsManager {
 
 	public updateConfig(recipe: (draft: AppConfig) => void) {
 		if (this.updateFn) {
-			this.updateFn((draft) => {
-				recipe(draft);
-				this.settings = draft as AppConfig; // Update internal reference
-			});
+			this.updateFn(recipe);
 		} else {
 			this.pendingUpdates.push(recipe);
 		}
@@ -81,7 +78,7 @@ class SettingsManager {
 	 * In the case no provider is available, the config will not be saved; so this function is used to force the config to be saved.
 	 */
 	public forceSaveConfig() {
-		Core_SetBackendConfig({ config: JSON.stringify(this.settings), skip_propagation: true });
+		backend.config.millennium.setConfig(JSON.stringify(this.settings), true);
 	}
 }
 

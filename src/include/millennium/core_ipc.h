@@ -80,7 +80,7 @@ class ipc_main
     struct vm_call_result
     {
         bool success;
-        std::variant<std::monostate, bool, uint64_t, int64_t, double, std::string, nlohmann::json> value;
+        std::variant<std::monostate, bool, uint64_t, int64_t, double, std::string, nlohmann::ordered_json> value;
     };
 
     static std::string get_vm_call_result_error(vm_call_result result);
@@ -104,7 +104,7 @@ class ipc_main
 
     javascript_evaluation_result evaluate_javascript_expression(std::string script);
     const std::string compile_javascript_expression(std::string plugin, std::string methodName, std::vector<javascript_parameter> fnParams);
-    json process_message(json payload);
+    ordered_json process_message(json payload);
 
     std::shared_ptr<cdp_client> get_cdp_client() const
     {
@@ -112,14 +112,14 @@ class ipc_main
     }
 
   private:
-    json call_server_method(const json& call);
-    json on_front_end_loaded(const json& call);
-    json call_frontend_method(const json& call);
+    ordered_json call_server_method(const json& call);
+    ordered_json on_front_end_loaded(const json& call);
+    ordered_json call_frontend_method(const json& call);
 
     vm_call_result handle_plugin_server_method(const std::string& pluginName, const json& message);
     vm_call_result handle_core_server_method(const json& call);
 
-    json plugin_config_method(const json& call);
+    ordered_json plugin_config_method(const json& call);
     vm_call_result handle_plugin_config(const std::string& pluginName, config_method method, const json& data);
 
     std::shared_ptr<plugin_manager> m_plugin_manager;

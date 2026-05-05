@@ -69,7 +69,10 @@ DESTRUCTOR void Posix_UnInitializeEnvironment()
 void Posix_AttachMillennium()
 {
     /** Handle signal interrupts (^C) */
-    signal(SIGINT, [](int /** signalCode */) { std::exit(128 + SIGINT); });
+    signal(SIGINT, [](int /** signalCode */)
+    {
+        std::exit(128 + SIGINT);
+    });
 
     platform::before_attach_millennium();
     platform::initialize_steam_hooks();
@@ -90,7 +93,7 @@ extern "C" __attribute__((visibility("default"))) int StartMillennium()
 extern "C" __attribute__((visibility("default"))) int StopMillennium()
 {
     logger.log("Unloading Millennium...");
-    millennium_lifecycle::get().terminate.store(true);
+    millennium_lifecycle::get().terminate.notify();
 
     if (g_millenniumThread && g_millenniumThread->joinable()) {
         g_millenniumThread->join();

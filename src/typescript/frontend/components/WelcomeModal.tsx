@@ -34,7 +34,7 @@ import Markdown from 'markdown-to-jsx';
 import { locale } from '../utils/localization-manager';
 import { JSX, useEffect } from 'react';
 
-export const WelcomeModalComponent = (): JSX.Element => {
+export const WelcomeModalComponent = (): JSX.Element | null => {
 	useEffect(() => {
 		if (settingsManager.config.misc.hasShownWelcomeModal) {
 			return;

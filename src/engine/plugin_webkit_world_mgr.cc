@@ -51,17 +51,15 @@ webkit_world_mgr::~webkit_world_mgr()
     m_shutdown.store(true, std::memory_order_release);
 
     /** unregister all event listeners to prevent new callbacks */
-    m_client->off("Target.targetCreated");
-    m_client->off("Target.targetDestroyed");
-    m_client->off("Target.targetInfoChanged");
-    m_client->off("Runtime.executionContextCreated");
+    for (int token : m_listener_tokens) {
+        m_client->off(token);
+    }
 
     logger.log("Successfully shut down webkit_world_mgr...");
 }
 
 void webkit_world_mgr::initialize()
 {
-    /** setup event listeners FIRST before any cdp commands to avoid race conditions */
     setup_event_listeners();
 
     const json discover_params = {
@@ -69,13 +67,10 @@ void webkit_world_mgr::initialize()
     };
 
     try {
-        m_client->send_host("Target.setDiscoverTargets", discover_params).get();
+        m_client->send_host("Target.setDiscoverTargets", discover_params);
     } catch (const std::exception& e) {
-        LOG_ERROR("webkit_world_mgr: failed to enable target discovery: {}", e.what());
-        throw;
+        LOG_ERROR("webkit_world_mgr: failed to send setDiscoverTargets: {}", e.what());
     }
-
-    attach_to_existing_targets();
 }
 
 bool webkit_world_mgr::is_valid_target_url(const std::string& url) const
@@ -88,47 +83,17 @@ bool webkit_world_mgr::is_valid_target_url(const std::string& url) const
         return false;
     }
 
-    if (url.find("https://steamloopback.host/index.html") == 0) {
+    if (url.find("https://steamloopback.host/") == 0) {
         return false;
     }
 
-    return true;
-}
-
-void webkit_world_mgr::attach_to_existing_targets()
-{
-    try {
-        auto result = m_client->send_host("Target.getTargets", json::object()).get();
-
-        if (!result.contains("targetInfos") || !result["targetInfos"].is_array()) {
-            LOG_ERROR("webkit_world_mgr: invalid response from Target.getTargets - missing or invalid targetInfos");
-            return;
+    for (const auto& pattern : g_js_hook_blacklist) {
+        if (std::regex_match(url, std::regex(pattern))) {
+            return false;
         }
-
-        const auto& target_infos = result["targetInfos"];
-
-        for (const auto& target_info : target_infos) {
-            if (!target_info.contains("canAccessOpener") || !target_info.contains("url") || !target_info.contains("targetId")) {
-                continue;
-            }
-
-            /** skip targets that can access their opener, they are Steam UI windows spawned by the SharedJS context */
-            if (target_info["canAccessOpener"].get<bool>()) {
-                continue;
-            }
-
-            std::string url = target_info["url"].get<std::string>();
-            if (!is_valid_target_url(url)) {
-                continue;
-            }
-
-            std::string target_id = target_info["targetId"].get<std::string>();
-
-            attach_to_target(target_id);
-        }
-    } catch (const std::exception& e) {
-        LOG_ERROR("webkit_world_mgr: exception while attaching to existing targets: {}", e.what());
     }
+
+    return true;
 }
 
 void webkit_world_mgr::attach_to_target(const std::string& target_id)
@@ -232,21 +197,24 @@ import('{ftpPath}')
         return acc + fmt::format("\"{}\"", utils::url::get_url_from_path(m_ftp_url, item.abs_webkit_path.generic_string()));
     });
 
-    const std::string plugins = std::accumulate(plist.begin(), plist.end(), std::string{}, [](auto acc, auto& p) { return acc + fmt::format("'{}',", p.plugin_name); });
+    const std::string plugins = std::accumulate(plist.begin(), plist.end(), std::string{}, [](auto acc, auto& p)
+    {
+        return acc + fmt::format("'{}',", p.plugin_name);
+    });
     const std::string location = GET_GITHUB_URL_FROM_HERE();
     const std::string token = GetAuthToken();
     const std::string ftp_path = m_ftp_url + platform::get_millennium_preload_path();
     const std::string ftp_base = m_ftp_url + GetScrambledApiPathToken();
 
-    return fmt::format(                      //
-        m_api_shim_script,                   //
-        fmt::arg("location", location),      //
-        fmt::arg("ftpPath", ftp_path),       //
-        fmt::arg("token", token),            //
-        fmt::arg("plugins", plugins),        //
-        fmt::arg("legacy_shims", modules),   //
-        fmt::arg("ctx_shims", ""),           //
-        fmt::arg("ftp_base", ftp_base)       //
+    return fmt::format(                    //
+        m_api_shim_script,                 //
+        fmt::arg("location", location),    //
+        fmt::arg("ftpPath", ftp_path),     //
+        fmt::arg("token", token),          //
+        fmt::arg("plugins", plugins),      //
+        fmt::arg("legacy_shims", modules), //
+        fmt::arg("ctx_shims", ""),         //
+        fmt::arg("ftp_base", ftp_base)     //
     );
 }
 
@@ -268,8 +236,15 @@ void webkit_world_mgr::expose_millennium_to_ctx(const std::string& session_id, b
             for (auto& [tid, ctx] : m_attached_targets) {
                 if (ctx.session_id == session_id && !ctx.script_id.empty()) {
                     try {
-                        m_client->send_host("Page.removeScriptToEvaluateOnNewDocument", json{{ "identifier", ctx.script_id }}, session_id).get();
-                    } catch (...) {}
+                        m_client
+                            ->send_host("Page.removeScriptToEvaluateOnNewDocument",
+                                        json{
+                                            { "identifier", ctx.script_id }
+                        },
+                                        session_id)
+                            .get();
+                    } catch (...) {
+                    }
                     ctx.script_id.clear();
                     break;
                 }
@@ -417,7 +392,7 @@ void webkit_world_mgr::target_change_hdlr(const json& params)
 
 void webkit_world_mgr::setup_event_listeners()
 {
-    m_client->on("Target.targetCreated", std::bind(&webkit_world_mgr::target_create_hdlr, this, std::placeholders::_1));
-    m_client->on("Target.targetDestroyed", std::bind(&webkit_world_mgr::target_destroy_hdlr, this, std::placeholders::_1));
-    m_client->on("Target.targetInfoChanged", std::bind(&webkit_world_mgr::target_change_hdlr, this, std::placeholders::_1));
+    m_listener_tokens.push_back(m_client->on("Target.targetCreated", std::bind(&webkit_world_mgr::target_create_hdlr, this, std::placeholders::_1)));
+    m_listener_tokens.push_back(m_client->on("Target.targetDestroyed", std::bind(&webkit_world_mgr::target_destroy_hdlr, this, std::placeholders::_1)));
+    m_listener_tokens.push_back(m_client->on("Target.targetInfoChanged", std::bind(&webkit_world_mgr::target_change_hdlr, this, std::placeholders::_1)));
 }

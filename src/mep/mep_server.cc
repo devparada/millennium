@@ -194,7 +194,7 @@ void server::start()
 
     ::DeleteFileA(m_socket_path.c_str());
 
-    m_server_fd = static_cast<socket_t>(::WSASocket(AF_UNIX, SOCK_STREAM, 0, nullptr, 0, WSA_FLAG_NO_HANDLE_INHERIT));
+    m_server_fd = static_cast<socket_t>(::WSASocketW(AF_UNIX, SOCK_STREAM, 0, nullptr, 0, WSA_FLAG_NO_HANDLE_INHERIT));
     if (m_server_fd == INVALID_SOCKET) {
         m_running = false;
         throw std::system_error(WSAGetLastError(), std::system_category(), "mep: WSASocket()");
@@ -301,9 +301,18 @@ void server::handle_client(socket_t fd)
     auto subs = std::make_shared<client_subscriptions>();
     auto ctx = std::make_shared<client_context>();
 
-    ctx->push = [this, fd](const nlohmann::json& event) -> bool { return write_frame(fd, nlohmann::json::to_msgpack(event)); };
-    ctx->subscribe = [subs, fd](std::function<void()> cancel_fn) -> std::string { return subs->subscribe(std::move(cancel_fn), fd); };
-    ctx->unsubscribe = [subs](const std::string& id) -> bool { return subs->unsubscribe(id); };
+    ctx->push = [this, fd](const nlohmann::json& event) -> bool
+    {
+        return write_frame(fd, nlohmann::json::to_msgpack(event));
+    };
+    ctx->subscribe = [subs, fd](std::function<void()> cancel_fn) -> std::string
+    {
+        return subs->subscribe(std::move(cancel_fn), fd);
+    };
+    ctx->unsubscribe = [subs](const std::string& id) -> bool
+    {
+        return subs->unsubscribe(id);
+    };
 
     std::vector<uint8_t> payload;
     while (m_running) {

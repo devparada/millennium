@@ -30,7 +30,7 @@
 
 import React, { createContext, useContext, ReactNode, useState, useEffect, useCallback, useMemo } from 'react';
 import { PluginComponent, ThemeItem } from '../types';
-import { Core_FindAllPlugins, Core_FindAllThemes } from '../utils/ffi';
+import { backend } from '../utils/ffi';
 import { pluginSelf } from '@steambrew/client';
 import { Utils } from '../utils';
 import { locale } from '../utils/localization-manager';
@@ -66,11 +66,11 @@ export const DesktopMenuProvider: React.FC<DesktopMenuProviderProps> = ({ childr
 	const [focusedItemType, setFocusedItemType] = useState<DesktopSideBarFocusedItemType | undefined>(undefined);
 
 	useEffect(() => {
-		Core_FindAllPlugins().then((pluginsJson: string) => {
-			setPlugins(JSON.parse(pluginsJson));
+		backend.plugins.getPlugins().then((plugins: any) => {
+			setPlugins(plugins);
 		});
-		Core_FindAllThemes().then((themesJson: string) => {
-			setThemes(JSON.parse(themesJson));
+		backend.themes.getThemes().then((themes: any) => {
+			setThemes(themes);
 		});
 	}, []);
 

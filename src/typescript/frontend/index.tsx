@@ -38,16 +38,18 @@ import { MillenniumDesktopSidebar } from './quick-access';
 import { DesktopMenuProvider } from './quick-access/DesktopMenuContext';
 import { handleSettingsReturnNavigation, MillenniumSettings } from './settings';
 import { MillenniumQuickCssEditor } from './settings/quickcss';
-import { PluginCrashInfo, SettingsProps, SystemAccentColor, ThemeItem, ThemeItemV1 } from './types';
-import { Core_GetRootColors, Core_GetStartConfig } from './utils/ffi';
+import { PluginComponent, PluginCrashInfo, SettingsProps, SystemAccentColor, ThemeItem, ThemeItemV1 } from './types';
+import { backend } from './utils/ffi';
 import { Logger } from './utils/Logger';
 import { useQuickCssState } from './utils/quick-css-state';
 import { NotificationService } from './utils/update-notification-service';
 import { OnRunSteamURL } from './utils/url-scheme-handler';
 import { showPluginCrashModal } from './components/PluginCrashModal';
+import { showLegacyPluginModal } from './components/LegacyPluginModal';
+import { showSupersededPluginModal, SUPERSEDED_PLUGIN_NAMES } from './components/SupersededPluginModal';
 
 async function initializeMillennium(settings: SettingsProps) {
-	Logger.Log(`Received props`, settings);
+	Logger.Log(`Initialized Millennium Frontend Settings Store:`, settings);
 
 	const theme: ThemeItem = settings.active_theme;
 	const systemColors: SystemAccentColor = settings.accent_color;
@@ -63,7 +65,7 @@ async function initializeMillennium(settings: SettingsProps) {
 
 	if (theme?.data?.hasOwnProperty('RootColors')) {
 		try {
-			const rootColors = JSON.parse(await Core_GetRootColors());
+			const rootColors = await backend.themes.getRootColors();
 			pluginSelf.RootColors = rootColors;
 		} catch (error) {
 			Logger.Error('Failed to load root colors from backend', error);
@@ -82,6 +84,7 @@ async function initializeMillennium(settings: SettingsProps) {
 		updates: settings?.updates ?? [],
 		hasCheckedForUpdates: settings?.hasCheckedForUpdates ?? false,
 		buildDate: settings?.buildDate,
+		gitCommitOid: settings?.gitCommitOid,
 		millenniumUpdates: settings?.millenniumUpdates ?? {},
 		platformType: settings?.platformType,
 		millenniumLinuxUpdateScript: settings?.millenniumLinuxUpdateScript,
@@ -103,10 +106,36 @@ async function initializeMillennium(settings: SettingsProps) {
 		setTimeout(() => showPluginCrashModal(detail), remaining);
 	};
 
+	const checkLegacyPlugins = async () => {
+		try {
+			const plugins: PluginComponent[] = await backend.plugins.getPlugins();
+			const legacy = plugins.filter((p) => p.enabled && p.data.name !== 'core' && p.data.useBackend !== false && p.data.backendType !== 'lua');
+
+			if (legacy.length) {
+				const disablePayload = legacy.map((p) => ({ plugin_name: p.data.name, enabled: false }));
+				await backend.plugins.togglePlugin(JSON.stringify(disablePayload));
+			}
+
+			const superseded = plugins.filter((p) => SUPERSEDED_PLUGIN_NAMES.includes(p.data.name));
+			const nonSupersededLegacy = legacy.filter((p) => !SUPERSEDED_PLUGIN_NAMES.includes(p.data.name));
+
+			if (superseded.length && nonSupersededLegacy.length) {
+				showSupersededPluginModal(superseded, () => showLegacyPluginModal(nonSupersededLegacy));
+			} else if (superseded.length) {
+				showSupersededPluginModal(superseded);
+			} else if (legacy.length) {
+				showLegacyPluginModal(legacy);
+			}
+		} catch (e) {
+			Logger.Error('Failed to check for legacy plugins', e);
+		}
+	};
+
 	const flushCrashQueue = () => {
 		mainWindowReady = true;
 		mainWindowReadyAt = Date.now();
 		crashQueue.splice(0).forEach(showAfterDelay);
+		setTimeout(checkLegacyPlugins, 5000);
 	};
 
 	window.addEventListener('millennium-main-window-ready', flushCrashQueue, { once: true });
@@ -118,8 +147,6 @@ async function initializeMillennium(settings: SettingsProps) {
 		else crashQueue.push(detail);
 	});
 
-	/* Show crash modals for any plugins that crashed before this init.
-	   The data comes from Core_GetStartConfig — no async poll needed. */
 	if (settings?.pendingCrashes?.length) {
 		Logger.Log(`Startup config contains ${settings.pendingCrashes.length} pending crash(es)`);
 		settings.pendingCrashes.forEach((d) => crashQueue.push(d));
@@ -129,11 +156,11 @@ async function initializeMillennium(settings: SettingsProps) {
 // Entry point on the front end of your plugin
 export default async function PluginMain() {
 	try {
-		await initializeMillennium(JSON.parse(await Core_GetStartConfig()));
+		await initializeMillennium(await backend.config.getInitService());
 	} catch (error) {
 		Logger.Error('Millennium frontend initialization failed, continuing with route registration.', error);
 	}
-	Millennium.AddWindowCreateHook(onWindowCreatedCallback);
+	Millennium.AddWindowCreateHook?.(onWindowCreatedCallback);
 
 	routerHook.addRoute('/millennium/settings', () => <MillenniumSettings />, { exact: false });
 

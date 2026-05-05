@@ -65,9 +65,19 @@ class FFI_Binder {
 		{
 			resolve: (value: any) => void;
 			reject: (error: Error) => void;
+			callSite: Error;
+			raw?: boolean;
 		}
 	>();
 	private nextId = 0;
+
+	private static rejectWithCallSite(pending: { reject: (reason?: any) => void; callSite: Error }, message: string) {
+		pending.callSite.message = message;
+		const stack = pending.callSite.stack ?? '';
+		const nl = stack.indexOf('\n');
+		pending.callSite.stack = `Error: ${message}` + (nl >= 0 ? stack.slice(nl) : '');
+		pending.reject(pending.callSite);
+	}
 
 	/** Capture the full call stack. */
 	private getCaller(): string {
@@ -86,17 +96,18 @@ class FFI_Binder {
 		return '';
 	}
 
-	async call(payloadType: IpcMethod, pluginName: string, methodName: string | number, argumentList: any): Promise<any> {
+	async call(payloadType: IpcMethod, pluginName: string, methodName: string | number, argumentList: any, callSite?: Error, raw?: boolean): Promise<any> {
 		if (typeof (window as any).__private_millennium_ffi_do_not_use__ !== 'function') {
 			console.error("Millennium FFI is not available in this context. To use the FFI, make sure you've selected the 'millennium' context");
 			return;
 		}
 
 		const requestId = this.nextId++;
+		if (!callSite) callSite = new Error();
 		const caller = this.getCaller();
 
 		return new Promise((resolve, reject) => {
-			this.pendingRequests.set(requestId, { resolve, reject });
+			this.pendingRequests.set(requestId, { resolve, reject, callSite, raw });
 			(window as any).__private_millennium_ffi_do_not_use__(
 				JSON.stringify({
 					id: payloadType,
@@ -121,9 +132,9 @@ class FFI_Binder {
 
 		this.pendingRequests.delete(requestId);
 		if (response.success) {
-			pending.resolve(JSON.stringify(response.returnJson));
+			pending.resolve(pending.raw ? (response.returnJson ?? null) : JSON.stringify(response.returnJson));
 		} else {
-			pending.reject(new Error('Millennium Error: ' + (response.returnJson || 'Unknown error') + '\n\n\nMillennium internal traceback'));
+			FFI_Binder.rejectWithCallSite(pending, 'Millennium Error: ' + (response.returnJson || 'Unknown error'));
 		}
 	}
 
@@ -139,11 +150,11 @@ const ffiBinder = new FFI_Binder();
 window.MILLENNIUM_PRIVATE_INTERNAL_FOREIGN_FUNCTION_INTERFACE_DO_NOT_USE = ffiBinder;
 
 export const Millennium = {
-	callServerMethod: (pluginName: string, methodName: string, kwargs?: any) => {
+	callServerMethod: (pluginName: string, methodName: string, kwargs?: any, callSite?: Error) => {
 		if (methodName.startsWith('frontend:')) {
-			return ffiBinder.call(IpcMethod.CALL_FRONTEND_METHOD, pluginName, methodName.substring(9), kwargs);
+			return ffiBinder.call(IpcMethod.CALL_FRONTEND_METHOD, pluginName, methodName.substring(9), kwargs, callSite);
 		}
-		return ffiBinder.call(IpcMethod.CALL_SERVER_METHOD, pluginName, methodName, kwargs);
+		return ffiBinder.call(IpcMethod.CALL_SERVER_METHOD, pluginName, methodName, kwargs, callSite);
 	},
 
 	findElement: (doc: Document, selector: string, timeout?: number): Promise<NodeListOf<Element>> =>
@@ -182,14 +193,24 @@ export const Millennium = {
 // @ts-expect-error. The types don't have pluginName on callServerMethod, but it is used in the client.
 window.Millennium = Millennium;
 
-// Callable wrapper — creates a reusable RPC function for a given route.
 export function callable(pluginNameOrFn: string | ((...args: any[]) => any), route: string) {
 	if (typeof pluginNameOrFn === 'function') {
-		// Old API: callable(__call_server_method__, route)
-		// __call_server_method__(route, ...args) → Millennium.callServerMethod(pluginName, route, ...args)
 		return (...args: any[]) => pluginNameOrFn(route, ...args);
 	}
-	return (...args: any[]) => Millennium.callServerMethod(pluginNameOrFn, route, ...args);
+	return (...args: any[]) => {
+		const callSite = new Error();
+		return Millennium.callServerMethod(pluginNameOrFn, route, args[0], callSite);
+	};
+}
+
+export function ffi(pluginName: string, route: string) {
+	return (...args: any[]) => {
+		const callSite = new Error();
+		const frontend = route.startsWith('frontend:');
+		const method = frontend ? IpcMethod.CALL_FRONTEND_METHOD : IpcMethod.CALL_SERVER_METHOD;
+		const methodName = frontend ? route.substring(9) : route;
+		return ffiBinder.call(method, pluginName, methodName, args, callSite, true);
+	};
 }
 
 // Only define pluginSelf if on loopback host
@@ -232,11 +253,8 @@ async function _configCall(pluginName: string, method: ConfigMethod, args: Recor
 
 export const pluginConfig = {
 	get: <T = any>(pluginName: string, key: string): Promise<T> => _configCall(pluginName, ConfigMethod.GET, { key }),
-
 	set: (pluginName: string, key: string, value: any): Promise<void> => _configCall(pluginName, ConfigMethod.SET, { key, value }),
-
 	delete: (pluginName: string, key: string): Promise<void> => _configCall(pluginName, ConfigMethod.DELETE, { key }),
-
 	getAll: <T = Record<string, any>>(pluginName: string): Promise<T> => _configCall(pluginName, ConfigMethod.GET_ALL, {}),
 };
 

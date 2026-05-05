@@ -28,7 +28,7 @@
  * SOFTWARE.
  */
 
-import { DialogButton, DialogButtonPrimary, Field, IconsModule, joinClassNames, ProgressBarWithInfo } from '@steambrew/client';
+import { DialogButton, Field, IconsModule, joinClassNames } from '@steambrew/client';
 import { settingsClasses } from '../../utils/classes';
 import { Component, createRef, ReactNode } from 'react';
 import Markdown from 'markdown-to-jsx';
@@ -68,7 +68,7 @@ interface UpdateCardState {
 }
 
 export class UpdateCard extends Component<UpdateCardProps, UpdateCardState> {
-	private descriptionRef: React.RefObject<HTMLDivElement>;
+	private descriptionRef: React.RefObject<HTMLDivElement | null>;
 	private descriptionHeight: number = 0;
 
 	constructor(props: UpdateCardProps) {
@@ -106,7 +106,7 @@ export class UpdateCard extends Component<UpdateCardProps, UpdateCardState> {
 	}
 
 	private showInteractables() {
-		const { isUpdating, statusText, progress, onUpdateClick, update, toolTipText } = this.props;
+		const { isUpdating, statusText, onUpdateClick, update, toolTipText } = this.props;
 
 		if (isUpdating) {
 			return (

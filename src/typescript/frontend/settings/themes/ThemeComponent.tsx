@@ -28,15 +28,14 @@
  * SOFTWARE.
  */
 
-import { callable, DialogButton, Field, IconsModule, joinClassNames, Menu, MenuItem, pluginSelf, showContextMenu, showModal } from '@steambrew/client';
+import { ffi, DialogButton, Field, IconsModule, joinClassNames, Menu, MenuItem, pluginSelf, showContextMenu } from '@steambrew/client';
 import { ThemeItem } from '../../types';
 import { DesktopTooltip, Separator } from '../../components/SteamComponents';
-import { RenderThemeEditor } from '../../components/ThemeEditor';
 import { Utils } from '../../utils';
 import { formatString, locale } from '../../utils/localization-manager';
 import { SiKofi } from 'react-icons/si';
 import { Component } from 'react';
-import { Core_UninstallTheme } from '../../utils/ffi';
+import { backend } from '../../utils/ffi';
 import { IconButton } from '../../components/IconButton';
 import { settingsClasses } from '../../utils/classes';
 import { useQuickAccessStore } from '../../quick-access/quickAccessStore';
@@ -67,7 +66,7 @@ export const ChangeActiveTheme = async (themeName: string, reloadProps: UIReload
 		return false;
 	}
 
-	await callable<[{ theme_name: string }]>('Core_ChangeActiveTheme')({ theme_name: themeName });
+	await ffi<[string]>('Core_ChangeActiveTheme')(themeName);
 
 	return new Promise((resolve) => {
 		switch (reloadProps) {
@@ -131,10 +130,10 @@ export class ThemeItemComponent extends Component<ThemeItemComponentProps, Theme
 	async uninstallTheme() {
 		const { theme, fetchThemes } = this.props;
 
-		const shouldUninstall = await Utils.ShowMessageBox(formatString(locale.themeUninstallConfirm, theme.data.name), locale.strHeadsUp);
+		const shouldUninstall = await Utils.ShowMessageBox(formatString(locale.themeUninstallConfirm, theme.data.name ?? ''), locale.strHeadsUp);
 		if (!shouldUninstall) return;
 
-		Core_UninstallTheme({ owner: theme.data.github.owner, repo: theme.data.github.repo_name }).then(() => {
+		backend.themes.uninstall(theme.data.github?.owner ?? '', theme.data.github?.repo_name ?? '').then(() => {
 			if (this.isActive) {
 				SteamClient.Browser.RestartJSContext();
 			} else {
@@ -144,11 +143,10 @@ export class ThemeItemComponent extends Component<ThemeItemComponentProps, Theme
 	}
 
 	showCtxMenu(event: React.MouseEvent<HTMLButtonElement>) {
-		const { theme, onChangeTheme, onUseDefault } = this.props;
-		const isActive = this.isActive;
+		const { theme } = this.props;
 
 		showContextMenu(
-			<Menu label={theme?.data?.name}>
+			<Menu label={theme?.data?.name ?? ''}>
 				<MenuItem disabled tone="emphasis" bInteractableItem={false}>
 					{theme?.data?.name} {theme?.data?.version && <>v{theme.data.version}</>}
 				</MenuItem>
@@ -176,7 +174,7 @@ export class ThemeItemComponent extends Component<ThemeItemComponentProps, Theme
 					<span className="MillenniumThemes_Author">
 						{formatString(locale.strByAuthor, name)}
 						{theme?.data?.github?.owner && (
-							<a onClick={() => Utils.OpenUrl('https://github.com/' + theme.data.github.owner)}>{`(${theme?.data?.github?.owner})`}</a>
+							<a onClick={() => Utils.OpenUrl('https://github.com/' + theme.data.github?.owner)}>{`(${theme?.data?.github?.owner})`}</a>
 						)}
 					</span>
 				)}
@@ -216,7 +214,7 @@ export class ThemeItemComponent extends Component<ThemeItemComponentProps, Theme
 						{/* <IconButton> doesn't allow for react-icons, etc. */}
 						<DialogButton
 							className={joinClassNames('MillenniumButton', 'MillenniumIconButton', settingsClasses.SettingsDialogButton)}
-							onClick={() => Utils.OpenUrl('https://ko-fi.com/' + theme.data.funding.kofi)}
+							onClick={() => Utils.OpenUrl('https://ko-fi.com/' + theme.data.funding?.kofi)}
 							data-icon-name={name}
 						>
 							<SiKofi />
@@ -224,7 +222,7 @@ export class ThemeItemComponent extends Component<ThemeItemComponentProps, Theme
 					</DesktopTooltip>
 				)}
 
-				<IconButton name="KaratDown" onClick={this.showCtxMenu} text={locale.strShowMenu} />
+				<IconButton name="KaratDown" onClick={(ev) => this.showCtxMenu(ev as React.MouseEvent<HTMLButtonElement>)} text={locale.strShowMenu} />
 			</Field>
 		);
 	}

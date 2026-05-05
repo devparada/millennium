@@ -2,18 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { EditorView, basicSetup } from 'codemirror';
 import { css } from '@codemirror/lang-css';
 import { vscodeDark } from '@uiw/codemirror-theme-vscode';
-import {
-	callable,
-	Classes,
-	DialogBody,
-	DialogButton,
-	DialogControlsSection,
-	DialogHeader,
-	Field,
-	findModuleDetailsByExport,
-	IconsModule,
-	pluginSelf,
-} from '@steambrew/client';
+import { ffi, DialogButton, DialogControlsSection, DialogHeader, Field, IconsModule, Millennium, pluginSelf, Toggle } from '@steambrew/client';
 import { ViewUpdate } from '@codemirror/view';
 import ReactDOM from 'react-dom';
 import {
@@ -30,8 +19,9 @@ import {
 	windowHandler,
 } from '../../components/SteamComponents';
 import { settingsClasses } from '../../utils/classes';
-import { setEditorCode, setIsMillenniumOpen, useQuickCssState } from '../../utils/quick-css-state';
+import { setEditorCode, setIsMillenniumOpen, setIsWatching, useQuickCssState } from '../../utils/quick-css-state';
 import { locale } from '../../utils/localization-manager';
+import { backend } from '../../utils/ffi';
 import Styles from '../../utils/styles';
 
 function UpdateStylesLive(cssContent: string) {
@@ -45,23 +35,29 @@ function UpdateStylesLive(cssContent: string) {
 
 export async function LoadStylesFromDisk(): Promise<string> {
 	try {
-		return JSON.parse(await callable<[], string>('Core_LoadQuickCss')());
-	} catch (error) {
-		try {
-			return await callable<[], string>('Core_LoadQuickCss')();
-		} catch {
-			console.warn('Failed to load styles from disk!');
-		}
+		return await ffi<[], string>('Core_LoadQuickCss')();
+	} catch {
+		console.warn('Failed to load styles from disk!');
 	}
 
 	return String();
 }
 
 export function SaveStylesToDisk(cssContent: string) {
-	callable<[{ css: string }]>('Core_SaveQuickCss')({ css: cssContent });
-	pluginSelf.quickCSS = cssContent;
+	ffi<[string]>('Core_SaveQuickCss')(cssContent);
+	pluginSelf.quickCss = cssContent;
 	UpdateStylesLive(cssContent);
 }
+
+/* called from the millennium backend */
+async function OnQuickCssFileChanged() {
+	const cssContent = await LoadStylesFromDisk();
+	setEditorCode(cssContent);
+	pluginSelf.quickCss = cssContent;
+	UpdateStylesLive(cssContent);
+}
+
+Millennium.exposeObj?.({ OnQuickCssFileChanged });
 
 export const MillenniumQuickCssEditor = () => {
 	const g_ModalManagerInstance = g_ModalManager();
@@ -127,8 +123,9 @@ export const MillenniumQuickCssEditor = () => {
 		strClassName: 'DialogMenuPosition',
 	};
 
-	const editorRef = useRef(null);
+	const editorRef = useRef<EditorView | null>(null);
 	const containerRef = useRef(null);
+	const isLocalEdit = useRef(false);
 
 	useEffect(() => {
 		if (containerRef.current && !editorRef.current) {
@@ -140,6 +137,7 @@ export const MillenniumQuickCssEditor = () => {
 					vscodeDark,
 					EditorView.updateListener.of((update: ViewUpdate) => {
 						if (update.docChanged) {
+							isLocalEdit.current = true;
 							const content = update.state.doc.toString();
 							SaveStylesToDisk(content);
 							setEditorCode(content);
@@ -152,6 +150,17 @@ export const MillenniumQuickCssEditor = () => {
 
 		return () => editorRef.current?.destroy();
 	}, [element]);
+
+	useEffect(() => {
+		if (isLocalEdit.current) {
+			isLocalEdit.current = false;
+			return;
+		}
+		const view = editorRef.current;
+		if (view && editorCode !== view.state.doc.toString()) {
+			view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: editorCode } });
+		}
+	}, [editorCode]);
 
 	return (
 		element &&
@@ -190,13 +199,26 @@ function getCssStats(cssContent: string) {
 	return { rules, bytes, kilobytes };
 }
 
+function useQuickCssFileWatcher(isWatching: boolean) {
+	useEffect(() => {
+		if (!isWatching) return undefined;
+
+		backend.quickCss.registerWatcher();
+		return () => {
+			backend.quickCss.destroyWatcher();
+		};
+	}, [isWatching]);
+}
+
 /**
  * Quick CSS View Modal
  * @returns A React component that displays information about Quick CSS and provides a button to open the editor.
  */
 export function QuickCssViewModal() {
-	const { editorCode } = useQuickCssState();
+	const { editorCode, isWatching } = useQuickCssState();
 	const [cssStats, setCssStats] = useState<{ rules: number; bytes: number; kilobytes: string } | null>(null);
+
+	useQuickCssFileWatcher(isWatching);
 
 	useEffect(() => {
 		LoadStylesFromDisk().then((cssContent) => {
@@ -225,6 +247,10 @@ export function QuickCssViewModal() {
 					</Field>
 				</DialogControlsSection>
 			)}
+
+			<Field label={locale.quickCssWatchFileDescription} icon={<IconsModule.Browse />}>
+				<Toggle value={isWatching} onChange={(enabled) => setIsWatching(enabled)} />
+			</Field>
 
 			<Field label={locale.quickCssStatusLoaded} bottomSeparator="none" icon={<IconsModule.Checkmark color="green" />}>
 				<DialogButton onClick={() => setIsMillenniumOpen(true)} className={settingsClasses.SettingsDialogButton}>

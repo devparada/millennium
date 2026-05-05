@@ -28,6 +28,7 @@
  * SOFTWARE.
  */
 
+#include "millennium/encoding.h"
 #include "millennium/auth.h"
 #include "millennium/core_ipc.h"
 #include "millennium/logger.h"
@@ -38,9 +39,6 @@
 #include <cstdint>
 #include <fmt/core.h>
 #include <functional>
-
-#include <websocketpp/config/asio_no_tls.hpp>
-#include <websocketpp/server.hpp>
 
 using namespace std::placeholders;
 
@@ -143,7 +141,7 @@ ipc_main::vm_call_result ipc_main::handle_core_server_method(const json& call)
         const auto& args = call["data"].contains("argumentList") ? call["data"]["argumentList"] : json::object();
 
         ordered_json result = backend->ipc_message_hdlr(functionName, args);
-        return { true, nlohmann::json(result) };
+        return { true, std::move(result) };
     }
     /** the internal c ipc method threw an exception */
     catch (const std::exception& ex) {
@@ -157,7 +155,7 @@ ipc_main::vm_call_result ipc_main::handle_core_server_method(const json& call)
  * @param {json} message - A JSON message containing the method to be called and its arguments.
  * @returns {json} - A JSON response with the result of the server method call.
  */
-json ipc_main::call_server_method(const json& call)
+ordered_json ipc_main::call_server_method(const json& call)
 {
     const auto& data = call["data"];
     if (!data.contains("pluginName")) {
@@ -172,7 +170,7 @@ json ipc_main::call_server_method(const json& call)
 
     const auto response = pluginName == "core" ? handle_core_server_method(call) : this->lua_evaluate(pluginName, call["data"]);
 
-    json responseMessage{
+    ordered_json responseMessage{
         { "success",    response.success },
         { "pluginName", pluginName       }
     };
@@ -194,7 +192,7 @@ json ipc_main::call_server_method(const json& call)
  * @param {json} message - A JSON message containing the plugin name and event data.
  * @returns {json} - A JSON response indicating success.
  */
-json ipc_main::on_front_end_loaded(const json& call)
+ordered_json ipc_main::on_front_end_loaded(const json& call)
 {
     const std::string pluginName = call["data"]["pluginName"];
 
@@ -217,7 +215,7 @@ json ipc_main::on_front_end_loaded(const json& call)
     };
 }
 
-json ipc_main::plugin_config_method(const json& call)
+ordered_json ipc_main::plugin_config_method(const json& call)
 {
     const auto& data = call["data"];
     if (!data.contains("pluginName")) {
@@ -237,7 +235,7 @@ json ipc_main::plugin_config_method(const json& call)
 
     const auto response = handle_plugin_config(pluginName, static_cast<config_method>(method), data);
 
-    json responseMessage{
+    ordered_json responseMessage{
         { "success",    response.success },
         { "pluginName", pluginName       }
     };
@@ -258,7 +256,10 @@ ipc_main::vm_call_result ipc_main::handle_plugin_config(const std::string& plugi
 
     auto to_result = [](const plugin_config::result& r) -> vm_call_result
     {
-        return { r.success, r.success ? r.value : std::variant<std::monostate, bool, uint64_t, int64_t, double, std::string, json>(r.value.get<std::string>()) };
+        if (r.success) {
+            return { true, ordered_json(r.value) };
+        }
+        return { false, r.value.get<std::string>() };
     };
 
     try {
@@ -285,7 +286,7 @@ ipc_main::vm_call_result ipc_main::handle_plugin_config(const std::string& plugi
     }
 }
 
-json ipc_main::call_frontend_method(const json& call)
+ordered_json ipc_main::call_frontend_method(const json& call)
 {
     std::vector<javascript_parameter> params;
 
@@ -337,10 +338,10 @@ json ipc_main::call_frontend_method(const json& call)
  * such as `CallServerMethod` or `OnFrontEndLoaded`. If any exceptions are caught, they are sent back
  * as error messages.
  */
-json ipc_main::process_message(const json payload)
+ordered_json ipc_main::process_message(const json payload)
 {
     try {
-        const std::unordered_map<int, std::function<nlohmann::json(nlohmann::json)>> handlers = {
+        const std::unordered_map<int, std::function<nlohmann::ordered_json(nlohmann::json)>> handlers = {
             { ipc_main::ipc_method::CALL_SERVER_METHOD,   std::bind(&ipc_main::call_server_method,   this, _1) },
             { ipc_main::ipc_method::FRONT_END_LOADED,     std::bind(&ipc_main::on_front_end_loaded,  this, _1) },
             { ipc_main::ipc_method::CALL_FRONTEND_METHOD, std::bind(&ipc_main::call_frontend_method, this, _1) },
@@ -350,7 +351,7 @@ json ipc_main::process_message(const json payload)
         int messageId = payload["id"].get<int>();
         auto it = handlers.find(messageId);
 
-        return it != handlers.end() ? it->second(payload) : nlohmann::json{};
+        return it != handlers.end() ? it->second(payload) : nlohmann::ordered_json{};
     } catch (const nlohmann::detail::exception& ex) {
         return {
             { "error", fmt::format("JSON parsing error: {}", ex.what()) },

@@ -50,7 +50,6 @@
 class webkit_world_mgr
 {
   public:
-
     explicit webkit_world_mgr(std::shared_ptr<cdp_client> client, std::shared_ptr<plugin_manager> plugin_manager, std::shared_ptr<network_hook_ctl> network_hook_ctl,
                               std::shared_ptr<plugin_webkit_store> plugin_webkit_store);
     ~webkit_world_mgr();
@@ -79,13 +78,13 @@ class webkit_world_mgr
     std::mutex m_inflight_mutex;
 
     std::atomic<bool> m_shutdown{ false };
+    std::vector<int> m_listener_tokens;
 
     /** separate thread pool for attachment operations to avoid deadlock */
     std::shared_ptr<thread_pool> m_attachment_pool;
 
     /** kick off discovery and attach to existing targets */
     void initialize();
-    void attach_to_existing_targets();
     void attach_to_target(const std::string& target_id);
     void expose_millennium_to_ctx(const std::string& session_id, bool can_reload);
     void setup_event_listeners();

@@ -1,7 +1,4 @@
 cmake_minimum_required(VERSION 3.10)
-message(STATUS "[hhx64] Using compiler: ${CMAKE_CXX_COMPILER}")
-
-include(FetchContent)
 project(hhx64 CXX)
 include(${MILLENNIUM_BASE}/scripts/cmake/millennium_version.cmake)
 
@@ -12,6 +9,7 @@ set(VERSION_TRADEMARK1   "All Rights Reserved")
 set(VERSION_DESCRIPTION  "A hook utility library for Millennium")
 set(VERSION_FILENAME     "${MILLENNIUM_HOOK_HELPER_OUTPUT_NAME}")
 set(VERSION_PRODUCT      "Millennium Webhelper Hook")
+set(VERSION_FILETYPE     "VFT_DLL")
 
 set(VERSION_FILE "${CMAKE_BINARY_DIR}/${MILLENNIUM_HOOK_HELPER_OUTPUT_NAME}.rc")
 
@@ -37,36 +35,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(BUILD_STATIC_LIBS ON)
-set(ABSL_ENABLE_INSTALL ON)
-set(ABSL_PROPAGATE_CXX_STD ON)
-set(ABSL_MSVC_STATIC_RUNTIME ON)
 set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS OFF)
-
-function(millennium_process_package input_path)
-    if(EXISTS "${input_path}/CMakeLists.txt")
-        file(READ "${input_path}/CMakeLists.txt" CMAKELISTS_CONTENTS)
-        string(REGEX REPLACE "cmake_minimum_required[ \t]*\\([ \t]*VERSION[^)]*\\)" "cmake_minimum_required(VERSION 3.21)" CMAKELISTS_CONTENTS "${CMAKELISTS_CONTENTS}")
-        file(WRITE "${input_path}/CMakeLists.txt" "${CMAKELISTS_CONTENTS}")
-    else()
-        message(WARNING "Could not find ${input_path} to patch.")
-    endif()
-endfunction()
-if(DISTRO_NIX)
-    FetchContent_Declare(abseil SOURCE_DIR "${MILLENNIUM_BASE}/deps/abseil"     SOURCE_SUBDIR fakedir)
-    FetchContent_Declare(re2    SOURCE_DIR "${MILLENNIUM_BASE}/deps/re2"        SOURCE_SUBDIR fakedir)
-else()
-    FetchContent_Declare(abseil GIT_REPOSITORY https://github.com/abseil/abseil-cpp GIT_TAG 20240722.0 SOURCE_SUBDIR fakedir)
-    FetchContent_Declare(re2    GIT_REPOSITORY https://github.com/google/re2        GIT_TAG 2025-11-05 SOURCE_SUBDIR fakedir)
-endif()
-
-FetchContent_MakeAvailable(abseil re2)
-
-millennium_process_package("${abseil_SOURCE_DIR}")
-millennium_process_package("${re2_SOURCE_DIR}")
-
-add_subdirectory("${abseil_SOURCE_DIR}" "${abseil_BINARY_DIR}")
-add_subdirectory("${re2_SOURCE_DIR}"    "${re2_BINARY_DIR}"   )
-
 
 include_directories("${MILLENNIUM_BASE}/src/include")
 include_directories("${snare_SOURCE_DIR}")
@@ -102,6 +71,10 @@ endif()
 if(APPLE)
     target_link_libraries(hhx64 "-framework AppKit" "-framework QuartzCore")
 endif()
+
+include(FetchContent)
+FetchContent_GetProperties(re2)
+add_subdirectory("${re2_SOURCE_DIR}" "${re2_BINARY_DIR}")
 
 target_link_libraries(hhx64 re2)
 set_target_properties(hhx64 PROPERTIES

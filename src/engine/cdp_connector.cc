@@ -28,116 +28,341 @@
  * SOFTWARE.
  */
 
-#include "millennium/cmdline_parse.h"
-#include "millennium/cdp_api.h"
-#include "millennium/http.h"
-#include "millennium/logger.h"
 #include "millennium/cdp_connector.h"
-
-#include <websocketpp/client.hpp>
-#include <websocketpp/config/asio_no_tls_client.hpp>
+#include "millennium/logger.h"
 
 #include <fmt/format.h>
 
-socket_utils::socket_utils() : m_debugger_port(get_steam_debugger_port())
+#ifdef _WIN32
+#include <windows.h>
+#include <mutex>
+#include <condition_variable>
+#include <thread>
+#include "millennium/millennium_lifecycle.h"
+
+extern HANDLE g_cdp_pipe_read;
+extern HANDLE g_cdp_pipe_write;
+extern std::mutex g_cdp_pipe_mutex;
+extern std::condition_variable g_cdp_pipe_cv;
+extern std::atomic<bool> g_cdp_pipes_ready;
+
+static bool pipe_send(HANDLE hWrite, const std::string& payload)
 {
-    logger.log("Opting to use '{}' for SteamDBG port", m_debugger_port);
+    std::string msg = payload;
+    msg.push_back('\0');
+
+    const char* data = msg.data();
+    DWORD remaining = static_cast<DWORD>(msg.size());
+
+    while (remaining > 0) {
+        DWORD written = 0;
+        if (!WriteFile(hWrite, data, remaining, &written, nullptr)) {
+            LOG_ERROR("CDP pipe write failed (error {})", GetLastError());
+            return false;
+        }
+        data += written;
+        remaining -= written;
+    }
+    return true;
 }
 
-const std::string socket_utils::get_steam_browser_context()
+static void pipe_read_loop(HANDLE hRead, std::shared_ptr<cdp_client> cdp)
 {
-    try {
-        std::string browser_url = fmt::format("{}/json/version", this->get_steam_debugger_url());
-        json instance = nlohmann::json::parse(Http::Get(browser_url.c_str(), true, 5L));
+    std::string buffer;
+    char chunk[4096];
 
-        return instance["webSocketDebuggerUrl"];
-    } catch (nlohmann::detail::exception& exception) {
-        LOG_ERROR("An error occurred while making a connection to Steam browser context. It's likely that the debugger port '{}' is in use by another process. exception -> {}",
-                  m_debugger_port, exception.what());
-        std::exit(1);
+    while (cdp->is_active()) {
+        DWORD bytesRead = 0;
+        if (!ReadFile(hRead, chunk, sizeof(chunk), &bytesRead, nullptr)) {
+            DWORD err = GetLastError();
+            if (err == ERROR_BROKEN_PIPE) {
+                logger.log("CDP pipe closed by remote end.");
+            } else if (err == ERROR_OPERATION_ABORTED) {
+                logger.log("CDP pipe read cancelled.");
+            } else {
+                LOG_ERROR("CDP pipe read failed (error {})", err);
+            }
+            break;
+        }
+
+        if (bytesRead == 0) {
+            continue;
+        }
+
+        buffer.append(chunk, bytesRead);
+
+        /** extract null-terminated messages */
+        size_t pos;
+        while ((pos = buffer.find('\0')) != std::string::npos) {
+            std::string message = buffer.substr(0, pos);
+            buffer.erase(0, pos + 1);
+
+            if (!message.empty()) {
+                cdp->handle_message(message);
+            }
+        }
     }
 }
 
 void socket_utils::connect_socket(std::shared_ptr<socket_utils::socket_t> socket_props)
 {
-    std::string socket_url;
     std::string name = socket_props->name;
-    auto fetch_socket_url = socket_props->fetch_socket_url;
     auto on_connect_cb = socket_props->on_connect;
 
-    try {
-        socket_url = fetch_socket_url();
-    } catch (HttpError& exception) {
-        logger.warn("Failed to get Steam browser context: {}", exception.GetMessage());
-        return;
-    }
-
-    if (socket_url.empty()) {
-        LOG_ERROR("[{}] Socket URL is empty. Aborting connection.", name);
-        return;
-    }
-
-    websocketpp::client<websocketpp::config::asio_client> socket_client;
-    std::shared_ptr<cdp_client> cdp;
-
-    try {
-        socket_client.set_access_channels(websocketpp::log::alevel::none);
-        socket_client.clear_error_channels(websocketpp::log::elevel::none);
-        socket_client.set_error_channels(websocketpp::log::elevel::none);
-        socket_client.init_asio();
-
-        if (!on_connect_cb) {
-            LOG_ERROR("[{}] Invalid event handlers. Connection aborted.", name);
-            return;
-        }
-
-        websocketpp::lib::error_code ec;
-        auto con = socket_client.get_connection(socket_url, ec);
-        if (ec) {
-            LOG_ERROR("[{}] Failed to get_connection: {} [{}]", name, ec.message(), ec.value());
-            return;
-        }
-
-        cdp = std::make_shared<cdp_client>(con);
-        con->set_message_handler([cdp = cdp, name](websocketpp::connection_hdl, auto msg) { cdp->handle_message(msg->get_payload()); });
-
-        con->set_open_handler([cdp = cdp, on_connect_cb, name](websocketpp::connection_hdl h)
+    {
+        std::unique_lock<std::mutex> lock(g_cdp_pipe_mutex);
+        g_cdp_pipe_cv.wait(lock, []
         {
-            try {
-                if (auto locked = h.lock()) {
-                    on_connect_cb(cdp);
-                }
-            } catch (const std::exception& e) {
-                LOG_ERROR("[{}] Exception in onConnect: {}", name, e.what());
-            } catch (...) {
-                LOG_ERROR("[{}] Unknown exception in onConnect", name);
-            }
+            return g_cdp_pipes_ready.load();
         });
-
-        socket_client.connect(con);
-        socket_client.run();
-
-    } catch (const websocketpp::exception& ex) {
-        LOG_ERROR("[{}] WebSocket exception thrown -> {}", name, ex.what());
-    } catch (const std::exception& ex) {
-        LOG_ERROR("[{}] Standard exception caught -> {}", name, ex.what());
-    } catch (...) {
-        LOG_ERROR("[{}] Unknown exception caught.", name);
     }
 
-    logger.log("[{}] Shutting down CDP client...", name);
-    if (cdp) {
+    if (g_cdp_pipe_read == INVALID_HANDLE_VALUE || g_cdp_pipe_write == INVALID_HANDLE_VALUE) {
+        LOG_ERROR("[{}] CDP pipes are not available. Cannot connect.", name);
+        return;
+    }
+
+    if (!on_connect_cb) {
+        LOG_ERROR("[{}] Invalid event handlers. Connection aborted.", name);
+        return;
+    }
+
+    HANDLE hWrite = g_cdp_pipe_write;
+    auto cdp = std::make_shared<cdp_client>([hWrite](const std::string& payload) -> bool
+    {
+        return pipe_send(hWrite, payload);
+    });
+
+    logger.log("[{}] CDP pipe transport connected.", name);
+
+    /** start the read loop on a background thread so messages flow immediately */
+    std::thread read_thread([hRead = g_cdp_pipe_read, cdp, name]()
+    {
+        pipe_read_loop(hRead, cdp);
+        logger.log("[{}] CDP pipe read loop exited.", name);
+    });
+
+    try {
+        on_connect_cb(cdp);
+    } catch (const std::exception& e) {
+        LOG_ERROR("[{}] Exception in onConnect: {}", name, e.what());
+    }
+
+    HANDLE read_thread_handle = read_thread.native_handle();
+    std::thread terminate_watcher([cdp, read_thread_handle]()
+    {
+        millennium_lifecycle::get().terminate.wait();
+        CancelSynchronousIo(read_thread_handle);
         cdp->shutdown();
+    });
+
+    if (read_thread.joinable()) {
+        read_thread.join();
     }
+
+    cdp->shutdown();
+
+    if (terminate_watcher.joinable()) {
+        terminate_watcher.join();
+    }
+
     logger.log("Disconnected from [{}] module...", name);
 }
 
-unsigned short socket_utils::get_steam_debugger_port()
+#elif __linux__
+
+#include <unistd.h>
+#include <poll.h>
+#include <sys/eventfd.h>
+#include <mutex>
+#include <condition_variable>
+#include <thread>
+#include "millennium/millennium_lifecycle.h"
+
+extern int g_cdp_pipe_read_fd;
+extern int g_cdp_pipe_write_fd;
+extern int g_cdp_pipe_change_efd;
+extern std::mutex g_cdp_pipe_mutex;
+extern std::condition_variable g_cdp_pipe_cv;
+extern std::atomic<bool> g_cdp_pipes_ready;
+
+static bool pipe_send(int fd, const std::string& payload)
 {
-    return CommandLineArguments::get_remote_debugger_port();
+    std::string msg = payload;
+    msg.push_back('\0');
+
+    const char* data = msg.data();
+    ssize_t remaining = static_cast<ssize_t>(msg.size());
+
+    while (remaining > 0) {
+        ssize_t written = write(fd, data, static_cast<size_t>(remaining));
+        if (written < 0) {
+            LOG_ERROR("CDP pipe write failed (errno {})", errno);
+            return false;
+        }
+        data += written;
+        remaining -= written;
+    }
+    return true;
 }
 
-const std::string socket_utils::get_steam_debugger_url()
+static void pipe_read_loop(int data_fd, int cancel_fd, int pipe_change_fd, std::shared_ptr<cdp_client> cdp)
 {
-    return fmt::format("http://127.0.0.1:{}", m_debugger_port);
+    std::string buffer;
+    char chunk[4096];
+
+    struct pollfd pfds[3] = {
+        { data_fd,        POLLIN, 0 },
+        { cancel_fd,      POLLIN, 0 },
+        { pipe_change_fd, POLLIN, 0 },
+    };
+    const int nfds = (pipe_change_fd >= 0) ? 3 : 2;
+
+    while (cdp->is_active()) {
+        int r = poll(pfds, nfds, -1);
+        if (r < 0) {
+            if (errno == EINTR) continue;
+            LOG_ERROR("CDP pipe poll failed (errno {})", errno);
+            break;
+        }
+
+        if (pfds[1].revents & POLLIN) {
+            logger.log("CDP pipe read cancelled.");
+            break;
+        }
+
+        if (pipe_change_fd >= 0 && (pfds[2].revents & POLLIN)) {
+            uint64_t val;
+            [[maybe_unused]] ssize_t _ = read(pipe_change_fd, &val, sizeof(val));
+            logger.log("CDP pipe replaced (steamwebhelper restarted), reconnecting...");
+            cdp->shutdown();
+            break;
+        }
+
+        if (pfds[0].revents & (POLLHUP | POLLERR | POLLNVAL)) {
+            logger.log("CDP pipe closed or error.");
+            break;
+        }
+
+        if (!(pfds[0].revents & POLLIN)) continue;
+
+        ssize_t n = read(data_fd, chunk, sizeof(chunk));
+        if (n < 0) {
+            LOG_ERROR("CDP pipe read failed (errno {})", errno);
+            break;
+        }
+        if (n == 0) {
+            logger.log("CDP pipe closed by remote end.");
+            break;
+        }
+
+        buffer.append(chunk, static_cast<size_t>(n));
+
+        size_t pos;
+        while ((pos = buffer.find('\0')) != std::string::npos) {
+            std::string message = buffer.substr(0, pos);
+            buffer.erase(0, pos + 1);
+            if (!message.empty()) {
+                cdp->handle_message(message);
+            }
+        }
+    }
 }
+
+void socket_utils::connect_socket(std::shared_ptr<socket_utils::socket_t> socket_props)
+{
+    std::string name = socket_props->name;
+    auto on_connect_cb = socket_props->on_connect;
+
+    {
+        std::unique_lock<std::mutex> lock(g_cdp_pipe_mutex);
+        g_cdp_pipe_cv.wait(lock, []
+        {
+            return g_cdp_pipes_ready.load();
+        });
+    }
+
+    if (g_cdp_pipe_read_fd < 0 || g_cdp_pipe_write_fd < 0) {
+        LOG_ERROR("[{}] CDP pipes are not available. Cannot connect.", name);
+        return;
+    }
+
+    if (!on_connect_cb) {
+        LOG_ERROR("[{}] Invalid event handlers. Connection aborted.", name);
+        return;
+    }
+
+    int cancel_fd = eventfd(0, EFD_CLOEXEC);
+    if (cancel_fd < 0) {
+        LOG_ERROR("[{}] Failed to create cancel eventfd (errno {})", name, errno);
+        return;
+    }
+
+    int read_fd = g_cdp_pipe_read_fd;
+    int write_fd = g_cdp_pipe_write_fd;
+
+    if (g_cdp_pipe_change_efd >= 0) {
+        uint64_t val;
+        [[maybe_unused]] ssize_t _ = read(g_cdp_pipe_change_efd, &val, sizeof(val));
+    }
+
+    auto cdp = std::make_shared<cdp_client>([write_fd](const std::string& payload) -> bool
+    {
+        return pipe_send(write_fd, payload);
+    });
+
+    logger.log("[{}] CDP pipe transport connected.", name);
+
+    std::thread read_thread([read_fd, cancel_fd, cdp, name]()
+    {
+        pipe_read_loop(read_fd, cancel_fd, g_cdp_pipe_change_efd, cdp);
+        logger.log("[{}] CDP pipe read loop exited.", name);
+    });
+
+    try {
+        on_connect_cb(cdp);
+    } catch (const std::exception& e) {
+        LOG_ERROR("[{}] Exception in onConnect: {}", name, e.what());
+    }
+
+    auto connection_closed = std::make_shared<std::atomic<bool>>(false);
+
+    std::thread terminate_watcher([cdp, cancel_fd, connection_closed]()
+    {
+        std::unique_lock<std::mutex> lk(millennium_lifecycle::get().terminate.mtx);
+        millennium_lifecycle::get().terminate.cv.wait(lk, [&]
+        {
+            return millennium_lifecycle::get().terminate.flag.load() || connection_closed->load();
+        });
+
+        if (millennium_lifecycle::get().terminate.flag.load()) {
+            const uint64_t val = 1;
+            [[maybe_unused]] ssize_t _ = write(cancel_fd, &val, sizeof(val));
+            cdp->shutdown();
+        }
+    });
+
+    if (read_thread.joinable()) {
+        read_thread.join();
+    }
+
+    cdp->shutdown();
+
+    connection_closed->store(true);
+    millennium_lifecycle::get().terminate.cv.notify_all();
+
+    if (terminate_watcher.joinable()) {
+        terminate_watcher.join();
+    }
+
+    close(cancel_fd);
+    close(read_fd);
+    close(write_fd);
+    logger.log("Disconnected from [{}] module...", name);
+}
+#else
+void socket_utils::connect_socket(std::shared_ptr<socket_utils::socket_t> socket_props)
+{
+    LOG_ERROR("[{}] CDP pipe transport is not available on this platform.", socket_props->name);
+}
+#endif

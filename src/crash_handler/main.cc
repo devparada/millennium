@@ -149,6 +149,16 @@ static void handle_crash(HANDLE steam_process, const crash_ipc_region* shm)
 
 int main(int argc, char* argv[])
 {
+    if (argc < 2) {
+        SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+        MessageBoxA(nullptr,
+                    "This is an internal Millennium runtime component.\n"
+                    "It is not meant to be run directly.\n\n"
+                    "Please launch Steam with Millennium instead.",
+                    "millennium.crashhandler64.exe", MB_OK | MB_ICONINFORMATION);
+        return 1;
+    }
+
     uint32_t steam_pid = 0;
     HANDLE steam_process = nullptr;
 

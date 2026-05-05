@@ -143,6 +143,8 @@ export interface Plugin {
 	description?: string;
 	venv?: string;
 	version?: string;
+	useBackend?: boolean;
+	backendType?: string;
 	__private_browser_extension?: boolean;
 }
 
@@ -222,7 +224,8 @@ export interface SettingsProps {
 		updateInProgress: boolean;
 	};
 
-	buildDate: string;
+    buildDate: string;
+    gitCommitOid: string;
 	platformType: OSType;
 	millenniumLinuxUpdateScript?: string;
 	quickCss: string;
@@ -261,8 +264,8 @@ export interface IProgressProps {
 }
 
 export interface InstallerProps {
-	updateInstallerState: (element: React.ReactNode) => void;
-	ShowMessageBox: (message: React.ReactNode, title: React.ReactNode, props?: ConfirmModalProps) => void;
+	updateInstallerState: (element: React.ReactElement) => void;
+	ShowMessageBox: (message: React.ReactNode, title: React.ReactNode, props?: ConfirmModalProps) => void | Promise<unknown>;
 	modal: ShowModalResult;
 	refetchDataCb?: () => void;
 }

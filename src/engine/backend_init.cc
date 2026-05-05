@@ -70,12 +70,11 @@ void backend_initializer::compat_restore_shared_js_context()
     }
 
     if (libraryChunkJS.empty()) {
-        platform::messagebox::show(
-                    "Millennium",
-                    "Millennium failed to find a key library used by Steam. "
-                    "Let our developers know if you see this message, it's likely a bug.\n"
-                    "You can reach us over at steambrew.app/discord",
-                    platform::messagebox::error);
+        platform::messagebox::show("Millennium",
+                                   "Millennium failed to find a key library used by Steam. "
+                                   "Let our developers know if you see this message, it's likely a bug.\n"
+                                   "You can reach us over at steambrew.app/discord",
+                                   platform::messagebox::error);
 
         return;
     }

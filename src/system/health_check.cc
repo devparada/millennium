@@ -31,10 +31,12 @@
 #include "millennium/filesystem.h"
 #include "millennium/logger.h"
 #include "millennium/health_check.h"
-#include "millennium/plat_msg.h"
 #include <filesystem>
 #include <vector>
 
+#ifdef _WIN32
+#include "millennium/plat_msg.h"
+#endif
 /**
  * The following keys in "Steam.cfg" block Steam from updating, which
  * breaks Millennium as Millennium requires the latest version of Steam.
@@ -66,7 +68,10 @@ void platform::health::check_health()
     if (std::filesystem::exists(steam_cfg)) {
         try {
             const std::string steamConfig = platform::read_file(steam_cfg.string());
-            if (std::any_of(blackListedKeys.begin(), blackListedKeys.end(), [&](const auto& key) { return steamConfig.find(key) != std::string::npos; })) {
+            if (std::any_of(blackListedKeys.begin(), blackListedKeys.end(), [&](const auto& key)
+            {
+                return steamConfig.find(key) != std::string::npos;
+            })) {
                 show_bootstrap_error();
             }
         } catch (const platform::file_exception&) {

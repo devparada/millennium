@@ -45,8 +45,8 @@ struct crash_handler_ctx
 
     bool (*is_watchdog_available)();
     void (*write_shm_fields)(crash_ipc_region* shm); /* extra SHM fields, null = none */
-    void (*fallback_write)(EXCEPTION_POINTERS* ep);   /* in-process fallback */
-    bool terminate_after_crash;                        /* TerminateProcess vs EXCEPTION_CONTINUE_SEARCH */
+    void (*fallback_write)(EXCEPTION_POINTERS* ep);  /* in-process fallback */
+    bool terminate_after_crash;                      /* TerminateProcess vs EXCEPTION_CONTINUE_SEARCH */
 };
 
 /* ctx must outlive the process (static global) */
@@ -63,9 +63,6 @@ struct crash_handler_signal_ctx
     bool chain_to_previous;
 };
 
-void crash_handler_core_install_signals(
-    crash_handler_signal_ctx* ctx,
-    const int* signals,
-    int num_signals);
+void crash_handler_core_install_signals(crash_handler_signal_ctx* ctx, const int* signals, int num_signals);
 
 #endif

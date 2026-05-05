@@ -31,9 +31,6 @@
 #pragma once
 #include "millennium/cdp_api.h"
 
-#include <websocketpp/client.hpp>
-#include <websocketpp/config/asio_no_tls_client.hpp>
-
 #include <fmt/format.h>
 
 class socket_utils
@@ -42,17 +39,8 @@ class socket_utils
     struct socket_t
     {
         std::string name;
-        std::function<std::string()> fetch_socket_url;
         std::function<void(std::shared_ptr<cdp_client>)> on_connect;
     };
 
-    socket_utils();
-
-    const std::string get_steam_browser_context();
     void connect_socket(std::shared_ptr<socket_t> socket_props);
-
-  private:
-    unsigned short m_debugger_port;
-    unsigned short get_steam_debugger_port();
-    const std::string get_steam_debugger_url();
 };

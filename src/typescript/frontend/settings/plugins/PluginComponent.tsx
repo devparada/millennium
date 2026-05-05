@@ -29,14 +29,14 @@
  */
 
 import { Field, IconsModule, Menu, MenuItem, showContextMenu, Toggle } from '@steambrew/client';
-import { Component } from 'react';
+import React, { Component } from 'react';
 import { IconButton } from '../../components/IconButton';
 import { DesktopTooltip, Separator } from '../../components/SteamComponents';
 import { DesktopSideBarFocusedItemType } from '../../quick-access/DesktopMenuContext';
 import { useQuickAccessStore } from '../../quick-access/quickAccessStore';
 import { PluginComponent } from '../../types';
 import { Utils } from '../../utils';
-import { Core_UninstallPlugin, PluginConfig_GetAll, PluginConfig_DeleteAll } from '../../utils/ffi';
+import { backend } from '../../utils/ffi';
 import { formatString, locale } from '../../utils/localization-manager';
 import { MillenniumIcons } from '../../components/Icons';
 import { showPluginCrashModal } from '../../components/PluginCrashModal';
@@ -52,6 +52,7 @@ interface PluginComponentProps {
 	refetchPlugins: () => Promise<void>;
 	allPlugins: Array<PluginComponent>;
 	isPluginConfigurable: boolean;
+	isLegacy: boolean;
 }
 
 enum TooltipType {
@@ -69,25 +70,25 @@ export class RenderPluginComponent extends Component<PluginComponentProps> {
 	async uninstallPlugin() {
 		const { plugin, refetchPlugins } = this.props;
 
-		const shouldUninstall = await Utils.ShowMessageBox(formatString(locale.pluginUninstallConfirm, plugin.data.common_name), locale.strHeadsUp);
+		const shouldUninstall = await Utils.ShowMessageBox(formatString(locale.pluginUninstallConfirm, plugin.data.common_name ?? ''), locale.strHeadsUp);
 		if (!shouldUninstall) return;
 
-		const success = JSON.parse(await Core_UninstallPlugin({ pluginName: plugin.data.name }));
+		const success = await backend.plugins.uninstall(plugin.data.name);
 
 		if (success == false) {
-			Utils.ShowMessageBox(formatString(locale.pluginUninstallFailed, plugin.data.common_name), locale.errorMessageTitle, {
+			Utils.ShowMessageBox(formatString(locale.pluginUninstallFailed, plugin.data.common_name ?? ''), locale.errorMessageTitle, {
 				bAlertDialog: true,
 			});
 		} else {
 			try {
-				const configData = JSON.parse(await PluginConfig_GetAll({ pluginName: plugin.data.name }));
+				const configData = await backend.config.plugins.getAll(plugin.data.name);
 				if (configData && Object.keys(configData).length > 0) {
 					const shouldDelete = await Utils.ShowMessageBox(
-						formatString(locale.pluginDeleteConfigPrompt ?? 'Do you want to delete saved settings for {0}?', plugin.data.common_name),
+						formatString(locale.pluginDeleteConfigPrompt ?? 'Do you want to delete saved settings for {0}?', plugin.data.common_name ?? ''),
 						locale.strHeadsUp,
 					);
 					if (shouldDelete) {
-						await PluginConfig_DeleteAll({ pluginName: plugin.data.name });
+						await backend.config.plugins.removeAll(plugin.data.name);
 					}
 				}
 			} catch {
@@ -108,9 +109,7 @@ export class RenderPluginComponent extends Component<PluginComponentProps> {
 		});
 	}
 
-	onExtensionSettings() {
-		const { plugin } = this.props;
-	}
+	onExtensionSettings() {}
 
 	showCtxMenu(e: React.MouseEvent<HTMLButtonElement>) {
 		const { plugin, isPluginConfigurable } = this.props;
@@ -148,7 +147,18 @@ export class RenderPluginComponent extends Component<PluginComponentProps> {
 	}
 
 	getTooltipContent() {
-		const { plugin, hasErrors, hasWarnings } = this.props;
+		const { plugin, hasErrors, hasWarnings, isLegacy } = this.props;
+
+		if (isLegacy) {
+			return {
+				type: TooltipType.Error,
+				content: (
+					<DesktopTooltip toolTipContent={locale.legacyPluginDisabledTooltip} direction="top">
+						<IconsModule.ExclamationPoint color="red" />
+					</DesktopTooltip>
+				),
+			};
+		}
 
 		if (plugin.data.__private_browser_extension) {
 			return {
@@ -162,11 +172,12 @@ export class RenderPluginComponent extends Component<PluginComponentProps> {
 		}
 
 		if (plugin.status === 'crashed' && plugin.crash) {
+			const crash = plugin.crash;
 			return {
 				type: TooltipType.Error,
 				content: (
-					<DesktopTooltip toolTipContent={formatString(locale.pluginCrashedTooltip, plugin.data.common_name)} direction="top">
-						<div style={{ cursor: 'pointer' }} onClick={() => showPluginCrashModal(plugin.crash, this.props.refetchPlugins)}>
+					<DesktopTooltip toolTipContent={formatString(locale.pluginCrashedTooltip, plugin.data.common_name ?? '')} direction="top">
+						<div style={{ cursor: 'pointer' }} onClick={() => showPluginCrashModal(crash, this.props.refetchPlugins)}>
 							<IconsModule.ExclamationPoint color="red" />
 						</div>
 					</DesktopTooltip>
@@ -185,7 +196,7 @@ export class RenderPluginComponent extends Component<PluginComponentProps> {
 		return {
 			type: status.type,
 			content: (
-				<DesktopTooltip toolTipContent={formatString(locale[status.localeKey], plugin?.data?.common_name)} direction="top">
+				<DesktopTooltip toolTipContent={formatString(locale[status.localeKey] ?? '', plugin?.data?.common_name ?? '')} direction="top">
 					<IconsModule.ExclamationPoint color={status.color} />
 				</DesktopTooltip>
 			),
@@ -219,8 +230,13 @@ export class RenderPluginComponent extends Component<PluginComponentProps> {
 				data-plugin-common-name={plugin.data.common_name}
 				data-plugin-status={type}
 			>
-				<Toggle key={plugin.data.name} disabled={plugin.data.name === 'core'} value={isEnabled} onChange={onSelectionChange.bind(null, index)} />
-				<IconButton name="KaratDown" onClick={this.showCtxMenu} text={locale.strShowMenu} />
+				<Toggle
+					key={plugin.data.name}
+					disabled={plugin.data.name === 'core' || this.props.isLegacy}
+					value={this.props.isLegacy ? false : isEnabled}
+					onChange={() => onSelectionChange(index)}
+				/>
+				<IconButton name="KaratDown" onClick={(ev) => this.showCtxMenu(ev as React.MouseEvent<HTMLButtonElement>)} text={locale.strShowMenu} />
 			</Field>
 		);
 	}

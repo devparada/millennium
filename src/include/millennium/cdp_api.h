@@ -31,8 +31,6 @@
 #pragma once
 #include "millennium/thread_pool.h"
 #include "millennium/types.h"
-#include <websocketpp/client.hpp>
-#include <websocketpp/config/asio_no_tls_client.hpp>
 #include <nlohmann/json.hpp>
 #include <functional>
 #include <unordered_map>
@@ -56,11 +54,11 @@
 class cdp_client : public std::enable_shared_from_this<cdp_client>
 {
   public:
-    using ws_client = websocketpp::client<websocketpp::config::asio_client>;
+    using send_fn = std::function<bool(const std::string&)>;
     using event_callback = std::function<void(const json&)>;
     using error_callback = std::function<void(const std::string&, const std::exception&)>;
 
-    explicit cdp_client(ws_client::connection_ptr conn);
+    explicit cdp_client(send_fn sender);
     ~cdp_client();
 
     cdp_client(const cdp_client&) = delete;
@@ -84,11 +82,16 @@ class cdp_client : public std::enable_shared_from_this<cdp_client>
     /**
      * subscribe to cdp events by method name.
      * callbacks run on a thread pool, so they won't block message processing.
+     * returns a token that can be passed to off() to remove this specific listener.
+     * multiple listeners can be registered for the same event.
      */
-    void on(const std::string& event, event_callback callback);
+    int on(const std::string& event, event_callback callback);
 
-    /** unsubscribe from a cdp event */
-    void off(const std::string& event);
+    /** remove a specific event listener by its registration token */
+    void off(int token);
+
+    /** remove ALL listeners for an event (use sparingly, prefer token-based removal) */
+    void off_all(const std::string& event);
 
     /**
      * set a handler for internal errors (parsing failures, callback exceptions, etc).
@@ -111,6 +114,12 @@ class cdp_client : public std::enable_shared_from_this<cdp_client>
         m_shared_js_session_id = sessionId;
     }
 
+    /** get the session id for the shared js context */
+    const std::string& get_shared_js_session_id() const
+    {
+        return m_shared_js_session_id;
+    }
+
     /** check if the client is still running */
     bool is_active() const
     {
@@ -130,7 +139,7 @@ class cdp_client : public std::enable_shared_from_this<cdp_client>
         std::atomic<bool> completed{ false }; // prevents double-completing promises
     };
 
-    ws_client::connection_ptr m_conn;
+    send_fn m_sender;
     std::atomic<int> m_next_id{ 1 }; // cdp message ids increment per request
     std::atomic<bool> m_shutdown{ false };
 
@@ -138,15 +147,23 @@ class cdp_client : public std::enable_shared_from_this<cdp_client>
     std::mutex m_requests_mutex;
     std::unordered_map<int, std::shared_ptr<async_request>> m_pending_requests;
 
-    /** event subscriptions (e.g., "Page.frameNavigated") */
+    /** event subscriptions (e.g., "Page.frameNavigated"). multiple listeners per event */
+    struct event_listener
+    {
+        int token;
+        std::shared_ptr<event_callback> callback;
+    };
     std::shared_mutex m_events_mutex;
-    std::unordered_map<std::string, std::shared_ptr<event_callback>> m_event_callbacks;
+    std::unordered_map<std::string, std::vector<event_listener>> m_event_callbacks;
+    std::atomic<int> m_next_event_token{ 1 };
+    /** reverse lookup token → event name (for token-based removal) */
+    std::unordered_map<int, std::string> m_token_to_event;
 
     /** optional error callback for non-fatal issues */
     std::mutex m_error_mutex;
     error_callback m_error_handler;
 
-    /** prevents concurrent sends on the websocket */
+    /** prevents concurrent sends on the transport */
     std::mutex m_send_mutex;
 
     /** background thread that times out stale requests */

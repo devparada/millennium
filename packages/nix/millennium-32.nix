@@ -17,7 +17,7 @@
 }:
 pkgsi686Linux.stdenv.mkDerivation (finalAttrs: {
   pname = "millennium-32";
-  version = "2.34.0";
+  version = "2.36.0";
 
   src = inputs.millennium-src;
 
@@ -123,6 +123,7 @@ pkgsi686Linux.stdenv.mkDerivation (finalAttrs: {
     mkdir -p $out/lib/
     install -Dm755 src/libmillennium_x86.so                      $out/lib/libmillennium_x86.so
     install -Dm755 src/boot/linux/libmillennium_bootstrap_x86.so $out/lib/libmillennium_bootstrap_x86.so
+    install -Dm755 libmillennium_pvs64                           $out/lib/libmillennium_pvs64
 
     runHook postInstall
   '';

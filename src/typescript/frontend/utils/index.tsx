@@ -32,7 +32,7 @@ import { ConfirmModal, ConfirmModalProps, pluginSelf, showModal } from '@steambr
 import { PluginComponent } from '../types';
 import { Logger } from './Logger';
 import { SteamLocale } from './localization-manager';
-import { Core_FindAllPlugins } from './ffi';
+import { backend } from './ffi';
 
 export namespace Utils {
 	export function BrowseLocalFolder(path: string) {
@@ -45,7 +45,7 @@ export namespace Utils {
 	}
 
 	export async function GetPluginAssetUrl(): Promise<string> {
-		const plugins: Array<PluginComponent> = JSON.parse(await Core_FindAllPlugins());
+		const plugins: Array<PluginComponent> = await backend.plugins.getPlugins();
 		const injectedScript = Array.from(document.scripts).find((script) => script.id === 'millennium-injected');
 
 		if (!injectedScript || !injectedScript.src) {
@@ -53,7 +53,9 @@ export namespace Utils {
 		}
 
 		const url = new URL(injectedScript.src);
-		const pluginPath = plugins.find((plugin) => plugin?.data?.name === 'core').path.replace(/\\/g, '/');
+		const corePlugin = plugins.find((plugin) => plugin?.data?.name === 'core');
+		if (!corePlugin) return String();
+		const pluginPath = corePlugin.path.replace(/\\/g, '/');
 
 		const encoded = pluginPath
 			.split('/')
@@ -79,7 +81,7 @@ export namespace Utils {
 
 	export const URLComponent = ({ url }: { url: string }) => {
 		return (
-			<a href="#" onClick={Utils.OpenUrl.spread(url)}>
+			<a href="#" onClick={Utils.OpenUrl.bind(null, url)}>
 				{url}
 			</a>
 		);
@@ -118,15 +120,3 @@ export namespace Utils {
 		});
 	};
 }
-
-type Drop<N extends number, T extends any[], I extends any[] = []> = I['length'] extends N ? T : T extends [any, ...infer R] ? Drop<N, R, [any, ...I]> : [];
-
-declare global {
-	interface Function {
-		spread<Args extends any[], R, Bound extends Partial<Args>>(this: (...args: Args) => R, ...boundArgs: Bound): (...args: Drop<Bound['length'], Args>) => R;
-	}
-}
-
-Function.prototype.spread = function (...boundArgs: any[]) {
-	return this.bind(null, ...boundArgs);
-};

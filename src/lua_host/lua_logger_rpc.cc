@@ -38,8 +38,8 @@ static void send_log(const char* level, const char* message)
     if (!g_rpc) return;
 
     g_rpc->notify(plugin_ipc::child_method::LOG, {
-        { "level",   level   },
-        { "message", message }
+                                                     { "level",   level   },
+                                                     { "message", message }
     });
 }
 

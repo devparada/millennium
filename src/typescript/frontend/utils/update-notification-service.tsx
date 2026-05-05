@@ -29,7 +29,6 @@
  */
 
 import { IconsModule, pluginSelf, sleep, toaster, Navigation } from '@steambrew/client';
-import { Logger } from './Logger';
 import { settingsManager } from './settings-manager';
 import { OnMillenniumUpdate } from '../types';
 import { MillenniumIcons } from '../components/Icons';
@@ -53,7 +52,6 @@ export class NotificationService {
 		await sleep(1000); // Wait for the toaster to be ready
 
 		if (this.libraryUpdateCount === 0) {
-			Logger.Log('No updates found, skipping notification.');
 			return;
 		}
 
@@ -93,7 +91,6 @@ export class NotificationService {
 		}
 
 		if (!pluginSelf?.millenniumUpdates?.hasUpdate) {
-			Logger.Log('No Millennium updates found, skipping notification.');
 			return;
 		}
 

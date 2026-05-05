@@ -27,7 +27,7 @@ export function parseTheme(incomingPatches: Patch[]) {
 	};
 
 	let newMatchRegexStrings: Set<string> = new Set(incomingPatches.map((patch: Patch) => patch.MatchRegexString));
-	let filteredPatches: Patch[] = patches.Patches.filter((patch: Patch) => !newMatchRegexStrings.has(patch.MatchRegexString));
+	let filteredPatches: Patch[] = (patches.Patches ?? []).filter((patch: Patch) => !newMatchRegexStrings.has(patch.MatchRegexString));
 
 	return filteredPatches.concat(incomingPatches) as Patch[];
 }

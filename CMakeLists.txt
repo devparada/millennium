@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.21)
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>" CACHE STRING "Static MSVC Runtime Library" FORCE)
-set(MILLENNIUM_BASE            ${CMAKE_SOURCE_DIR}                     CACHE PATH   "Base path to Millennium source"   )
+set(MILLENNIUM_BASE            ${CMAKE_SOURCE_DIR})
 
 project(MillenniumBuildSlave)
 add_compile_definitions(MILLENNIUM_$<IF:$<CONFIG:Debug>,DEBUG,RELEASE> MILLENNIUM_64BIT)
@@ -25,10 +25,10 @@ endif()
 
 # Millennium lua host that runs the backend in a sandbox.
 if(WIN32)
-    set(MILLENNIUM_RTB_NAME "millennium.luavm64" CACHE STRING "Lua VM executable name")
-    set(MILLENNIUM_CRASH_HANDLER_NAME "millennium.crashhandler64" CACHE STRING "Crash handler executable name")
+    set(MILLENNIUM_RTB_NAME "millennium.luavm64")
+    set(MILLENNIUM_CRASH_HANDLER_NAME "millennium.crashhandler64")
 else()
-    set(MILLENNIUM_RTB_NAME "libmillennium_luavm_x86" CACHE STRING "Lua VM executable name")
+    set(MILLENNIUM_RTB_NAME "libmillennium_luavm_x86")
 endif()
 
 add_compile_definitions(__MILLENNIUM_OUTPUT_NAME__="${MILLENNIUM_OUTPUT_NAME}")

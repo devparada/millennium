@@ -32,7 +32,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { produce } from 'immer';
 import { Millennium } from '@steambrew/client';
 import { settingsManager } from './settings-manager';
-import { Core_GetBackendConfig, Core_SetBackendConfig } from './ffi';
+import { backend } from './ffi';
 import { AppConfig } from './AppConfig';
 
 type ConfigContextType = {
@@ -49,17 +49,15 @@ const OnBackendConfigUpdate = (config: string) => {
 };
 
 /** Expose the function to allow it to be callable from the backend */
-Millennium.exposeObj({ OnBackendConfigUpdate });
+Millennium.exposeObj?.({ OnBackendConfigUpdate });
 
-const GetBackendConfig = async (): Promise<AppConfig> => JSON.parse(await Core_GetBackendConfig()) as AppConfig;
-const SetBackendConfig = async (config: AppConfig): Promise<void> => config && (await Core_SetBackendConfig({ config: JSON.stringify(config), skip_propagation: true }));
+const GetBackendConfig = async (): Promise<AppConfig> => (await backend.config.millennium.getConfig()) as AppConfig;
+const SetBackendConfig = async (config: AppConfig): Promise<void> => config && (await backend.config.millennium.setConfig(JSON.stringify(config), true));
 
 export const ConfigProvider = ({ children }: { children: React.ReactNode }) => {
 	const [config, setConfig] = useState<AppConfig>(settingsManager.getConfig());
-	const [isLocalUpdate, setIsLocalUpdate] = useState<boolean>(false);
 
 	const OnConfigChange = (event: CustomEvent<AppConfig>) => {
-		setIsLocalUpdate(false); // Reset the flag when receiving backend updates
 		setConfig(event.detail);
 		settingsManager.setConfigDirect(event.detail);
 	};
@@ -78,24 +76,20 @@ export const ConfigProvider = ({ children }: { children: React.ReactNode }) => {
 	}, []);
 
 	const updateConfig = useCallback((recipe: (draft: AppConfig) => void) => {
-		setIsLocalUpdate(true); // Set the flag when making local updates
-		setConfig((prev: AppConfig) => {
-			const next = produce(prev!, recipe);
-			settingsManager.setConfigDirect(next);
-			return next;
+		const next = produce(settingsManager.getConfig()!, recipe);
+		setConfig(next);
+		settingsManager.setConfigDirect(next);
+		SetBackendConfig(next).catch(() => {
+			GetBackendConfig().then((cfg) => {
+				setConfig(cfg);
+				settingsManager.setConfigDirect(cfg);
+			});
 		});
 	}, []);
 
 	useEffect(() => {
 		settingsManager.setUpdateFunction(updateConfig);
 	}, [updateConfig]);
-
-	useEffect(() => {
-		if (!isLocalUpdate) {
-			return; // Don't propagate if this wasn't a local update
-		}
-		SetBackendConfig(config);
-	}, [config, isLocalUpdate]);
 
 	return <ConfigContext.Provider value={{ config, updateConfig }}>{children}</ConfigContext.Provider>;
 };

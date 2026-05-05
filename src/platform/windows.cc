@@ -31,14 +31,11 @@
 #ifdef _WIN32
 #include "millennium/millennium.h"
 #include "millennium/filesystem.h"
-#include "millennium/cmdline_parse.h"
+#include "millennium/cmdline_api.h"
 #include "millennium/plat_msg.h"
 #include "millennium/environment.h"
 #include "millennium/encoding.h"
-#include "millennium/http_hooks.h"
-#include "millennium/plugin_loader.h"
 #include "millennium/steam_hooks.h"
-#include "millennium/millennium_updater.h"
 #include "millennium/plat_msg.h"
 #include "shared/crash_handler.h"
 
@@ -89,34 +86,46 @@ BOOL AreFilesIdentical(LPCWSTR path1, LPCWSTR path2)
 }
 
 /**
- * Initialize Millennium webhelper hook by hardlinking it into the cef bin directory.
+ * Initialize Millennium webhelper hook by hardlinking it into the cef bin directories.
  */
 VOID Win32_AttachWebHelperHook(VOID)
 {
     const auto hookPath = platform::get_millennium_path() / "lib" / "millennium.hhx64.dll";
-    const auto targetPath = platform::get_steam_path() / "bin" / "cef" / "cef.win7x64" / "version.dll";
 
     if (!std::filesystem::exists(hookPath)) {
         platform::messagebox::show("Millennium Error", "Millennium webhelper hook is missing. Please reinstall Millennium.", platform::messagebox::error);
         return;
     }
 
-    if (!AreFilesIdentical(hookPath.wstring().c_str(), targetPath.wstring().c_str())) {
-        // Remove existing target if it exists
-        DeleteFileW(targetPath.wstring().c_str());
-    }
+    const fs::path cefDirs[] = {
+        platform::get_steam_path() / "bin" / "cef" / "cef.win7x64",
+        platform::get_steam_path() / "bin" / "cef" / "cef.win64",
+    };
 
-    if (std::filesystem::exists(targetPath)) {
-        /** target file exist, and is identical to the hook, so we don't need to hardlink */
-        return;
-    }
+    for (const auto& cefDir : cefDirs) {
+        if (!std::filesystem::exists(cefDir)) {
+            continue;
+        }
 
-    BOOL result = CreateHardLinkW(targetPath.wstring().c_str(), hookPath.wstring().c_str(), NULL);
-    if (!result) {
-        platform::messagebox::show(
-            "Millennium Error",
-            fmt::format("Failed to create hardlink for Millennium webhelper hook.\nError Code: {}\nMake sure Steam is not running and try again.", GetLastError()).c_str(),
-            platform::messagebox::error);
+        const auto targetPath = cefDir / "version.dll";
+
+        if (!AreFilesIdentical(hookPath.wstring().c_str(), targetPath.wstring().c_str())) {
+            DeleteFileW(targetPath.wstring().c_str());
+        }
+
+        if (std::filesystem::exists(targetPath)) {
+            continue;
+        }
+
+        BOOL result = CreateHardLinkW(targetPath.wstring().c_str(), hookPath.wstring().c_str(), NULL);
+        if (!result) {
+            platform::messagebox::show(
+                "Millennium Error",
+                fmt::format("Failed to create hardlink for Millennium webhelper hook.\nTarget: {}\nError Code: {}\nMake sure Steam is not running and try again.",
+                            targetPath.string(), GetLastError())
+                    .c_str(),
+                platform::messagebox::error);
+        }
     }
 }
 
@@ -262,15 +271,12 @@ static VOID Win32_MigrateLegacyLayout(VOID)
 
 VOID Win32_AttachMillennium(VOID)
 {
-    install_millennium_crash_handler();
-
-    Win32_MigrateLegacyLayout();
-
-    /** Starts the CEF arg hook, it doesn't wait for the hook to be installed, it waits for the hook to be setup */
     if (!platform::initialize_steam_hooks()) {
         platform::messagebox::show("Millennium Error", "Failed to initialize Steam hooks, Millennium cannot continue startup.", platform::messagebox::error);
     }
 
+    install_millennium_crash_handler();
+    Win32_MigrateLegacyLayout();
     Win32_MoveVersionHook();
 
     g_millennium = std::make_unique<millennium>();
@@ -297,7 +303,7 @@ VOID Win32_AttachMillennium(VOID)
 VOID Win32_DetachMillennium(VOID)
 {
     logger.print(" MAIN ", "Shutting Millennium down...", COL_MAGENTA);
-    millennium_lifecycle::get().terminate.store(true);
+    millennium_lifecycle::get().terminate.notify();
     logger.log("Waiting for Millennium thread to exit...");
 
     if (!g_millenniumThread.joinable()) {
@@ -322,6 +328,7 @@ DLL_EXPORT INT WINAPI DllMain([[maybe_unused]] HINSTANCE hinstDLL, DWORD fdwReas
         case DLL_PROCESS_ATTACH:
         {
             logger.log("Millennium-x86_64@{} attached...", MILLENNIUM_VERSION);
+            register_dll_notifications();
 
             g_millenniumThread = std::thread(Win32_AttachMillennium);
             break;
@@ -332,7 +339,7 @@ DLL_EXPORT INT WINAPI DllMain([[maybe_unused]] HINSTANCE hinstDLL, DWORD fdwReas
                 if (g_millenniumThread.joinable()) {
                     g_millenniumThread.detach();
                 }
-                g_millennium.release();
+                void(g_millennium.release());
                 break;
             }
 
