@@ -40,7 +40,7 @@ import { waitForInstallerComplete } from '../general/Installer';
 type UpdateItemType = any;
 
 const FindPluginByName = async (pluginName: string) => {
-	const allPlugins = JSON.parse(await Core_FindAllPlugins());
+	const allPlugins = await Core_FindAllPlugins();
 	return allPlugins.find((plugin: any) => plugin.data.name === pluginName);
 };
 
@@ -56,10 +56,10 @@ const StartPluginUpdate = async (ctx: UpdateContextProviderState, updateObject: 
 	const wasEnabled = (await FindPluginByName(pluginName))?.enabled;
 
 	if (wasEnabled) {
-		await Core_KillPluginBackend({ pluginName });
+		await Core_KillPluginBackend(pluginName);
 	}
 
-	const result: any = await Core_DownloadPluginUpdate({ id: updateObject?.id, name: updateObject?.pluginDirectory, commit: updateObject?.pluginInfo?.commit });
+	const result: any = await Core_DownloadPluginUpdate(updateObject?.id, updateObject?.pluginDirectory, updateObject?.pluginInfo?.commit);
 	const parsed = typeof result === 'string' ? JSON.parse(result) : result;
 	const opId: number = parsed?.opId ?? 0;
 
@@ -73,7 +73,7 @@ const StartPluginUpdate = async (ctx: UpdateContextProviderState, updateObject: 
 		}
 		setPluginProgress(key, { statusText: locale.strComplete, progress: 100 });
 		sessionStorage.setItem('millennium-settings-tab', '/millennium/settings/updates');
-		await Core_ChangePluginStatus({ pluginJson: JSON.stringify([{ plugin_name: pluginName, enabled: true }]) });
+		await Core_ChangePluginStatus(JSON.stringify([{ plugin_name: pluginName, enabled: true }]));
 		return;
 	}
 
@@ -109,8 +109,8 @@ export function PluginUpdateCard({ pluginUpdates }: { pluginUpdates: any[] }) {
 					index={index}
 					totalCount={pluginUpdates.length}
 					isUpdating={ctx.updatingPlugins[update?.id ?? update?.pluginDirectory]}
-					progress={ctx.pluginProgress[update?.id ?? update?.pluginDirectory]?.progress}
-					statusText={ctx.pluginProgress[update?.id ?? update?.pluginDirectory]?.statusText}
+					progress={ctx.pluginProgress[update?.id ?? update?.pluginDirectory]?.progress ?? 0}
+					statusText={ctx.pluginProgress[update?.id ?? update?.pluginDirectory]?.statusText ?? ''}
 					onUpdateClick={() => StartPluginUpdate(ctx, update)}
 				/>
 			))}

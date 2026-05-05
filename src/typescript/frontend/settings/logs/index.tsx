@@ -180,6 +180,7 @@ export class RenderLogViewer extends Component<{}, RenderLogViewerState> {
 
 	renderSelector() {
 		const { logData } = this.state;
+		if (!logData) return [];
 
 		/** Millennium specific logs */
 		const millenniumNames = new Set(['Millennium', 'Standard Output', 'Package Manager']);
@@ -189,7 +190,7 @@ export class RenderLogViewer extends Component<{}, RenderLogViewerState> {
 				(millenniumNames.has(item.name) ? acc.millenniumItems : acc.userPlugins).push(item);
 				return acc;
 			},
-			{ millenniumItems: [], userPlugins: [] },
+			{ millenniumItems: [] as LogData[], userPlugins: [] as LogData[] },
 		);
 
 		let components = [];
@@ -222,7 +223,7 @@ export class RenderLogViewer extends Component<{}, RenderLogViewerState> {
 			<div className="MillenniumLogs_TextContainer">
 				<div className="MillenniumLogs_ControlSection">
 					<div className="MillenniumLogs_NavContainer">
-						<DialogButton onClick={() => this.setState({ selectedLog: null })} className={`MillenniumButton ${settingsClasses.SettingsDialogButton}`}>
+						<DialogButton onClick={() => this.setState({ selectedLog: undefined })} className={`MillenniumButton ${settingsClasses.SettingsDialogButton}`}>
 							<IconsModule.Carat direction="left" />
 							{locale.strBack}
 						</DialogButton>

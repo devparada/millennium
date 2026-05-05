@@ -34,7 +34,7 @@ import { StartThemeInstaller } from '../../components/ThemeInstaller';
 import { IProgressProps } from '../../types';
 import { StartPluginInstaller } from '../../components/PluginInstaller';
 import { API_URL } from '../../utils/globals';
-import { formatString, locale } from '../../utils/localization-manager';
+import { locale } from '../../utils/localization-manager';
 import { Logger } from '../../utils/Logger';
 import { IncrementPluginDownloadFromId, IncrementThemeDownloadFromId } from '../../utils/update-bump';
 
@@ -99,7 +99,7 @@ function InstallerMessageEmitter(status: string, progress: number, isComplete: b
 	}
 }
 
-Millennium.exposeObj({ InstallerMessageEmitter });
+Millennium.exposeObj?.({ InstallerMessageEmitter });
 
 export class Installer {
 	async FetchPluginInfo(id: string) {
@@ -112,7 +112,7 @@ export class Installer {
 			const pluginInfo = await response.json();
 			return pluginInfo;
 		} catch (error) {
-			throw new Error(locale.errorFailedToFetchPlugin + error.message);
+			throw new Error(locale.errorFailedToFetchPlugin + (error as Error).message);
 		}
 	}
 
@@ -126,7 +126,7 @@ export class Installer {
 			const themeInfo = await response.json();
 			return themeInfo;
 		} catch (error) {
-			throw new Error(locale.errorFailedToFetchTheme + error.message);
+			throw new Error(locale.errorFailedToFetchTheme + (error as Error).message);
 		}
 	}
 
@@ -227,7 +227,7 @@ export class Installer {
 		}
 
 		function RenderInstallerProgress() {
-			const [event, setEvent] = useState<IProgressProps>(null);
+			const [event, setEvent] = useState<IProgressProps | null>(null);
 			const opId = renderProps.opId;
 
 			useEffect(() => {
@@ -277,7 +277,7 @@ export class Installer {
 
 			updateInstallerState!(<RenderInstallerProgress />);
 		} catch (error) {
-			ShowMessageBox(error.message, locale.errorMessageTitle);
+			ShowMessageBox((error as Error).message, locale.errorMessageTitle);
 		}
 	}
 }

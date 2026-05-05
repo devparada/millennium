@@ -3,6 +3,8 @@ import ProtocolMapping from 'devtools-protocol/types/protocol-mapping';
 /** Returnable IPC types */
 type IPCType = string | number | boolean | void;
 
+type Json = string | number | boolean | null | void | Json[] | { [key: string]: Json };
+
 /*
  Global Millennium API for developers.
 */
@@ -49,6 +51,20 @@ const callable: <
 >(
 	route: string,
 ) => (...params: Params) => Promise<Return> =
+	(_route: string) =>
+	(..._params: any[]) =>
+		Promise.resolve(undefined as any);
+
+/**
+ * Like `callable`, but allows JSON objects as positional arguments and auto-parses the JSON result.
+ *
+ * frontend:
+ * ```typescript
+ * const method = ffi<[string], MyObject>("methodName");
+ * const result = await method('value'); // result is MyObject, not a JSON string
+ * ```
+ */
+const ffi: <Params extends Json[] = [], Return extends Json | void = Json>(route: string) => (...params: Params) => Promise<Return> =
 	(_route: string) =>
 	(..._params: any[]) =>
 		Promise.resolve(undefined as any);
@@ -288,4 +304,4 @@ class MillenniumChromeDevToolsProtocolShared extends MillenniumChromeDevToolsPro
 
 const ChromeDevToolsProtocol: MillenniumChromeDevToolsProtocol = new MillenniumChromeDevToolsProtocolShared();
 const Millennium: Millennium = window.Millennium;
-export { BindPluginSettings, callable, ChromeDevToolsProtocol, Millennium, pluginConfig, subscribePluginConfig, usePluginConfig };
+export { BindPluginSettings, callable, ffi, ChromeDevToolsProtocol, Millennium, pluginConfig, subscribePluginConfig, usePluginConfig };

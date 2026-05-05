@@ -46,7 +46,7 @@ async function StartThemeUpdate(ctx: UpdateContextProviderState, updateObject: U
 	setUpdatingTheme(key, true);
 	setThemeProgress(key, { statusText: locale.strPreparing, progress: 0 });
 
-	const result: any = await Core_DownloadThemeUpdate({ native: updateObject.native });
+	const result: any = await Core_DownloadThemeUpdate(updateObject.native);
 	const parsed = typeof result === 'string' ? JSON.parse(result) : result;
 	const opId: number = parsed?.opId ?? 0;
 
@@ -85,8 +85,8 @@ export function ThemeUpdateCard({ themeUpdates }: { themeUpdates: UpdateItemType
 					index={index}
 					totalCount={themeUpdates.length}
 					isUpdating={ctx.updatingThemes[update.native]}
-					progress={ctx.themeProgress[update.native]?.progress}
-					statusText={ctx.themeProgress[update.native]?.statusText}
+					progress={ctx.themeProgress[update.native]?.progress ?? 0}
+					statusText={ctx.themeProgress[update.native]?.statusText ?? ''}
 					onUpdateClick={() => StartThemeUpdate(ctx, update)}
 				/>
 			))}

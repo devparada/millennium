@@ -28,12 +28,11 @@
  * SOFTWARE.
  */
 
-import { ConfirmModal, pluginSelf, showModal, ShowModalResult, SuspensefulImage, TextField } from '@steambrew/client';
-import React, { Component, useEffect } from 'react';
+import { ConfirmModal, pluginSelf, showModal, ShowModalResult, TextField } from '@steambrew/client';
+import React, { useEffect } from 'react';
 import { Utils } from '../../utils';
 import { locale } from '../../utils/localization-manager';
 
-import FindThemeIdGif from '../../../static/theme_id.gif';
 import { THEMES_URL } from '../../utils/globals';
 import { Installer } from '../general/Installer';
 
@@ -86,7 +85,7 @@ export async function showInstallThemeModal(refetchDataCb: () => void) {
 			setModalInstance(modal);
 		}, []);
 
-		return <ThemeIdModal refetchDataCb={refetchDataCb} installer={installer} modal={modalInstance} />;
+		return <ThemeIdModal refetchDataCb={refetchDataCb} installer={installer} modal={modalInstance!} />;
 	};
 
 	modal = showModal(<WrappedModal />, pluginSelf.mainWindow, {

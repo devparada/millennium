@@ -66,11 +66,11 @@ export const DesktopMenuProvider: React.FC<DesktopMenuProviderProps> = ({ childr
 	const [focusedItemType, setFocusedItemType] = useState<DesktopSideBarFocusedItemType | undefined>(undefined);
 
 	useEffect(() => {
-		Core_FindAllPlugins().then((pluginsJson: string) => {
-			setPlugins(JSON.parse(pluginsJson));
+		Core_FindAllPlugins().then((plugins: any) => {
+			setPlugins(plugins);
 		});
-		Core_FindAllThemes().then((themesJson: string) => {
-			setThemes(JSON.parse(themesJson));
+		Core_FindAllThemes().then((themes: any) => {
+			setThemes(themes);
 		});
 	}, []);
 

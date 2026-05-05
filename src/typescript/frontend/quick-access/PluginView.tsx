@@ -106,7 +106,7 @@ export const RenderPluginViews = ({ plugins, pluginName, pluginView, editableSto
 	return (
 		<PluginItem
 			disabledReason={PluginDisabledReason.NONE}
-			onClick={setFocusedItem.spread(plugin, DesktopSideBarFocusedItemType.PLUGIN)}
+			onClick={() => setFocusedItem(plugin, DesktopSideBarFocusedItemType.PLUGIN)}
 			plugin={plugin}
 			pluginView={pluginView}
 		/>
@@ -115,12 +115,12 @@ export const RenderPluginViews = ({ plugins, pluginName, pluginView, editableSto
 
 export const RenderPluginView = () => {
 	const { focusedItem } = useDesktopMenu();
-	const renderer = getPluginView(focusedItem?.data?.name)?.content;
+	const renderer = getPluginView(focusedItem?.data?.name ?? '')?.content;
 
 	if (!renderer) {
 		return (
 			<PanelSection>
-				<PanelSectionRow>{formatString(locale.pluginRendererError, focusedItem?.data?.name)}</PanelSectionRow>
+				<PanelSectionRow>{formatString(locale.pluginRendererError, focusedItem?.data?.name ?? '')}</PanelSectionRow>
 			</PanelSection>
 		);
 	}
@@ -135,10 +135,12 @@ export const RenderPluginView = () => {
 export const PluginSelectorView = () => {
 	const { plugins } = useDesktopMenu();
 	const configurablePluginRenderers = getPluginRenderers();
-	const [configurablePluginStore, setConfigurablePluginStore] = useState<Array<{ name: string; isEditable: boolean }>>();
+	const [configurablePluginStore, setConfigurablePluginStore] = useState<Array<{ name: string; isEditable: boolean }>>([]);
 
 	useEffect(() => {
-		getPluginConfigurableStatus(plugins).then(setConfigurablePluginStore);
+		if (plugins) {
+			getPluginConfigurableStatus(plugins).then(setConfigurablePluginStore);
+		}
 	}, []);
 
 	if (!plugins || !plugins?.length) {

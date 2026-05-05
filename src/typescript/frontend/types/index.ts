@@ -264,8 +264,8 @@ export interface IProgressProps {
 }
 
 export interface InstallerProps {
-	updateInstallerState: (element: React.ReactNode) => void;
-	ShowMessageBox: (message: React.ReactNode, title: React.ReactNode, props?: ConfirmModalProps) => void;
+	updateInstallerState: (element: React.ReactElement) => void;
+	ShowMessageBox: (message: React.ReactNode, title: React.ReactNode, props?: ConfirmModalProps) => void | Promise<unknown>;
 	modal: ShowModalResult;
 	refetchDataCb?: () => void;
 }

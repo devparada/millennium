@@ -29,7 +29,7 @@
  */
 
 import { useRef } from 'react';
-import { useMillenniumState, useUpdateConfig } from './config-provider';
+import { useUpdateConfig } from './config-provider';
 import { AppConfig } from './AppConfig';
 // Utility: deep merge only when keys don't exist
 function mergeIfMissing<T>(target: T, source: Partial<T>): T {
@@ -52,7 +52,6 @@ function mergeIfMissing<T>(target: T, source: Partial<T>): T {
 }
 
 export const useSetDefaultConfigOnce = () => {
-	const config = useMillenniumState();
 	const setConfig = useUpdateConfig();
 	const didSetRef = useRef(false);
 

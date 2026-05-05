@@ -1,4 +1,4 @@
-import { Millennium, pluginSelf } from '@steambrew/client';
+import { pluginSelf } from '@steambrew/client';
 import { ConditionalControlFlowType as ModuleType, Patch, ThemeItem } from '../types';
 import { DOMModifier, classListMatch, constructThemePath } from './Dispatch';
 import { EvaluateConditions } from './v2/Conditions';
@@ -25,7 +25,7 @@ const EvaluateModule = (module: string, type: ModuleType, document: Document) =>
  * @param type the type of the module
  * @returns null
  */
-const SanitizeTargetModule = (module: string | Array<string>, type: ModuleType, document: Document) => {
+const SanitizeTargetModule = (module: string | Array<string> | undefined, type: ModuleType, document: Document) => {
 	if (module === undefined) {
 		return;
 	} else if (typeof module === 'string') {
@@ -36,7 +36,7 @@ const SanitizeTargetModule = (module: string | Array<string>, type: ModuleType, 
 };
 
 const EvaluatePatches = (activeTheme: ThemeItem, documentTitle: string, classList: string[], document: Document, popup: any) => {
-	activeTheme.data.Patches.forEach((patch: Patch) => {
+	(activeTheme.data.Patches ?? []).forEach((patch: Patch) => {
 		const match = patch.MatchRegexString;
 		popup.window.HAS_INJECTED_THEME = true;
 

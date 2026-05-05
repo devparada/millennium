@@ -75,7 +75,7 @@ export const TitleView = () => {
 
 	return (
 		<Title text={libraryItemTitle}>
-			<IconButton name="KaratLeft" onClick={setFocusedItem.bind(undefined, undefined)} />
+			<IconButton name="KaratLeft" onClick={() => setFocusedItem(undefined, undefined)} />
 		</Title>
 	);
 };

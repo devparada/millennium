@@ -50,7 +50,7 @@ export type InstallerProgress = {
 
 export type UpdateContextProviderState = {
 	isUpdatingMillennium: boolean;
-	setMillenniumUpdating: React.Dispatch<React.SetStateAction<boolean>>;
+	setMillenniumUpdating: (newState: boolean) => void;
 	millenniumUpdateProgress: MillenniumUpdateProgress;
 	setMillenniumUpdateProgress: (progress: MillenniumUpdateProgress) => void;
 	updatingThemes: Record<string, boolean>;
@@ -129,7 +129,7 @@ const opSetPluginProgress = (key: string, progress: InstallerProgress | null) =>
 const _fetchAvailableUpdates = async (force: boolean = false): Promise<boolean> => {
 	try {
 		if (force || !pluginSelf.hasCheckedForUpdates) {
-			const updates = JSON.parse(await Core_GetUpdates({ force: true }));
+			const updates = await Core_GetUpdates(true);
 			pluginSelf.updates.themes = updates.themes;
 			pluginSelf.updates.plugins = updates.plugins;
 			pluginSelf.hasCheckedForUpdates = true;
@@ -214,16 +214,16 @@ export class UpdateContextProvider extends React.Component<UpdateContextProvider
 		return (
 			<UpdateContext.Provider
 				value={{
-					updatingThemes,
-					updatingPlugins,
-					themeUpdates: this.state.themeUpdates,
-					pluginUpdates: this.state.pluginUpdates,
-					isUpdatingMillennium: this.state.isUpdatingMillennium,
-					millenniumUpdateProgress: this.state.millenniumUpdateProgress,
-					themeProgress: this.state.themeProgress,
-					pluginProgress: this.state.pluginProgress,
-					hasReceivedUpdates: this.state.hasReceivedUpdates,
-					hasUpdateError: this.state.hasUpdateError,
+					updatingThemes: updatingThemes ?? {},
+					updatingPlugins: updatingPlugins ?? {},
+					themeUpdates: this.state.themeUpdates ?? null,
+					pluginUpdates: this.state.pluginUpdates ?? null,
+					isUpdatingMillennium: this.state.isUpdatingMillennium ?? false,
+					millenniumUpdateProgress: this.state.millenniumUpdateProgress ?? { statusText: '', progress: 0, isComplete: false },
+					themeProgress: this.state.themeProgress ?? {},
+					pluginProgress: this.state.pluginProgress ?? {},
+					hasReceivedUpdates: this.state.hasReceivedUpdates ?? false,
+					hasUpdateError: this.state.hasUpdateError ?? false,
 					setUpdatingTheme: opSetUpdatingTheme,
 					setUpdatingPlugin: opSetUpdatingPlugin,
 					setMillenniumUpdating: this.setMillenniumUpdating,

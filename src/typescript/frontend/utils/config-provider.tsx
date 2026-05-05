@@ -49,10 +49,10 @@ const OnBackendConfigUpdate = (config: string) => {
 };
 
 /** Expose the function to allow it to be callable from the backend */
-Millennium.exposeObj({ OnBackendConfigUpdate });
+Millennium.exposeObj?.({ OnBackendConfigUpdate });
 
-const GetBackendConfig = async (): Promise<AppConfig> => JSON.parse(await Core_GetBackendConfig()) as AppConfig;
-const SetBackendConfig = async (config: AppConfig): Promise<void> => config && (await Core_SetBackendConfig({ config: JSON.stringify(config), skip_propagation: true }));
+const GetBackendConfig = async (): Promise<AppConfig> => (await Core_GetBackendConfig()) as AppConfig;
+const SetBackendConfig = async (config: AppConfig): Promise<void> => config && (await Core_SetBackendConfig(JSON.stringify(config), true));
 
 export const ConfigProvider = ({ children }: { children: React.ReactNode }) => {
 	const [config, setConfig] = useState<AppConfig>(settingsManager.getConfig());

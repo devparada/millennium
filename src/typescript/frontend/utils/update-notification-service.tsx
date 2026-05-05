@@ -29,7 +29,6 @@
  */
 
 import { IconsModule, pluginSelf, sleep, toaster, Navigation } from '@steambrew/client';
-import { Logger } from './Logger';
 import { settingsManager } from './settings-manager';
 import { OnMillenniumUpdate } from '../types';
 import { MillenniumIcons } from '../components/Icons';

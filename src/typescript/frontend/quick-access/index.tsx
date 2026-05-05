@@ -28,7 +28,7 @@
  * SOFTWARE.
  */
 
-import { ErrorBoundary, getParentWindow, IconsModule } from '@steambrew/client';
+import { ErrorBoundary, getParentWindow } from '@steambrew/client';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { TitleView } from '../components/QuickAccessTitle';
 import { PluginSelectorView, RenderPluginView } from './PluginView';
@@ -42,7 +42,7 @@ import { MillenniumIcons } from '../components/Icons';
 import { locale } from '../utils/localization-manager';
 
 export const MillenniumDesktopSidebar: React.FC = () => {
-	const { isOpen, focusedItem, focusedItemType, closeMenu, openMenu, toggleMenu, setFocusedItem, plugins, themes } = useDesktopMenu();
+	const { isOpen, focusedItem, focusedItemType, closeMenu, openMenu, toggleMenu, setFocusedItem } = useDesktopMenu();
 
 	const [openAnimStart, setOpenAnimStartState] = useState(false);
 	const [closed, setClosed] = useState(true);
@@ -91,7 +91,9 @@ export const MillenniumDesktopSidebar: React.FC = () => {
 
 		closedInterval.current = setTimeout(() => {
 			setClosed(true);
-			browserManagerHook.current.setBrowserVisible(hostWindow, true);
+			if (hostWindow) {
+				browserManagerHook.current.setBrowserVisible(hostWindow, true);
+			}
 			closedInterval.current = null;
 			setFocusedItem(undefined, undefined);
 		}, 300);
@@ -109,7 +111,9 @@ export const MillenniumDesktopSidebar: React.FC = () => {
 		}
 
 		try {
-			await browserManagerHook.current.setBrowserVisible(hostWindow, false);
+			if (hostWindow) {
+				await browserManagerHook.current.setBrowserVisible(hostWindow, false);
+			}
 		} catch (error) {
 			console.error('Error setting browser visibility:', error);
 		}
@@ -173,8 +177,8 @@ export const MillenniumDesktopSidebar: React.FC = () => {
 	function RenderByType() {
 		const { plugins, themes } = useDesktopMenu();
 
-		const hasConfigurableThemes = themes?.filter?.((theme) => theme?.data?.Conditions || theme?.data?.RootColors)?.length > 0;
-		const hasConfigurablePlugins = plugins?.length > 0;
+		const hasConfigurableThemes = (themes?.filter?.((theme) => theme?.data?.Conditions || theme?.data?.RootColors)?.length ?? 0) > 0;
+		const hasConfigurablePlugins = (plugins?.length ?? 0) > 0;
 
 		if (!hasConfigurableThemes && !hasConfigurablePlugins) {
 			return <Placeholder icon={<MillenniumIcons.Empty />} header={locale.quickAccessEmptyLibrary} body={locale.quickAccessEmptyLibraryBody} />;
@@ -204,7 +208,7 @@ export const MillenniumDesktopSidebar: React.FC = () => {
 			<Styles />
 			<MillenniumDesktopSidebarStyles isDesktopMenuOpen={isOpen || !closed} openAnimStart={openAnimStart} isViewingPlugin={!!focusedItem} />
 			<div className="MillenniumDesktopSidebar_Overlay" onClick={handleSidebarDimClick} />
-			<div className="MillenniumDesktopSidebar" ref={ref} data-focused-item-type={DesktopSideBarFocusedItemType[focusedItemType]}>
+			<div className="MillenniumDesktopSidebar" ref={ref} data-focused-item-type={focusedItemType !== undefined ? DesktopSideBarFocusedItemType[focusedItemType] : undefined}>
 				<TitleView />
 				<div className="MillenniumDesktopSidebar_Content">
 					<RenderByType />

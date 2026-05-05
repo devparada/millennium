@@ -65,7 +65,7 @@ async function initializeMillennium(settings: SettingsProps) {
 
 	if (theme?.data?.hasOwnProperty('RootColors')) {
 		try {
-			const rootColors = JSON.parse(await Core_GetRootColors());
+			const rootColors = await Core_GetRootColors();
 			pluginSelf.RootColors = rootColors;
 		} catch (error) {
 			Logger.Error('Failed to load root colors from backend', error);
@@ -108,12 +108,12 @@ async function initializeMillennium(settings: SettingsProps) {
 
 	const checkLegacyPlugins = async () => {
 		try {
-			const plugins: PluginComponent[] = JSON.parse(await Core_FindAllPlugins());
+			const plugins: PluginComponent[] = await Core_FindAllPlugins();
 			const legacy = plugins.filter((p) => p.enabled && p.data.name !== 'core' && p.data.useBackend !== false && p.data.backendType !== 'lua');
 
 			if (legacy.length) {
 				const disablePayload = legacy.map((p) => ({ plugin_name: p.data.name, enabled: false }));
-				await Core_ChangePluginStatus({ pluginJson: JSON.stringify(disablePayload) });
+				await Core_ChangePluginStatus(JSON.stringify(disablePayload));
 			}
 
 			const superseded = plugins.filter((p) => SUPERSEDED_PLUGIN_NAMES.includes(p.data.name));
@@ -158,11 +158,11 @@ async function initializeMillennium(settings: SettingsProps) {
 // Entry point on the front end of your plugin
 export default async function PluginMain() {
 	try {
-		await initializeMillennium(JSON.parse(await Core_GetStartConfig()));
+		await initializeMillennium(await Core_GetStartConfig());
 	} catch (error) {
 		Logger.Error('Millennium frontend initialization failed, continuing with route registration.', error);
 	}
-	Millennium.AddWindowCreateHook(onWindowCreatedCallback);
+	Millennium.AddWindowCreateHook?.(onWindowCreatedCallback);
 
 	routerHook.addRoute('/millennium/settings', () => <MillenniumSettings />, { exact: false });
 

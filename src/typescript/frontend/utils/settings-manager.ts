@@ -32,13 +32,13 @@ import { Core_GetBackendConfig, Core_SetBackendConfig } from './ffi';
 import { AppConfig } from './AppConfig';
 
 class SettingsManager {
-	private settings: AppConfig;
+	private settings!: AppConfig;
 	private updateFn: ((recipe: (draft: AppConfig) => void) => void) | null = null;
 	private pendingUpdates: ((draft: AppConfig) => void)[] = [];
 
 	constructor() {
 		Core_GetBackendConfig().then((cfg) => {
-			this.settings = JSON.parse(cfg) as AppConfig;
+			this.settings = cfg as AppConfig;
 		});
 	}
 
@@ -78,7 +78,7 @@ class SettingsManager {
 	 * In the case no provider is available, the config will not be saved; so this function is used to force the config to be saved.
 	 */
 	public forceSaveConfig() {
-		Core_SetBackendConfig({ config: JSON.stringify(this.settings), skip_propagation: true });
+		Core_SetBackendConfig(JSON.stringify(this.settings), true);
 	}
 }
 

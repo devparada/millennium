@@ -29,7 +29,7 @@
  */
 
 import { DialogButton, DialogControlsSection, joinClassNames, pluginSelf } from '@steambrew/client';
-import { ThemeItem } from '../../types';
+import { Theme, ThemeItem } from '../../types';
 import { locale } from '../../utils/localization-manager';
 import { Placeholder } from '../../components/Placeholder';
 import { Core_FindAllThemes } from '../../utils/ffi';
@@ -41,7 +41,7 @@ import { FaFolderOpen, FaPaintRoller, FaStore } from 'react-icons/fa';
 import { Utils } from '../../utils';
 
 const findAllThemes = async (): Promise<ThemeItem[]> => {
-	return JSON.parse(await Core_FindAllThemes());
+	return await Core_FindAllThemes();
 };
 
 interface ThemeViewModalState {
@@ -69,7 +69,7 @@ export class ThemeViewModal extends Component<{}, ThemeViewModalState> {
 
 	UseDefaultTheme = () => {
 		/** Default theme object */
-		this.ChangeActiveTheme({ native: 'default', data: null, failed: false });
+		this.ChangeActiveTheme({ native: 'default', data: {} as Theme, failed: false });
 	};
 
 	ChangeActiveTheme = (item: ThemeItem) => {
@@ -98,10 +98,9 @@ export class ThemeViewModal extends Component<{}, ThemeViewModalState> {
 		);
 	};
 
-	FetchAllPlugins = () => {
-		findAllThemes().then((themes) => {
-			this.setState({ themes });
-		});
+	FetchAllPlugins = async (): Promise<void> => {
+		const themes = await findAllThemes();
+		this.setState({ themes });
 	};
 
 	OpenThemesFolder = () => {

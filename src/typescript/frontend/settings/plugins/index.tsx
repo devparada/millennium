@@ -29,7 +29,7 @@
  */
 
 import { Component } from 'react';
-import { ConfirmModal, DialogButton, DialogControlsSection, IconsModule, joinClassNames, pluginSelf, showModal } from '@steambrew/client';
+import { ConfirmModal, DialogButton, DialogControlsSection, joinClassNames, pluginSelf, showModal } from '@steambrew/client';
 import { PluginComponent } from '../../types';
 import { locale } from '../../utils/localization-manager';
 import { settingsClasses } from '../../utils/classes';
@@ -64,7 +64,7 @@ interface UpdatedPluginProps {
 }
 
 interface PluginViewModalState {
-	plugins: PluginComponent[];
+	plugins: PluginComponent[] | undefined;
 	checkedItems: { [key: number]: boolean };
 	pluginsWithLogs?: Map<string, PluginStatusProps>;
 	updatedPlugins: UpdatedPluginProps[];
@@ -99,7 +99,7 @@ class PluginViewModal extends Component<{}, PluginViewModalState> {
 	}
 
 	async FetchAllPlugins() {
-		const plugins: PluginComponent[] = JSON.parse(await Core_FindAllPlugins());
+		const plugins: PluginComponent[] = await Core_FindAllPlugins();
 		const checkedItems = this.getEnabledPlugins(plugins);
 		const pluginNames = plugins.map((p) => p.data.common_name);
 		const pluginsWithLogs = new Map<string, PluginStatusProps>();
@@ -120,7 +120,8 @@ class PluginViewModal extends Component<{}, PluginViewModalState> {
 	}
 
 	handleCheckboxChange(index: number) {
-		const plugin = this.state.plugins[index];
+		const plugin = this.state.plugins?.[index];
+		if (!plugin) return;
 
 		if (isLegacyPlugin(plugin)) return;
 
@@ -136,7 +137,7 @@ class PluginViewModal extends Component<{}, PluginViewModalState> {
 
 	SavePluginChanges() {
 		const onOK = () => {
-			Core_ChangePluginStatus({ pluginJson: JSON.stringify(this.state.updatedPlugins) });
+			Core_ChangePluginStatus(JSON.stringify(this.state.updatedPlugins));
 		};
 
 		showModal(
@@ -147,7 +148,7 @@ class PluginViewModal extends Component<{}, PluginViewModalState> {
 	}
 
 	async OpenPluginsFolder() {
-		const path = JSON.parse(await Core_GetEnvironmentVar({ variable: 'MILLENNIUM__PLUGINS_PATH' }));
+		const path = await Core_GetEnvironmentVar('MILLENNIUM__PLUGINS_PATH');
 		Utils.BrowseLocalFolder(path);
 	}
 
@@ -156,20 +157,20 @@ class PluginViewModal extends Component<{}, PluginViewModalState> {
 	}
 
 	renderPluginComponent({ plugin, index }: { plugin: PluginComponent; index: number }) {
-		const logState = this.state.pluginsWithLogs?.get(plugin.data.common_name);
+		const logState = this.state.pluginsWithLogs?.get(plugin.data.common_name ?? '');
 
 		return (
 			<RenderPluginComponent
 				plugin={plugin}
 				index={index}
-				isLastPlugin={index === this.state.plugins.length - 1}
+				isLastPlugin={index === (this.state.plugins?.length ?? 0) - 1}
 				isEnabled={this.state.checkedItems[index]}
-				hasErrors={logState?.errors > 0}
-				hasWarnings={logState?.warnings > 0}
+				hasErrors={(logState?.errors ?? 0) > 0}
+				hasWarnings={(logState?.warnings ?? 0) > 0}
 				onSelectionChange={(index: number) => this.handleCheckboxChange(index)}
 				refetchPlugins={this.FetchAllPlugins.bind(this)}
-				allPlugins={this.state.plugins}
-				isPluginConfigurable={this.state.configurablePluginStore?.find((p) => p.name === plugin.data.name).isEditable}
+				allPlugins={this.state.plugins ?? []}
+				isPluginConfigurable={this.state.configurablePluginStore?.find((p) => p.name === plugin.data.name)?.isEditable ?? false}
 				isLegacy={isLegacyPlugin(plugin)}
 			/>
 		);

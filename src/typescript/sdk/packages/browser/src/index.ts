@@ -31,8 +31,12 @@ type Millennium = {
 	exposeObj?: <T extends object>(obj: T) => any;
 };
 
+type Json = string | number | boolean | null | Json[] | { [key: string]: Json };
+
 // callable function definition
 declare const callable: <Args extends any[] = [], T = IPC_types>(route: string) => (...args: Args) => Promise<T>;
+
+declare const ffi: <Args extends Json[] = [], T extends Json | void = Json>(route: string) => (...args: Args) => Promise<T>;
 
 declare global {
 	interface Window {
@@ -43,4 +47,4 @@ declare global {
 declare const BindPluginSettings: () => any;
 
 const Millennium: Millennium = window.Millennium;
-export { BindPluginSettings, callable, constSysfsExpr, Millennium };
+export { BindPluginSettings, callable, ffi, constSysfsExpr, Millennium };

@@ -3,7 +3,7 @@ import { EditorView, basicSetup } from 'codemirror';
 import { css } from '@codemirror/lang-css';
 import { vscodeDark } from '@uiw/codemirror-theme-vscode';
 import {
-	callable,
+	ffi,
 	DialogButton,
 	DialogControlsSection,
 	DialogHeader,
@@ -45,20 +45,16 @@ function UpdateStylesLive(cssContent: string) {
 
 export async function LoadStylesFromDisk(): Promise<string> {
 	try {
-		return JSON.parse(await callable<[], string>('Core_LoadQuickCss')());
-	} catch (error) {
-		try {
-			return await callable<[], string>('Core_LoadQuickCss')();
-		} catch {
-			console.warn('Failed to load styles from disk!');
-		}
+		return await ffi<[], string>('Core_LoadQuickCss')();
+	} catch {
+		console.warn('Failed to load styles from disk!');
 	}
 
 	return String();
 }
 
 export function SaveStylesToDisk(cssContent: string) {
-	callable<[{ css: string }]>('Core_SaveQuickCss')({ css: cssContent });
+	ffi<[string]>('Core_SaveQuickCss')(cssContent);
 	pluginSelf.quickCss = cssContent;
 	UpdateStylesLive(cssContent);
 }
@@ -71,7 +67,7 @@ async function OnQuickCssFileChanged() {
 	UpdateStylesLive(cssContent);
 }
 
-Millennium.exposeObj({ OnQuickCssFileChanged });
+Millennium.exposeObj?.({ OnQuickCssFileChanged });
 
 export const MillenniumQuickCssEditor = () => {
 	const g_ModalManagerInstance = g_ModalManager();

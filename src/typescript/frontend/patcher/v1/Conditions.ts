@@ -75,18 +75,18 @@ const InsertModule = (target: EvaluateTargetProps, document: Document) => {
 const EvaluateComboBox = (statement: V1StatementCombo, currentValue: any, document: Document) => {
 	statement.Combo.forEach((comboItem) => {
 		if (comboItem.Equals === currentValue) {
-			InsertModule(comboItem?.True, document);
+			comboItem?.True && InsertModule(comboItem.True, document);
 		} else {
-			InsertModule(comboItem?.False, document);
+			comboItem?.False && InsertModule(comboItem.False, document);
 		}
 	});
 };
 
 const EvaluateCheckBox = (statement: V1Statement, currentValue: any, document: Document) => {
 	if (statement.Equals === currentValue) {
-		InsertModule(statement?.True, document);
+		statement?.True && InsertModule(statement.True, document);
 	} else {
-		InsertModule(statement?.False, document);
+		statement?.False && InsertModule(statement.False, document);
 	}
 };
 
@@ -97,6 +97,7 @@ const EvaluateType = (statement: V1StatementCombo) => {
 const EvaluateStatement = (statement: V1Statement | V1StatementCombo, document: Document) => {
 	const statementId = statement.If;
 	const statementStore = GetFromConfigurationStore(statementId);
+	if (!statementStore) return;
 	const storedStatementValue = statementStore.Value;
 	const statementType = EvaluateType(statement as V1StatementCombo);
 

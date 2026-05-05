@@ -3,7 +3,7 @@ import { Conditions, ConditionsStore, ThemeItem, ConditionalControlFlowType as M
 import { DOMModifier, EvaluatePatch } from '../Dispatch';
 
 export function EvaluateConditions(theme: ThemeItem, title: string, classes: string[], document: Document): void {
-	const themeConditions: Conditions = theme.data.Conditions;
+	const themeConditions: Conditions = theme.data.Conditions ?? {};
 	const savedConditions: ConditionsStore = pluginSelf.conditionals[theme.native];
 
 	for (const condition in themeConditions) {

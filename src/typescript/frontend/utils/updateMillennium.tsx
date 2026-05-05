@@ -18,5 +18,5 @@ export async function updateMillennium(background: boolean) {
 		return;
 	}
 
-	Core_UpdateMillennium({ downloadUrl, downloadSize, background });
+	Core_UpdateMillennium(downloadUrl, downloadSize, background);
 }

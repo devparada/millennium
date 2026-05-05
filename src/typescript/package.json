@@ -6,5 +6,9 @@
 		"sdk/packages/cdp-isolated-ctx",
 		"sdk/packages/loader",
 		"frontend"
-	]
+	],
+	"overrides": {
+		"@codemirror/view": "6.41.0",
+		"@codemirror/state": "6.6.0"
+	}
 }

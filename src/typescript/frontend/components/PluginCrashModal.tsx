@@ -57,14 +57,14 @@ const openModals = new Set<string>();
 const CrashModal = ({ detail, closeModal, onResolve }: { detail: PluginCrashInfo; closeModal: () => void; onResolve: () => void }): React.ReactElement => {
 	const pluginLabel = detail.displayName || detail.plugin;
 	const disablePlugin = async () => {
-		await Core_ChangePluginStatus({ pluginJson: JSON.stringify([{ plugin_name: detail.plugin, enabled: false }]) });
+		await Core_ChangePluginStatus(JSON.stringify([{ plugin_name: detail.plugin, enabled: false }]));
 		onResolve();
 		closeModal();
 	};
 
 	const restartPlugin = async () => {
-		await Core_ChangePluginStatus({ pluginJson: JSON.stringify([{ plugin_name: detail.plugin, enabled: false }]) });
-		await Core_ChangePluginStatus({ pluginJson: JSON.stringify([{ plugin_name: detail.plugin, enabled: true }]) });
+		await Core_ChangePluginStatus(JSON.stringify([{ plugin_name: detail.plugin, enabled: false }]));
+		await Core_ChangePluginStatus(JSON.stringify([{ plugin_name: detail.plugin, enabled: true }]));
 		onResolve();
 		closeModal();
 	};
@@ -72,12 +72,12 @@ const CrashModal = ({ detail, closeModal, onResolve }: { detail: PluginCrashInfo
 	const openCrashFolder = () => {
 		const target = detail.crashDumpDir || `${pluginSelf?.steamPath ?? ''}/millennium/crashes`;
 		if (target) {
-			(window as any).SteamClient.System.OpenLocalDirectoryInSystemExplorer(target);
+			SteamClient.System.OpenLocalDirectoryInSystemExplorer(target);
 		}
 	};
 
 	const viewLogs = () => {
-		setLogViewerAutoSelect(detail.plugin, detail.displayName);
+		setLogViewerAutoSelect(detail.plugin, detail.displayName ?? '');
 		closeModal();
 		Navigation.Navigate('/millennium/settings/logs');
 	};
@@ -139,7 +139,7 @@ function openCrashModal(detail: PluginCrashInfo, onAfterResolve?: () => void) {
 	let modalWindow: ReturnType<typeof showModal>;
 	const onResolve = () => {
 		openModals.delete(detail.plugin);
-		Core_AcknowledgeCrash({ plugin: detail.plugin });
+		Core_AcknowledgeCrash(detail.plugin);
 		onAfterResolve?.();
 	};
 	const onClose = () => {
@@ -158,4 +158,3 @@ export function showPluginCrashModal(detail: PluginCrashInfo, onAfterResolve?: (
 	if (openModals.has(detail.plugin)) return;
 	openCrashModal(detail, onAfterResolve);
 }
-

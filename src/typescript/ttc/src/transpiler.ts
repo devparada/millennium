@@ -238,6 +238,7 @@ const FRONTEND_TRANSFORMS: Transform[] = [
 	{ type: 'rename', match: ['client', 'pluginSelf'], replacement: 'window.PLUGIN_LIST[pluginName]' },
 	/* inject plugin name */
 	{ type: 'inject_arg', match: ['client', 'callable'], arg: 'pluginName' },
+	{ type: 'inject_arg', match: ['client', 'ffi'], arg: 'pluginName' },
 	{ type: 'inject_arg', match: ['client', 'Millennium', 'callServerMethod'], arg: 'pluginName' },
 	{ type: 'inject_arg', match: ['client', 'Millennium', 'exposeObj'], arg: 'exports' },
 	...PLUGIN_NAME_INJECTIONS,

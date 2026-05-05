@@ -144,7 +144,7 @@ export class BrowserManagerHook {
 		const interval = setInterval(() => {
 			const browser = MainWindowBrowserManager?.m_browser;
 
-			if (browser?.SetBounds !== this.setBrowserBoundsPatched.patchedFunction || browser?.SetVisible !== this.setBrowserVisiblePatched.patchedFunction) {
+			if (browser?.SetBounds !== this.setBrowserBoundsPatched?.patchedFunction || browser?.SetVisible !== this.setBrowserVisiblePatched?.patchedFunction) {
 				this.hook(true);
 			}
 		}, 100);

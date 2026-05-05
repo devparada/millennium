@@ -24,7 +24,7 @@ const SupersededPluginModal = ({
 
 		for (const plugin of plugins) {
 			try {
-				await Core_UninstallPlugin({ pluginName: plugin.data.name });
+				await Core_UninstallPlugin(plugin.data.name);
 			} catch (e) {
 				Logger.Error(`Failed to uninstall superseded plugin ${plugin.data.name}`, e);
 			}

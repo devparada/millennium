@@ -76,7 +76,7 @@ const RenderAccentColorPicker = () => {
 
 		debounceTimer.current = setTimeout(async () => {
 			setAccentColor(sanitizedColor);
-			UpdateAllWindows(JSON.parse(await Core_ChangeAccentColor({ new_color: sanitizedColor })));
+			UpdateAllWindows(await Core_ChangeAccentColor(sanitizedColor));
 		}, 300);
 	}
 
