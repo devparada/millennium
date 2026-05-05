@@ -47,6 +47,7 @@ import japanese from '../../locales/japanese.json';
 import hungarian from '../../locales/hungarian.json';
 import koreana from '../../locales/koreana.json';
 import latam from '../../locales/latam.json';
+import dutch from '../../locales/dutch.json';
 import { Logger } from './Logger';
 
 interface LocalizationData {
@@ -89,7 +90,8 @@ const localizationFiles: { [key: string]: LocalizationData } = {
 	japanese,
 	hungarian,
 	koreana,
-	latam
+	latam,
+	dutch
 	// Add other languages here
 };
 
