@@ -13,7 +13,7 @@
 }:
 stdenv.mkDerivation {
   pname = "millennium";
-  version = "2.34.0";
+  version = "2.36.0";
 
   phases = [
     "installPhase"
